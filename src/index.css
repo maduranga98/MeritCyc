@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+  /* MeritCyc Brand Colors */
+  --color-merit-navy: #0F172A;
+  --color-merit-emerald: #10B981;
+  --color-merit-slate: #64748B;
+  --color-merit-bg: #F8FAFC;
+
+  /* MeritCyc Brand Fonts */
+  --font-brand: "Inter", ui-sans-serif, system-ui;
+}

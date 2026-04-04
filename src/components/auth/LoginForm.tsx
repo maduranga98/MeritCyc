@@ -1,13 +1,43 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth, type Role } from "../../context/AuthContext";
 
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Logging in with:", { email, password });
-    // මෙතනට Firebase Sign-in logic එක පසුව එකතු කරමු
+
+    // Mock authentication logic based on email
+    let role: Role = null;
+    let redirectPath = "";
+
+    if (email.startsWith("superadmin")) {
+      role = "Super Admin";
+      redirectPath = "/dashboard/super-admin";
+    } else if (email.startsWith("admin")) {
+      role = "Admin";
+      redirectPath = "/dashboard/admin";
+    } else if (email.startsWith("hr")) {
+      role = "HR Admin";
+      redirectPath = "/dashboard/hr-admin";
+    } else if (email.startsWith("manager")) {
+      role = "Manager";
+      redirectPath = "/dashboard/manager";
+    } else if (email.startsWith("employee")) {
+      role = "Employee";
+      redirectPath = "/dashboard/employee";
+    }
+
+    if (role) {
+      login(email, role);
+      navigate(redirectPath);
+    } else {
+      alert("Invalid email. Please use a role-based prefix like superadmin@, admin@, hr@, manager@, or employee@");
+    }
   };
 
   return (

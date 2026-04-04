@@ -1,42 +1,50 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth, type Role } from "../../context/AuthContext";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../../config/firebase";
+import { useAuth } from "../../context/AuthContext";
 
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { user } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Mock authentication logic based on email
-    let role: Role = null;
-    let redirectPath = "";
-
-    if (email.startsWith("superadmin")) {
-      role = "Super Admin";
-      redirectPath = "/dashboard/super-admin";
-    } else if (email.startsWith("admin")) {
-      role = "Admin";
-      redirectPath = "/dashboard/admin";
-    } else if (email.startsWith("hr")) {
-      role = "HR Admin";
-      redirectPath = "/dashboard/hr-admin";
-    } else if (email.startsWith("manager")) {
-      role = "Manager";
-      redirectPath = "/dashboard/manager";
-    } else if (email.startsWith("employee")) {
-      role = "Employee";
-      redirectPath = "/dashboard/employee";
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      switch (user.role) {
+        case 'Super Admin': navigate('/dashboard/super-admin'); break;
+        case 'Admin': navigate('/dashboard/admin'); break;
+        case 'HR Admin': navigate('/dashboard/hr-admin'); break;
+        case 'Manager': navigate('/dashboard/manager'); break;
+        case 'Employee': navigate('/dashboard/employee'); break;
+        default: break; // Handle generic case if needed
+      }
     }
+  }, [user, navigate]);
 
-    if (role) {
-      login(email, role);
-      navigate(redirectPath);
-    } else {
-      alert("Invalid email. Please use a role-based prefix like superadmin@, admin@, hr@, manager@, or employee@");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // Navigation is handled by the useEffect watching the `user` state
+    } catch (err: unknown) {
+      console.error("Login Error:", err);
+      // Basic type checking for FirebaseError
+      if (err instanceof Error && 'code' in err && err.code === 'auth/invalid-credential') {
+        setError("Invalid email or password.");
+      } else {
+        setError("Failed to log in. Please try again later.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -48,6 +56,12 @@ export const LoginForm: React.FC = () => {
       <p className="text-merit-slate mb-8 text-sm">
         Please enter your details to sign in.
       </p>
+
+      {error && (
+        <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-4 text-sm font-medium border border-red-100">
+          {error}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
@@ -74,8 +88,11 @@ export const LoginForm: React.FC = () => {
             placeholder="••••••••"
           />
         </div>
-        <button className="w-full bg-merit-navy text-white font-bold py-4 rounded-xl hover:shadow-lg hover:shadow-merit-navy/20 transition-all active:scale-[0.98]">
-          Sign In
+        <button
+          disabled={isLoading}
+          className="w-full bg-merit-navy text-white font-bold py-4 rounded-xl hover:shadow-lg hover:shadow-merit-navy/20 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
+        >
+          {isLoading ? "Signing In..." : "Sign In"}
         </button>
       </form>
     </div>

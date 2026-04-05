@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { companyService } from '../../services/companyService';
-import { type Company } from '../../types/company';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { companyService } from "../../services/companyService";
+import { type Company } from "../../types/company";
 
 const SuperAdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -9,8 +9,8 @@ const SuperAdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [newCompanyName, setNewCompanyName] = useState('');
-  const [newCompanyEmail, setNewCompanyEmail] = useState('');
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompanyEmail, setNewCompanyEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchCompanies = async () => {
@@ -20,8 +20,8 @@ const SuperAdminDashboard: React.FC = () => {
       setCompanies(data);
       setError(null);
     } catch (err) {
-      console.error('Error fetching companies:', err);
-      setError('Failed to fetch companies.');
+      console.error("Error fetching companies:", err);
+      setError("Failed to fetch companies.");
     } finally {
       setLoading(false);
     }
@@ -37,90 +37,58 @@ const SuperAdminDashboard: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      await companyService.addCompany({ name: newCompanyName, email: newCompanyEmail });
-      setNewCompanyName('');
-      setNewCompanyEmail('');
+      await companyService.addCompany({
+        name: newCompanyName,
+        email: newCompanyEmail,
+      });
+      setNewCompanyName("");
+      setNewCompanyEmail("");
       await fetchCompanies();
     } catch (err) {
-      console.error('Error registering company:', err);
-      setError('Failed to register company.');
+      console.error("Error registering company:", err);
+      setError("Failed to register company.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = async (id: string, currentStatus: 'active' | 'inactive') => {
+  const handleToggleStatus = async (
+    id: string,
+    currentStatus: "active" | "inactive",
+  ) => {
     try {
       await companyService.toggleCompanyStatus(id, currentStatus);
       await fetchCompanies();
     } catch (err) {
-      console.error('Error toggling status:', err);
-      setError('Failed to update company status.');
+      console.error("Error toggling status:", err);
+      setError("Failed to update company status.");
     }
   };
 
   const handleDeleteCompany = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this company?')) return;
+    if (!window.confirm("Are you sure you want to delete this company?"))
+      return;
     try {
       await companyService.deleteCompany(id);
       await fetchCompanies();
     } catch (err) {
-      console.error('Error deleting company:', err);
-      setError('Failed to delete company.');
-    }
-  };
-
-  const [companyName, setCompanyName] = useState('');
-  const [adminName, setAdminName] = useState('');
-  const [adminEmail, setAdminEmail] = useState('');
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successData, setSuccessData] = useState<{ email: string; password: string } | null>(null);
-
-  const handleRegisterCompany = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccessData(null);
-    setIsLoading(true);
-
-    try {
-      const generatedPassword = generatePassword();
-      const createAdminUser = httpsCallable(functions, 'createAdminUser');
-
-      await createAdminUser({
-        email: adminEmail,
-        password: generatedPassword,
-        name: adminName,
-        companyName: companyName,
-      });
-
-      setSuccessData({
-        email: adminEmail,
-        password: generatedPassword,
-      });
-
-      // Clear form
-      setCompanyName('');
-      setAdminName('');
-      setAdminEmail('');
-    } catch (err: unknown) {
-      console.error("Error creating company admin:", err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An error occurred while creating the company admin.");
-      }
-    } finally {
-      setIsLoading(false);
+      console.error("Error deleting company:", err);
+      setError("Failed to delete company.");
     }
   };
 
   return (
     <div className="p-8 font-brand max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-8 pb-4 border-b">
-        <h1 className="text-3xl font-bold text-merit-navy">Super Admin Dashboard</h1>
-        <button onClick={logout} className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-medium hover:bg-red-100 transition">Logout</button>
+        <h1 className="text-3xl font-bold text-merit-navy">
+          Super Admin Dashboard
+        </h1>
+        <button
+          onClick={logout}
+          className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-medium hover:bg-red-100 transition"
+        >
+          Logout
+        </button>
       </div>
       <p>Welcome, {user?.name}!</p>
 
@@ -135,7 +103,9 @@ const SuperAdminDashboard: React.FC = () => {
         <form onSubmit={handleRegisterCompany} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Company Name
+              </label>
               <input
                 type="text"
                 value={newCompanyName}
@@ -146,7 +116,9 @@ const SuperAdminDashboard: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Admin Email
+              </label>
               <input
                 type="email"
                 value={newCompanyEmail}
@@ -162,7 +134,7 @@ const SuperAdminDashboard: React.FC = () => {
             disabled={isSubmitting}
             className="bg-merit-navy text-white px-6 py-2 rounded hover:bg-merit-navy/90 disabled:opacity-70 transition-colors"
           >
-            {isSubmitting ? 'Registering...' : 'Register Company'}
+            {isSubmitting ? "Registering..." : "Register Company"}
           </button>
         </form>
       </div>
@@ -178,20 +150,36 @@ const SuperAdminDashboard: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Admin Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Registered
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {companies.map((company) => (
                   <tr key={company.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{company.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{company.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {company.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {company.email}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${company.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${company.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                      >
                         {company.status}
                       </span>
                     </td>
@@ -200,10 +188,14 @@ const SuperAdminDashboard: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                       <button
-                        onClick={() => handleToggleStatus(company.id, company.status)}
-                        className={`text-white px-3 py-1 rounded text-xs ${company.status === 'active' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-500 hover:bg-green-600'}`}
+                        onClick={() =>
+                          handleToggleStatus(company.id, company.status)
+                        }
+                        className={`text-white px-3 py-1 rounded text-xs ${company.status === "active" ? "bg-orange-500 hover:bg-orange-600" : "bg-green-500 hover:bg-green-600"}`}
                       >
-                        {company.status === 'active' ? 'Deactivate' : 'Activate'}
+                        {company.status === "active"
+                          ? "Deactivate"
+                          : "Activate"}
                       </button>
                       <button
                         onClick={() => handleDeleteCompany(company.id)}

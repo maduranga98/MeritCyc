@@ -48,9 +48,11 @@ exports.createAdminUser = onCall(async (request) => {
     // 3. Save company details with address and mobile number
     await admin.firestore().collection('companies').add({
       name: companyName,
+      email: email, // Save the admin email as the primary contact email for the list
       address: address,
       mobileNumber: mobileNumber,
       adminUid: userRecord.uid,
+      status: 'active', // Add a default status for the listing UI
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
 

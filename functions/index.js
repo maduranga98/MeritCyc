@@ -22,9 +22,9 @@ exports.createAdminUser = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
   }
 
-  const { email, password, name, companyName } = request.data;
+  const { email, password, name, companyName, address, mobileNumber } = request.data;
 
-  if (!email || !password || !name || !companyName) {
+  if (!email || !password || !name || !companyName || !address || !mobileNumber) {
     throw new HttpsError('invalid-argument', 'Missing required fields.');
   }
 
@@ -45,9 +45,11 @@ exports.createAdminUser = onCall(async (request) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    // 3. Optional: Save company details
+    // 3. Save company details with address and mobile number
     await admin.firestore().collection('companies').add({
       name: companyName,
+      address: address,
+      mobileNumber: mobileNumber,
       adminUid: userRecord.uid,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });

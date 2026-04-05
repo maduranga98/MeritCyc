@@ -70,11 +70,57 @@ const SuperAdminDashboard: React.FC = () => {
     }
   };
 
+  const [companyName, setCompanyName] = useState('');
+  const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successData, setSuccessData] = useState<{ email: string; password: string } | null>(null);
+
+  const handleRegisterCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessData(null);
+    setIsLoading(true);
+
+    try {
+      const generatedPassword = generatePassword();
+      const createAdminUser = httpsCallable(functions, 'createAdminUser');
+
+      await createAdminUser({
+        email: adminEmail,
+        password: generatedPassword,
+        name: adminName,
+        companyName: companyName,
+      });
+
+      setSuccessData({
+        email: adminEmail,
+        password: generatedPassword,
+      });
+
+      // Clear form
+      setCompanyName('');
+      setAdminName('');
+      setAdminEmail('');
+    } catch (err: unknown) {
+      console.error("Error creating company admin:", err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An error occurred while creating the company admin.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="p-8 font-brand">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-8 font-brand max-w-4xl mx-auto">
+      <div className="flex justify-between items-center mb-8 pb-4 border-b">
         <h1 className="text-3xl font-bold text-merit-navy">Super Admin Dashboard</h1>
-        <button onClick={logout} className="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+        <button onClick={logout} className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-medium hover:bg-red-100 transition">Logout</button>
       </div>
       <p>Welcome, {user?.name}!</p>
 

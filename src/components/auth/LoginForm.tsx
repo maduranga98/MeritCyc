@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../config/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { getDashboardPath } from "../../types/roles";
 
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -16,14 +17,7 @@ export const LoginForm: React.FC = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      switch (user.role) {
-        case 'Super Admin': navigate('/dashboard/super-admin'); break;
-        case 'Admin': navigate('/dashboard/admin'); break;
-        case 'HR Admin': navigate('/dashboard/hr-admin'); break;
-        case 'Manager': navigate('/dashboard/manager'); break;
-        case 'Employee': navigate('/dashboard/employee'); break;
-        default: break; // Handle generic case if needed
-      }
+      navigate(getDashboardPath(user.role));
     }
   }, [user, navigate]);
 
@@ -34,11 +28,14 @@ export const LoginForm: React.FC = () => {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // Navigation is handled by the useEffect watching the `user` state
+      // Navigation handled by useEffect watching `user`
     } catch (err: unknown) {
       console.error("Login Error:", err);
-      // Basic type checking for FirebaseError
-      if (err instanceof Error && 'code' in err && err.code === 'auth/invalid-credential') {
+      if (
+        err instanceof Error &&
+        "code" in err &&
+        (err as { code: string }).code === "auth/invalid-credential"
+      ) {
         setError("Invalid email or password.");
       } else {
         setError("Failed to log in. Please try again later.");
@@ -74,6 +71,7 @@ export const LoginForm: React.FC = () => {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-merit-emerald/20 focus:border-merit-emerald transition-all"
             placeholder="name@company.com"
+            required
           />
         </div>
         <div>
@@ -86,6 +84,7 @@ export const LoginForm: React.FC = () => {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-merit-emerald/20 focus:border-merit-emerald transition-all"
             placeholder="••••••••"
+            required
           />
         </div>
         <button

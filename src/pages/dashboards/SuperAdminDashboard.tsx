@@ -129,10 +129,11 @@ const SuperAdminDashboard: React.FC = () => {
               />
             </div>
           </div>
+
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="bg-merit-navy text-white px-6 py-2 rounded hover:bg-merit-navy/90 disabled:opacity-70 transition-colors"
+            disabled={isLoading}
+            className="bg-merit-emerald text-white font-bold py-3 px-8 rounded-xl hover:shadow-lg hover:shadow-merit-emerald/20 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "Registering..." : "Register Company"}
           </button>

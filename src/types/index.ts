@@ -3,3 +3,6 @@ export * from './company';
 export * from './roles';
 export * from './user';
 export * from './invite';
+export * from './department';
+export * from './salaryBand';
+export * from './employee';

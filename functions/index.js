@@ -249,6 +249,19 @@ exports.resendInvite = invites.resendInvite;
 exports.revokeInvite = invites.revokeInvite;
 
 // =============================================================================
+// Registrations
+// =============================================================================
+
+const registrations = require("./src/https/registrations");
+
+exports.approveRegistration = registrations.approveRegistration;
+exports.rejectRegistration = registrations.rejectRegistration;
+exports.requestMoreInfo = registrations.requestMoreInfo;
+exports.bulkApprove = registrations.bulkApprove;
+exports.bulkReject = registrations.bulkReject;
+exports.pendingApprovalReminder = registrations.pendingApprovalReminder;
+
+// =============================================================================
 // deleteCompany — soft delete with 30-day grace period
 // =============================================================================
 

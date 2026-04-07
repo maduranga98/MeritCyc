@@ -12,10 +12,13 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/vite": "^4.2.2",
+    "@tanstack/react-table": "^8.21.3",
     "@types/papaparse": "^5.5.2",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.4.0",
     "firebase": "^12.11.0",
     "jspdf": "^4.2.1",
+    "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
     "papaparse": "^5.5.3",
     "qrcode.react": "^4.2.0",

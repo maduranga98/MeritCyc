@@ -1,20 +1,22 @@
 // =============================================================================
 // QRLanding — Feature 1.3
-// Entry point for employees who scan the QR code (or are redirected from
-// ManualJoin after manual code validation).
+// Public page for employees arriving via QR code scan or manual code entry.
 //
-// Route: /join/:code
+// Routes:
+//   /join              → show manual entry hint (code-less entry handled by ManualJoin)
+//   /join/:companyCode → auto-validate code on mount, then show registration form
 //
-// Two entry modes:
-//   A) QR scan  — code comes from URL, page auto-validates on mount
-//   B) Manual   — arrives from ManualJoin with location.state.preValidated
-//                  skips validation step, goes straight to the form
+// Flow:
+//   Step 1 — validate company code (auto or manual)
+//   Step 2 — registration form (name, email, department, jobTitle)
+//   Step 3 — navigate to /join/verify
 // =============================================================================
 
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "../../config/firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { functions, db } from "../../config/firebase";
 import { Logo } from "../../components/Logo";
 
 // ---------------------------------------------------------------------------
@@ -23,13 +25,19 @@ import { Logo } from "../../components/Logo";
 
 interface ValidateResult {
   success: boolean;
-  companyId: string;
-  companyName: string;
+  companyId?: string;
+  companyName?: string;
+  error?: { code: string; message: string };
 }
 
 interface SubmitResult {
   success: boolean;
-  registrationId: string;
+  message: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
 }
 
 interface LocationState {
@@ -38,23 +46,13 @@ interface LocationState {
   companyId?: string;
 }
 
-interface RegistrationFields {
-  firstName: string;
-  lastName: string;
-  email: string;
-  jobTitle: string;
-  department: string;
-}
-
-type ValidationStatus = "idle" | "loading" | "success" | "error";
-
 // ---------------------------------------------------------------------------
 // Spinner
 // ---------------------------------------------------------------------------
 
-const Spinner: React.FC<{ className?: string }> = ({ className = "" }) => (
-  <span
-    className={`inline-block rounded-full border-2 border-current border-t-transparent animate-spin ${className}`}
+const Spinner: React.FC<{ size?: string }> = ({ size = "h-8 w-8" }) => (
+  <div
+    className={`${size} rounded-full border-[3px] border-emerald-500 border-t-transparent animate-spin`}
   />
 );
 
@@ -63,142 +61,131 @@ const Spinner: React.FC<{ className?: string }> = ({ className = "" }) => (
 // ---------------------------------------------------------------------------
 
 const QRLanding: React.FC = () => {
-  const { code } = useParams<{ code: string }>();
+  const { companyCode } = useParams<{ companyCode: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = (location.state ?? {}) as LocationState;
+  const locState = (location.state ?? {}) as LocationState;
 
-  // --- Validation state ---
-  const [validationStatus, setValidationStatus] = useState<ValidationStatus>(
-    state.preValidated ? "success" : "idle",
+  // ── Step 1: validation ─────────────────────────────────────────────────
+  type Step = "validating" | "invalid" | "form";
+  const [step, setStep] = useState<Step>(
+    locState.preValidated ? "form" : companyCode ? "validating" : "invalid",
   );
-  const [companyName, setCompanyName] = useState<string>(
-    state.companyName ?? "",
-  );
-  const [companyId, setCompanyId] = useState<string>(state.companyId ?? "");
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState(locState.companyName ?? "");
+  const [companyId, setCompanyId] = useState(locState.companyId ?? "");
+  const didValidate = useRef(false);
 
-  // --- Registration form state ---
-  const [fields, setFields] = useState<RegistrationFields>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    jobTitle: "",
-    department: "",
-  });
-  const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<keyof RegistrationFields, string>>
-  >({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // ── Step 2: form ───────────────────────────────────────────────────────
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [deptLoading, setDeptLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Prevent double-validation on StrictMode double-invoke
-  const validated = useRef(false);
-
-  // -------------------------------------------------------------------------
-  // Auto-validate on mount (QR scan path)
-  // -------------------------------------------------------------------------
+  // ── Auto-validate on mount ─────────────────────────────────────────────
   useEffect(() => {
-    if (state.preValidated || validated.current || !code) return;
-    validated.current = true;
+    if (locState.preValidated || didValidate.current || !companyCode) return;
+    didValidate.current = true;
 
-    const validate = async () => {
-      setValidationStatus("loading");
-      setValidationError(null);
-
+    const run = async () => {
       try {
-        const validateFn = httpsCallable<{ code: string }, ValidateResult>(
+        const fn = httpsCallable<{ companyCode: string }, ValidateResult>(
           functions,
           "validateCompanyCode",
         );
-        const result = await validateFn({ code: code.toUpperCase() });
-        setCompanyName(result.data.companyName);
-        setCompanyId(result.data.companyId);
-        setValidationStatus("success");
-      } catch (err: unknown) {
-        const fnErr = err as { code?: string };
-        if (fnErr.code === "functions/resource-exhausted") {
-          setValidationError(
-            "Too many attempts. Please try again in a few minutes.",
-          );
+        const result = await fn({ companyCode: companyCode.toUpperCase() });
+        const data = result.data;
+
+        if (data.success && data.companyId && data.companyName) {
+          setCompanyId(data.companyId);
+          setCompanyName(data.companyName);
+          setStep("form");
         } else {
           setValidationError(
-            "This code is invalid or no longer active. Ask your HR team for a new link.",
+            data.error?.message ??
+              "This QR code is invalid or registration is disabled.",
           );
+          setStep("invalid");
         }
-        setValidationStatus("error");
+      } catch {
+        setValidationError(
+          "This QR code is invalid or registration is disabled.",
+        );
+        setStep("invalid");
       }
     };
 
-    validate();
-  }, [code, state.preValidated]);
+    run();
+  }, [companyCode, locState.preValidated]);
 
-  // -------------------------------------------------------------------------
-  // Form field change handler
-  // -------------------------------------------------------------------------
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFields((prev) => ({ ...prev, [name]: value }));
-    setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
-    setSubmitError(null);
-  };
+  // ── Fetch departments once company is known ────────────────────────────
+  useEffect(() => {
+    if (!companyId) return;
+    setDeptLoading(true);
 
-  // -------------------------------------------------------------------------
-  // Validate form fields, return true if valid
-  // -------------------------------------------------------------------------
-  const validateForm = (): boolean => {
-    const errors: Partial<Record<keyof RegistrationFields, string>> = {};
+    getDocs(collection(db, "companies", companyId, "departments"))
+      .then((snap) => {
+        setDepartments(
+          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
+        );
+      })
+      .catch(() => setDepartments([]))
+      .finally(() => setDeptLoading(false));
+  }, [companyId]);
 
-    if (!fields.firstName.trim()) errors.firstName = "First name is required.";
-    if (!fields.lastName.trim()) errors.lastName = "Last name is required.";
-    if (!fields.email.trim()) {
-      errors.email = "Work email is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) {
-      errors.email = "Please enter a valid email address.";
+  // ── Form validation ────────────────────────────────────────────────────
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!name.trim()) errs.name = "Full name is required.";
+    if (!email.trim()) {
+      errs.email = "Work email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errs.email = "Please enter a valid email.";
     }
-
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    if (!jobTitle.trim()) errs.jobTitle = "Job title is required.";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
-  // -------------------------------------------------------------------------
-  // Submit registration
-  // -------------------------------------------------------------------------
+  // ── Submit registration ────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validate()) return;
 
-    setIsSubmitting(true);
+    setSubmitting(true);
     setSubmitError(null);
 
     try {
-      const submitFn = httpsCallable<
+      const fn = httpsCallable<
         {
           companyCode: string;
-          firstName: string;
-          lastName: string;
+          name: string;
           email: string;
+          departmentId: string;
           jobTitle: string;
-          department: string;
         },
         SubmitResult
       >(functions, "submitSelfRegistration");
 
-      const result = await submitFn({
-        companyCode: (code ?? "").toUpperCase(),
-        firstName: fields.firstName.trim(),
-        lastName: fields.lastName.trim(),
-        email: fields.email.trim().toLowerCase(),
-        jobTitle: fields.jobTitle.trim(),
-        department: fields.department.trim(),
+      await fn({
+        companyCode: (companyCode ?? "").toUpperCase(),
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        departmentId,
+        jobTitle: jobTitle.trim(),
       });
 
       navigate("/join/verify", {
         state: {
-          registrationId: result.data.registrationId,
-          email: fields.email.trim().toLowerCase(),
-          companyName,
+          email: email.trim().toLowerCase(),
           companyId,
+          companyName,
+          companyCode: (companyCode ?? "").toUpperCase(),
         },
       });
     } catch (err: unknown) {
@@ -206,218 +193,193 @@ const QRLanding: React.FC = () => {
       if (fnErr.code === "functions/resource-exhausted") {
         setSubmitError("Too many attempts. Please try again in a few minutes.");
       } else if (fnErr.code === "functions/already-exists") {
-        setSubmitError(
-          "A registration for this email is already in progress.",
-        );
+        setSubmitError("An account with this email already exists in this company.");
       } else {
         setSubmitError("Registration failed. Please try again.");
       }
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
-  // -------------------------------------------------------------------------
-  // Render helpers
-  // -------------------------------------------------------------------------
-
-  const renderValidating = () => (
-    <div className="flex flex-col items-center py-8 gap-4">
-      <Spinner className="h-10 w-10 text-merit-emerald" />
-      <p className="text-merit-slate text-sm">Verifying company code…</p>
-    </div>
-  );
-
-  const renderValidationError = () => (
-    <div className="py-6">
-      <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 mb-6">
-        <p className="text-red-600 text-sm font-medium">{validationError}</p>
-      </div>
-      <Link
-        to="/join"
-        className="w-full flex items-center justify-center gap-2 bg-merit-navy text-white font-bold py-4 rounded-xl hover:shadow-lg hover:shadow-merit-navy/20 transition-all"
-      >
-        Enter code manually
-      </Link>
-    </div>
-  );
-
-  const renderForm = () => (
-    <>
-      {/* Company confirmation badge */}
-      <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-6">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#10B981"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="shrink-0"
-        >
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-          <polyline points="22 4 12 14.01 9 11.01" />
-        </svg>
-        <span className="text-emerald-700 text-sm font-medium">
-          Joining: {companyName}
-        </span>
-      </div>
-
-      <h2 className="text-xl font-bold text-merit-navy mb-1">
-        Complete Your Profile
-      </h2>
-      <p className="text-merit-slate text-sm mb-6">
-        Your account will be reviewed by HR before activation.
-      </p>
-
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        {/* First + Last name row */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-bold uppercase text-merit-slate mb-1.5 tracking-wider">
-              First Name
-            </label>
-            <input
-              type="text"
-              name="firstName"
-              value={fields.firstName}
-              onChange={handleChange}
-              placeholder="Jane"
-              autoComplete="given-name"
-              disabled={isSubmitting}
-              className={inputClass(!!fieldErrors.firstName)}
-            />
-            {fieldErrors.firstName && (
-              <FieldError msg={fieldErrors.firstName} />
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-bold uppercase text-merit-slate mb-1.5 tracking-wider">
-              Last Name
-            </label>
-            <input
-              type="text"
-              name="lastName"
-              value={fields.lastName}
-              onChange={handleChange}
-              placeholder="Smith"
-              autoComplete="family-name"
-              disabled={isSubmitting}
-              className={inputClass(!!fieldErrors.lastName)}
-            />
-            {fieldErrors.lastName && (
-              <FieldError msg={fieldErrors.lastName} />
-            )}
-          </div>
-        </div>
-
-        {/* Work email */}
-        <div>
-          <label className="block text-xs font-bold uppercase text-merit-slate mb-1.5 tracking-wider">
-            Work Email
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={fields.email}
-            onChange={handleChange}
-            placeholder="jane@company.com"
-            autoComplete="email"
-            inputMode="email"
-            disabled={isSubmitting}
-            className={inputClass(!!fieldErrors.email)}
-          />
-          {fieldErrors.email && <FieldError msg={fieldErrors.email} />}
-        </div>
-
-        {/* Job title */}
-        <div>
-          <label className="block text-xs font-bold uppercase text-merit-slate mb-1.5 tracking-wider">
-            Job Title{" "}
-            <span className="normal-case font-normal text-merit-slate/60">
-              (optional)
-            </span>
-          </label>
-          <input
-            type="text"
-            name="jobTitle"
-            value={fields.jobTitle}
-            onChange={handleChange}
-            placeholder="e.g. Software Engineer"
-            disabled={isSubmitting}
-            className={inputClass(false)}
-          />
-        </div>
-
-        {/* Department */}
-        <div>
-          <label className="block text-xs font-bold uppercase text-merit-slate mb-1.5 tracking-wider">
-            Department{" "}
-            <span className="normal-case font-normal text-merit-slate/60">
-              (optional)
-            </span>
-          </label>
-          <input
-            type="text"
-            name="department"
-            value={fields.department}
-            onChange={handleChange}
-            placeholder="e.g. Engineering"
-            disabled={isSubmitting}
-            className={inputClass(false)}
-          />
-        </div>
-
-        {/* Submit error */}
-        {submitError && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-            <p className="text-red-600 text-sm">{submitError}</p>
-          </div>
-        )}
-
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full bg-merit-navy text-white font-bold py-4 rounded-xl hover:shadow-lg hover:shadow-merit-navy/20 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
-        >
-          {isSubmitting ? (
-            <>
-              <Spinner className="h-4 w-4" />
-              <span>Submitting…</span>
-            </>
-          ) : (
-            "Submit Registration"
-          )}
-        </button>
-      </form>
-    </>
-  );
-
-  // -------------------------------------------------------------------------
-  // Main render
-  // -------------------------------------------------------------------------
+  // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-merit-bg font-brand flex flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-gray-100 shadow-sm p-8 sm:p-10">
+    <div className="min-h-screen bg-slate-50 font-brand flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md bg-white rounded-2xl border border-slate-100 shadow-sm p-8 sm:p-10">
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <Logo />
         </div>
 
-        {validationStatus === "loading" && renderValidating()}
-        {validationStatus === "error" && renderValidationError()}
-        {validationStatus === "success" && renderForm()}
+        {/* ── Validating ── */}
+        {step === "validating" && (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <Spinner />
+            <p className="text-slate-500 text-sm">Verifying company code…</p>
+          </div>
+        )}
 
-        {/* Idle — should not normally display (auto-validates on mount) */}
-        {validationStatus === "idle" && renderValidating()}
+        {/* ── Invalid code ── */}
+        {step === "invalid" && (
+          <div className="text-center">
+            <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 mb-2">
+              Code Not Valid
+            </h2>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+              {validationError ??
+                "This QR code is invalid or registration is disabled."}
+            </p>
+            <p className="text-slate-500 text-sm mb-4">
+              If you believe this is an error, please{" "}
+              <a
+                href="mailto:support@meritcyc.com"
+                className="text-emerald-600 font-medium hover:underline"
+              >
+                contact support
+              </a>
+              .
+            </p>
+            <Link
+              to="/join"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:underline"
+            >
+              Enter code manually →
+            </Link>
+          </div>
+        )}
+
+        {/* ── Registration form ── */}
+        {step === "form" && (
+          <>
+            {/* Company badge */}
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-6">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="#10B981" strokeWidth="2.5" strokeLinecap="round"
+                strokeLinejoin="round" className="shrink-0">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span className="text-emerald-700 text-sm font-semibold">
+                You're joining {companyName}
+              </span>
+            </div>
+
+            <h1 className="text-xl font-bold text-slate-900 mb-1">
+              Create Your Account
+            </h1>
+            <p className="text-slate-500 text-sm mb-6">
+              Your account will be reviewed by HR before activation.
+            </p>
+
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+              {/* Full Name */}
+              <Field label="Full Name" error={errors.name}>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setErrors((p) => ({ ...p, name: "" }));
+                  }}
+                  placeholder="Jane Smith"
+                  autoComplete="name"
+                  disabled={submitting}
+                  className={inputCls(!!errors.name)}
+                />
+              </Field>
+
+              {/* Work Email */}
+              <Field label="Work Email" error={errors.email}>
+                <input
+                  type="email"
+                  inputMode="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setErrors((p) => ({ ...p, email: "" }));
+                  }}
+                  placeholder="jane@company.com"
+                  autoComplete="email"
+                  disabled={submitting}
+                  className={inputCls(!!errors.email)}
+                />
+              </Field>
+
+              {/* Department */}
+              <Field label="Department" hint="(optional)">
+                {deptLoading ? (
+                  <div className="flex items-center gap-2 h-12 px-4 rounded-xl border border-slate-200 bg-slate-50">
+                    <div className="h-4 w-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+                    <span className="text-slate-400 text-sm">Loading…</span>
+                  </div>
+                ) : (
+                  <select
+                    value={departmentId}
+                    onChange={(e) => setDepartmentId(e.target.value)}
+                    disabled={submitting}
+                    className={inputCls(false) + " appearance-none bg-white"}
+                  >
+                    <option value="">Select department</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+
+              {/* Job Title */}
+              <Field label="Job Title" error={errors.jobTitle}>
+                <input
+                  type="text"
+                  value={jobTitle}
+                  onChange={(e) => {
+                    setJobTitle(e.target.value);
+                    setErrors((p) => ({ ...p, jobTitle: "" }));
+                  }}
+                  placeholder="e.g. Software Engineer"
+                  disabled={submitting}
+                  className={inputCls(!!errors.jobTitle)}
+                />
+              </Field>
+
+              {/* Submit error */}
+              {submitError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-red-600 text-sm">{submitError}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:shadow-lg hover:shadow-slate-900/20 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2 text-base"
+              >
+                {submitting ? (
+                  <>
+                    <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    Sending code…
+                  </>
+                ) : (
+                  "Send Verification Code"
+                )}
+              </button>
+            </form>
+          </>
+        )}
       </div>
 
       <Link
         to="/login"
-        className="mt-6 text-xs text-merit-slate hover:text-merit-navy transition-colors"
+        className="mt-6 text-xs text-slate-400 hover:text-slate-600 transition-colors"
       >
         Already have an account? Sign in
       </Link>
@@ -426,20 +388,36 @@ const QRLanding: React.FC = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Tiny helpers
+// Helpers
 // ---------------------------------------------------------------------------
 
-function inputClass(hasError: boolean): string {
+function inputCls(hasError: boolean) {
   return [
-    "w-full px-4 py-3 rounded-xl border text-sm",
-    "focus:outline-none focus:ring-2 focus:ring-merit-emerald/20 focus:border-merit-emerald",
-    "transition-all disabled:bg-gray-50 disabled:cursor-not-allowed",
-    hasError ? "border-red-400" : "border-gray-200",
+    "w-full px-4 py-3.5 rounded-xl border text-sm",
+    "focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500",
+    "transition-all disabled:bg-slate-50 disabled:cursor-not-allowed",
+    hasError ? "border-red-400" : "border-slate-200",
   ].join(" ");
 }
 
-const FieldError: React.FC<{ msg: string }> = ({ msg }) => (
-  <p className="mt-1 text-xs text-red-500">{msg}</p>
+interface FieldProps {
+  label: string;
+  hint?: string;
+  error?: string;
+  children: React.ReactNode;
+}
+
+const Field: React.FC<FieldProps> = ({ label, hint, error, children }) => (
+  <div>
+    <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5 tracking-wider">
+      {label}{" "}
+      {hint && (
+        <span className="normal-case font-normal text-slate-400">{hint}</span>
+      )}
+    </label>
+    {children}
+    {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+  </div>
 );
 
 export default QRLanding;

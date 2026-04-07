@@ -50,7 +50,6 @@ const APP_BASE_URL = "https://app.meritcyc.com";
 const QRCodeManager: React.FC = () => {
   const { user } = useAuth();
   const companyId = user?.companyId ?? "";
-  const companyName = user?.name ?? "Your Company"; // HR/SA name, not company name
   // We'll fetch company name from the registration doc parent — for now use a
   // separate state loaded from Firestore (the company document)
 

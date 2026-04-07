@@ -65,12 +65,12 @@ function App() {
 
         {/* ----------------------------------------------------------------- */}
         {/* Employee self-registration (Features 1.3 + 1.4)                   */}
-        {/* IMPORTANT: /join/verify must be declared BEFORE /join/:code        */}
-        {/* so React Router doesn't treat "verify" as a :code param.           */}
+        {/* ORDER MATTERS: /join/verify must come BEFORE /join/:companyCode    */}
+        {/* so React Router doesn't treat the literal "verify" as a param.     */}
         {/* ----------------------------------------------------------------- */}
         <Route path="/join" element={<ManualJoin />} />
         <Route path="/join/verify" element={<OTPVerification />} />
-        <Route path="/join/:code" element={<QRLanding />} />
+        <Route path="/join/:companyCode" element={<QRLanding />} />
 
         {/* ================================================================= */}
         {/* Pending approval                                                    */}

@@ -16,8 +16,9 @@ import { Logo } from "../../components/Logo";
 
 interface ValidateResult {
   success: boolean;
-  companyId: string;
-  companyName: string;
+  companyId?: string;
+  companyName?: string;
+  error?: { code: string; message: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -74,23 +75,26 @@ const ManualJoin: React.FC = () => {
     setError(null);
 
     try {
-      const validateFn = httpsCallable<{ code: string }, ValidateResult>(
+      const validateFn = httpsCallable<{ companyCode: string }, ValidateResult>(
         functions,
         "validateCompanyCode",
       );
-      const result = await validateFn({ code });
-      setValidated({
-        companyId: result.data.companyId,
-        companyName: result.data.companyName,
-      });
+      const result = await validateFn({ companyCode: code });
+      const data = result.data;
+
+      if (data.success && data.companyId && data.companyName) {
+        setValidated({ companyId: data.companyId, companyName: data.companyName });
+      } else if (data.error?.code === "RATE_LIMITED") {
+        setError("Too many attempts. Please try again in a few minutes.");
+      } else {
+        setError("Invalid or inactive company code. Check with your HR team.");
+      }
     } catch (err: unknown) {
-      const fnErr = err as { code?: string; message?: string };
+      const fnErr = err as { code?: string };
       if (fnErr.code === "functions/resource-exhausted") {
         setError("Too many attempts. Please try again in a few minutes.");
       } else {
-        setError(
-          "Invalid or inactive company code. Check with your HR team.",
-        );
+        setError("Invalid or inactive company code. Check with your HR team.");
       }
     } finally {
       setIsLoading(false);

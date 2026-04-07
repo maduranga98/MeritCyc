@@ -457,6 +457,7 @@ interface StepSalaryBandsData {
 
 const StepSalaryBands = ({ defaultValues, onNext, onPrev }: { defaultValues: StepSalaryBandsData, onNext: (data: StepSalaryBandsData) => void, onPrev: () => void }) => {
   const { register, control, handleSubmit, getValues, formState: { errors, isValid } } = useForm<StepSalaryBandsData>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(salaryBandsSchema) as any,
     defaultValues: defaultValues.salaryBands.length > 0 ? defaultValues : { salaryBands: [{ id: "1", name: "", level: 1, min: 0, max: 0 }] },
     mode: "onChange"

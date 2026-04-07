@@ -236,6 +236,19 @@ exports.toggleCompanyStatus = onCall(async (request) => {
 });
 
 // =============================================================================
+// Invites
+// =============================================================================
+
+const invites = require("./src/https/invites");
+
+exports.sendEmployeeInvite = invites.sendEmployeeInvite;
+exports.bulkImportEmployees = invites.bulkImportEmployees;
+exports.getInvitePreview = invites.getInvitePreview;
+exports.acceptInvite = invites.acceptInvite;
+exports.resendInvite = invites.resendInvite;
+exports.revokeInvite = invites.revokeInvite;
+
+// =============================================================================
 // deleteCompany — soft delete with 30-day grace period
 // =============================================================================
 

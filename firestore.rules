@@ -15,5 +15,16 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if request.time < timestamp.date(2026, 5, 3);
     }
+
+    // Feature 1.2: HR Invite System
+    match /companies/{companyId}/invites/{inviteId} {
+      // allow read by super_admin or hr_admin of the same company
+      allow read: if request.auth != null &&
+                  request.auth.token.companyId == companyId &&
+                  (request.auth.token.role == 'super_admin' || request.auth.token.role == 'hr_admin');
+
+      // writes are only allowed from Cloud Functions (which bypass these rules)
+      allow write: if false;
+    }
   }
 }

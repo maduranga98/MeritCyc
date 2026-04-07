@@ -6,6 +6,8 @@ import SuperAdminDashboard from "./pages/dashboards/SuperAdminDashboard";
 import HRAdminDashboard from "./pages/dashboards/HRAdminDashboard";
 import ManagerDashboard from "./pages/dashboards/ManagerDashboard";
 import EmployeeDashboard from "./pages/dashboards/EmployeeDashboard";
+import AcceptInvite from "./pages/auth/AcceptInvite";
+import InviteTracker from "./pages/people/InviteTracker";
 
 function App() {
   return (
@@ -13,6 +15,7 @@ function App() {
       {/* Public routes */}
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/accept-invite" element={<AcceptInvite />} />
 
       {/* Pending approval placeholder (feature 1.5) */}
       <Route
@@ -78,6 +81,16 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={["employee"]}>
             <EmployeeDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Feature 1.2 HR Invite System Tracker */}
+      <Route
+        path="/invites"
+        element={
+          <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+            <InviteTracker />
           </ProtectedRoute>
         }
       />

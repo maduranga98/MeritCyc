@@ -21,6 +21,11 @@ import InviteTracker from "./pages/people/InviteTracker";
 import PendingApprovals from "./pages/people/PendingApprovals";
 import ProfilePage from "./pages/settings/Profile";
 
+// Join / self-registration pages (public)
+import ManualJoin from "./pages/join/ManualJoin";
+import QRLanding from "./pages/join/QRLanding";
+import OTPVerification from "./pages/join/OTPVerification";
+
 // Layout
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -152,8 +157,20 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/accept-invite" element={<AcceptInvite />} />
 
-        {/* Pending approval */}
+        {/* ----------------------------------------------------------------- */}
+        {/* Employee self-registration (Features 1.3 + 1.4)                   */}
+        {/* IMPORTANT: /join/verify must be declared BEFORE /join/:code        */}
+        {/* so React Router doesn't treat "verify" as a :code param.           */}
+        {/* ----------------------------------------------------------------- */}
+        <Route path="/join" element={<ManualJoin />} />
+        <Route path="/join/verify" element={<OTPVerification />} />
+        <Route path="/join/:code" element={<QRLanding />} />
+
+        {/* ================================================================= */}
+        {/* Pending approval                                                    */}
+        {/* ================================================================= */}
         <Route
           path="/pending-approval"
           element={
@@ -279,6 +296,18 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================================================================= */}
+        {/* Feature 1.2 — HR Invite Tracker                                    */}
+        {/* ================================================================= */}
+        <Route
+          path="/invites"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <InviteTracker />
             </ProtectedRoute>
           }
         />

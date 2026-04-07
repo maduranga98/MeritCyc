@@ -811,3 +811,594 @@ exports.verifyEmailOTP = onCall(async (request) => {
 
   return { success: true };
 });
+
+// =============================================================================
+// Module 2 — Company & People Management
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Department Functions
+// ---------------------------------------------------------------------------
+
+exports.createDepartment = onCall(async (request) => {
+  const { uid, companyId, role } = requireHrOrAdmin(request);
+  const { name, managerId } = request.data;
+
+  if (!name || typeof name !== "string") {
+    throw new HttpsError("invalid-argument", "Department name is required.");
+  }
+
+  // Validate name unique within company
+  const deptsSnap = await firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("departments")
+    .where("name", "==", name.trim())
+    .limit(1)
+    .get();
+
+  if (!deptsSnap.empty) {
+    throw new HttpsError(
+      "already-exists",
+      `Department "${name}" already exists.`,
+    );
+  }
+
+  const deptData = {
+    name: name.trim(),
+    employeeCount: 0,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: uid,
+  };
+
+  if (managerId) {
+    deptData.managerId = managerId;
+  }
+
+  const docRef = await firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("departments")
+    .add(deptData);
+
+  await writeAuditLog({
+    companyId,
+    action: "DEPARTMENT_CREATED",
+    actorUid: uid,
+    actorEmail: request.auth.token.email || "",
+    actorRole: role,
+    targetType: "department",
+    targetId: docRef.id,
+    after: deptData,
+  });
+
+  return { success: true, departmentId: docRef.id };
+});
+
+exports.updateDepartment = onCall(async (request) => {
+  const { uid, companyId, role } = requireHrOrAdmin(request);
+  const { departmentId, name, managerId } = request.data;
+
+  if (!departmentId) {
+    throw new HttpsError("invalid-argument", "departmentId is required.");
+  }
+
+  const deptRef = firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("departments")
+    .doc(departmentId);
+
+  const deptDoc = await deptRef.get();
+  if (!deptDoc.exists) {
+    throw new HttpsError("not-found", "Department not found.");
+  }
+
+  const updates = {};
+  if (name && typeof name === "string") {
+    // Check uniqueness if name changed
+    if (name.trim() !== deptDoc.data().name) {
+      const deptsSnap = await firestore
+        .collection("companies")
+        .doc(companyId)
+        .collection("departments")
+        .where("name", "==", name.trim())
+        .limit(1)
+        .get();
+
+      if (!deptsSnap.empty) {
+        throw new HttpsError(
+          "already-exists",
+          `Department "${name}" already exists.`,
+        );
+      }
+    }
+    updates.name = name.trim();
+  }
+
+  if (managerId !== undefined) {
+    // Allow unsetting manager with null or empty string
+    updates.managerId = managerId || admin.firestore.FieldValue.delete();
+  }
+
+  if (Object.keys(updates).length > 0) {
+    updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    updates.updatedBy = uid;
+    await deptRef.update(updates);
+
+    await writeAuditLog({
+      companyId,
+      action: "DEPARTMENT_UPDATED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "department",
+      targetId: departmentId,
+      before: deptDoc.data(),
+      after: { ...deptDoc.data(), ...updates },
+    });
+  }
+
+  return { success: true };
+});
+
+exports.deleteDepartment = onCall(async (request) => {
+  const { uid, companyId, role } = requireHrOrAdmin(request);
+  const { departmentId } = request.data;
+
+  if (!departmentId) {
+    throw new HttpsError("invalid-argument", "departmentId is required.");
+  }
+
+  const deptRef = firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("departments")
+    .doc(departmentId);
+
+  const deptDoc = await deptRef.get();
+  if (!deptDoc.exists) {
+    throw new HttpsError("not-found", "Department not found.");
+  }
+
+  const deptData = deptDoc.data();
+  if (deptData.employeeCount > 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "DEPARTMENT_HAS_EMPLOYEES",
+    );
+  }
+
+  await deptRef.delete();
+
+  await writeAuditLog({
+    companyId,
+    action: "DEPARTMENT_DELETED",
+    actorUid: uid,
+    actorEmail: request.auth.token.email || "",
+    actorRole: role,
+    targetType: "department",
+    targetId: departmentId,
+    before: deptData,
+  });
+
+  return { success: true };
+});
+
+// ---------------------------------------------------------------------------
+// Salary Band Functions
+// ---------------------------------------------------------------------------
+
+exports.createSalaryBand = onCall(async (request) => {
+  const { uid, companyId, role } = requireHrOrAdmin(request);
+  const { name, level, minSalary, maxSalary, currency } = request.data;
+
+  if (!name || level === undefined || minSalary === undefined || maxSalary === undefined) {
+    throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  if (minSalary >= maxSalary) {
+    throw new HttpsError("invalid-argument", "minSalary must be less than maxSalary.");
+  }
+
+  const bandsSnap = await firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("salaryBands")
+    .get();
+
+  for (const doc of bandsSnap.docs) {
+    const band = doc.data();
+    if (band.level === level) {
+      throw new HttpsError("already-exists", `Band with level ${level} already exists.`);
+    }
+    // Check overlap
+    if (Math.max(minSalary, band.minSalary) < Math.min(maxSalary, band.maxSalary)) {
+      throw new HttpsError("invalid-argument", `Salary range overlaps with band "${band.name}".`);
+    }
+  }
+
+  const bandData = {
+    name: name.trim(),
+    level,
+    minSalary,
+    maxSalary,
+    currency: currency || "USD",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: uid,
+  };
+
+  const docRef = await firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("salaryBands")
+    .add(bandData);
+
+  await writeAuditLog({
+    companyId,
+    action: "SALARY_BAND_CREATED",
+    actorUid: uid,
+    actorEmail: request.auth.token.email || "",
+    actorRole: role,
+    targetType: "salaryBand",
+    targetId: docRef.id,
+    after: bandData,
+  });
+
+  return { success: true, bandId: docRef.id };
+});
+
+exports.updateSalaryBand = onCall(async (request) => {
+  const { uid, companyId, role } = requireHrOrAdmin(request);
+  const { bandId, name, level, minSalary, maxSalary, currency } = request.data;
+
+  if (!bandId) {
+    throw new HttpsError("invalid-argument", "bandId is required.");
+  }
+
+  const bandRef = firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("salaryBands")
+    .doc(bandId);
+
+  const bandDoc = await bandRef.get();
+  if (!bandDoc.exists) {
+    throw new HttpsError("not-found", "Salary band not found.");
+  }
+
+  const newMin = minSalary !== undefined ? minSalary : bandDoc.data().minSalary;
+  const newMax = maxSalary !== undefined ? maxSalary : bandDoc.data().maxSalary;
+  const newLevel = level !== undefined ? level : bandDoc.data().level;
+
+  if (newMin >= newMax) {
+    throw new HttpsError("invalid-argument", "minSalary must be less than maxSalary.");
+  }
+
+  const bandsSnap = await firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("salaryBands")
+    .get();
+
+  for (const doc of bandsSnap.docs) {
+    if (doc.id === bandId) continue;
+    const band = doc.data();
+    if (band.level === newLevel) {
+      throw new HttpsError("already-exists", `Band with level ${newLevel} already exists.`);
+    }
+    // Check overlap
+    if (Math.max(newMin, band.minSalary) < Math.min(newMax, band.maxSalary)) {
+      throw new HttpsError("invalid-argument", `Salary range overlaps with band "${band.name}".`);
+    }
+  }
+
+  const updates = {};
+  if (name !== undefined) updates.name = name.trim();
+  if (level !== undefined) updates.level = level;
+  if (minSalary !== undefined) updates.minSalary = minSalary;
+  if (maxSalary !== undefined) updates.maxSalary = maxSalary;
+  if (currency !== undefined) updates.currency = currency;
+
+  if (Object.keys(updates).length > 0) {
+    updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    updates.updatedBy = uid;
+    await bandRef.update(updates);
+
+    await writeAuditLog({
+      companyId,
+      action: "SALARY_BAND_UPDATED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "salaryBand",
+      targetId: bandId,
+      before: bandDoc.data(),
+      after: { ...bandDoc.data(), ...updates },
+    });
+  }
+
+  return { success: true };
+});
+
+exports.deleteSalaryBand = onCall(async (request) => {
+  const { uid, companyId, role } = requireHrOrAdmin(request);
+  const { bandId } = request.data;
+
+  if (!bandId) {
+    throw new HttpsError("invalid-argument", "bandId is required.");
+  }
+
+  // Check if employees are using this band
+  const usersSnap = await firestore
+    .collection("users")
+    .where("companyId", "==", companyId)
+    .where("salaryBandId", "==", bandId)
+    .limit(1)
+    .get();
+
+  if (!usersSnap.empty) {
+    throw new HttpsError(
+      "failed-precondition",
+      "BAND_HAS_EMPLOYEES",
+    );
+  }
+
+  const bandRef = firestore
+    .collection("companies")
+    .doc(companyId)
+    .collection("salaryBands")
+    .doc(bandId);
+
+  const bandDoc = await bandRef.get();
+  if (!bandDoc.exists) {
+    throw new HttpsError("not-found", "Salary band not found.");
+  }
+
+  const bandData = bandDoc.data();
+  await bandRef.delete();
+
+  await writeAuditLog({
+    companyId,
+    action: "SALARY_BAND_DELETED",
+    actorUid: uid,
+    actorEmail: request.auth.token.email || "",
+    actorRole: role,
+    targetType: "salaryBand",
+    targetId: bandId,
+    before: bandData,
+  });
+
+  return { success: true };
+});
+
+// ---------------------------------------------------------------------------
+// Employee Management Functions
+// ---------------------------------------------------------------------------
+
+exports.updateEmployeeProfile = onCall(async (request) => {
+  const { uid, companyId, role } = requireHrOrAdmin(request);
+  const { targetUid, departmentId, salaryBandId, jobTitle, status } = request.data;
+
+  if (!targetUid) {
+    throw new HttpsError("invalid-argument", "targetUid is required.");
+  }
+
+  const userRef = firestore.collection("users").doc(targetUid);
+  const userDoc = await userRef.get();
+
+  if (!userDoc.exists || userDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "User not found in your company.");
+  }
+
+  const updates = {};
+  if (departmentId !== undefined) updates.departmentId = departmentId || admin.firestore.FieldValue.delete();
+  if (salaryBandId !== undefined) updates.salaryBandId = salaryBandId || admin.firestore.FieldValue.delete();
+  if (jobTitle !== undefined) updates.jobTitle = jobTitle;
+  if (status !== undefined) {
+      if (!['active', 'inactive', 'pending'].includes(status)) {
+           throw new HttpsError("invalid-argument", "Invalid status.");
+      }
+      updates.status = status;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    updates.updatedBy = uid;
+
+    // Handle denormalized names
+    if (departmentId) {
+        const deptDoc = await firestore.collection("companies").doc(companyId).collection("departments").doc(departmentId).get();
+        if (deptDoc.exists) updates.departmentName = deptDoc.data().name;
+    } else if (departmentId === null || departmentId === "") {
+        updates.departmentName = admin.firestore.FieldValue.delete();
+    }
+
+    if (salaryBandId) {
+        const bandDoc = await firestore.collection("companies").doc(companyId).collection("salaryBands").doc(salaryBandId).get();
+        if (bandDoc.exists) updates.salaryBandName = bandDoc.data().name;
+    } else if (salaryBandId === null || salaryBandId === "") {
+         updates.salaryBandName = admin.firestore.FieldValue.delete();
+    }
+
+    await firestore.runTransaction(async (transaction) => {
+        const currentDoc = await transaction.get(userRef);
+
+        // If department changed, update counts
+        const oldDeptId = currentDoc.data().departmentId;
+        const newDeptId = departmentId;
+
+        if (departmentId !== undefined && oldDeptId !== newDeptId) {
+            if (oldDeptId) {
+                const oldDeptRef = firestore.collection("companies").doc(companyId).collection("departments").doc(oldDeptId);
+                transaction.update(oldDeptRef, { employeeCount: admin.firestore.FieldValue.increment(-1) });
+            }
+            if (newDeptId) {
+                 const newDeptRef = firestore.collection("companies").doc(companyId).collection("departments").doc(newDeptId);
+                 transaction.update(newDeptRef, { employeeCount: admin.firestore.FieldValue.increment(1) });
+            }
+        }
+
+        // if salary band changed, update counts
+        const oldBandId = currentDoc.data().salaryBandId;
+        const newBandId = salaryBandId;
+        if (salaryBandId !== undefined && oldBandId !== newBandId) {
+            if (oldBandId) {
+                const oldBandRef = firestore.collection("companies").doc(companyId).collection("salaryBands").doc(oldBandId);
+                transaction.update(oldBandRef, { employeeCount: admin.firestore.FieldValue.increment(-1) });
+            }
+            if (newBandId) {
+                const newBandRef = firestore.collection("companies").doc(companyId).collection("salaryBands").doc(newBandId);
+                transaction.update(newBandRef, { employeeCount: admin.firestore.FieldValue.increment(1) });
+            }
+        }
+
+        transaction.update(userRef, updates);
+    });
+
+    await writeAuditLog({
+      companyId,
+      action: "EMPLOYEE_PROFILE_UPDATED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "user",
+      targetId: targetUid,
+      before: userDoc.data(),
+      after: { ...userDoc.data(), ...updates },
+    });
+  }
+
+  return { success: true };
+});
+
+exports.changeEmployeeRole = onCall(async (request) => {
+  const { uid, companyId, role } = requireHrOrAdmin(request);
+  if (role !== "super_admin") {
+      throw new HttpsError("permission-denied", "Only super_admin can change roles.");
+  }
+
+  const { targetUid, newRole } = request.data;
+  if (!targetUid || !newRole) {
+      throw new HttpsError("invalid-argument", "targetUid and newRole are required.");
+  }
+
+  const userRef = firestore.collection("users").doc(targetUid);
+  const userDoc = await userRef.get();
+
+  if (!userDoc.exists || userDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "User not found in your company.");
+  }
+
+  // Update Auth claims
+  const authUser = await admin.auth().getUser(targetUid);
+  const currentClaims = authUser.customClaims || {};
+  await admin.auth().setCustomUserClaims(targetUid, { ...currentClaims, role: newRole });
+
+  // Update Firestore
+  await userRef.update({
+      role: newRole,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: uid
+  });
+
+  await writeAuditLog({
+      companyId,
+      action: "EMPLOYEE_ROLE_CHANGED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "user",
+      targetId: targetUid,
+      before: { role: userDoc.data().role },
+      after: { role: newRole },
+  });
+
+  return { success: true };
+});
+
+exports.deactivateEmployee = onCall(async (request) => {
+    const { uid, companyId, role } = requireHrOrAdmin(request);
+    const { targetUid } = request.data;
+
+    if (!targetUid) {
+        throw new HttpsError("invalid-argument", "targetUid is required.");
+    }
+
+    const userRef = firestore.collection("users").doc(targetUid);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists || userDoc.data().companyId !== companyId) {
+        throw new HttpsError("not-found", "User not found in your company.");
+    }
+
+    // Revoke Auth claim
+    const authUser = await admin.auth().getUser(targetUid);
+    const currentClaims = authUser.customClaims || {};
+    await admin.auth().setCustomUserClaims(targetUid, { ...currentClaims, approved: false });
+
+    // Update Firestore
+    await userRef.update({
+        status: "inactive",
+        approved: false,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: uid
+    });
+
+    await writeAuditLog({
+        companyId,
+        action: "EMPLOYEE_DEACTIVATED",
+        actorUid: uid,
+        actorEmail: request.auth.token.email || "",
+        actorRole: role,
+        targetType: "user",
+        targetId: targetUid,
+        before: { status: userDoc.data().status, approved: userDoc.data().approved },
+        after: { status: "inactive", approved: false },
+    });
+
+    return { success: true };
+});
+
+exports.reactivateEmployee = onCall(async (request) => {
+    const { uid, companyId, role } = requireHrOrAdmin(request);
+    const { targetUid } = request.data;
+
+    if (!targetUid) {
+        throw new HttpsError("invalid-argument", "targetUid is required.");
+    }
+
+    const userRef = firestore.collection("users").doc(targetUid);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists || userDoc.data().companyId !== companyId) {
+        throw new HttpsError("not-found", "User not found in your company.");
+    }
+
+    // Restore Auth claim
+    const authUser = await admin.auth().getUser(targetUid);
+    const currentClaims = authUser.customClaims || {};
+    await admin.auth().setCustomUserClaims(targetUid, { ...currentClaims, approved: true });
+
+    // Update Firestore
+    await userRef.update({
+        status: "active",
+        approved: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: uid
+    });
+
+    await writeAuditLog({
+        companyId,
+        action: "EMPLOYEE_REACTIVATED",
+        actorUid: uid,
+        actorEmail: request.auth.token.email || "",
+        actorRole: role,
+        targetType: "user",
+        targetId: targetUid,
+        before: { status: userDoc.data().status, approved: userDoc.data().approved },
+        after: { status: "active", approved: true },
+    });
+
+    return { success: true };
+});

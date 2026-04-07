@@ -19,6 +19,9 @@ import EmployeeDashboard from "./pages/dashboards/EmployeeDashboard";
 import AcceptInvite from "./pages/auth/AcceptInvite";
 import InviteTracker from "./pages/people/InviteTracker";
 import PendingApprovals from "./pages/people/PendingApprovals";
+import DepartmentManagement from "./pages/people/DepartmentManagement";
+import SalaryBandManagement from "./pages/people/SalaryBandManagement";
+import EmployeeDirectory from "./pages/people/EmployeeDirectory";
 import ProfilePage from "./pages/settings/Profile";
 
 // Join / self-registration pages (public)
@@ -304,6 +307,40 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <AppLayout>
                 <EmployeeDashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================================================================= */}
+        {/* Module 2 — Company & People Management                             */}
+        {/* ================================================================= */}
+        <Route
+          path="/people/directory"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <EmployeeDirectory />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/people/departments"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <DepartmentManagement />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/people/salary-bands"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <SalaryBandManagement />
               </AppLayout>
             </ProtectedRoute>
           }

@@ -52,7 +52,18 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
     case "super_admin":
       return [
         { name: "Dashboard", href: "/dashboard/super-admin", icon: LayoutDashboard },
-        { name: "People", href: "/people", icon: Users },
+        {
+          name: "People",
+          href: "/people",
+          icon: Users,
+          subItems: [
+            { name: "Employee Directory", href: "/people/directory", icon: Users },
+            { name: "Departments", href: "/people/departments", icon: Users },
+            { name: "Salary Bands", href: "/people/salary-bands", icon: Users },
+            { name: "Pending Approvals", href: "/hr/people/approvals", icon: Users, isBadge: true },
+            { name: "Invite Tracker", href: "/invites", icon: Users },
+          ],
+        },
         { name: "Cycles", href: "/cycles", icon: RefreshCw },
         { name: "Analytics", href: "/analytics", icon: BarChart2 },
         { name: "Settings", href: "/settings/profile", icon: Settings },
@@ -66,6 +77,8 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
           icon: Users,
           subItems: [
             { name: "Employee Directory", href: "/people/directory", icon: Users },
+            { name: "Departments", href: "/people/departments", icon: Users },
+            { name: "Salary Bands", href: "/people/salary-bands", icon: Users },
             { name: "Pending Approvals", href: "/hr/people/approvals", icon: Users, isBadge: true },
             { name: "Invite Tracker", href: "/invites", icon: Users },
           ],

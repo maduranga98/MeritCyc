@@ -19,7 +19,7 @@ import React, {
   useRef,
   useEffect,
   useCallback,
-  KeyboardEvent,
+  type KeyboardEvent,
 } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
@@ -119,8 +119,6 @@ const OTPVerification: React.FC = () => {
 
 // Inner component so we can safely call hooks after the guard
 const OTPForm: React.FC<{ state: LocationState }> = ({ state }) => {
-  const navigate = useNavigate();
-
   // ── Digit state ────────────────────────────────────────────────────────
   const [digits, setDigits] = useState<string[]>(Array(OTP_LEN).fill(""));
   const inputRefs = useRef<(HTMLInputElement | null)[]>(

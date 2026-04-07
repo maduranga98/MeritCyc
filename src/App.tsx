@@ -28,6 +28,7 @@ import OTPVerification from "./pages/join/OTPVerification";
 
 // Layout
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AppLayout } from "./components/layout/AppLayout";
 
 // Session management (idle timeout — only active for logged-in users)
 import { useIdleTimeout } from "./hooks/useIdleTimeout";
@@ -268,7 +269,9 @@ function App() {
           path="/dashboard/super-admin"
           element={
             <ProtectedRoute allowedRoles={["super_admin"]}>
-              <SuperAdminDashboard />
+              <AppLayout>
+                <SuperAdminDashboard />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -277,7 +280,9 @@ function App() {
           path="/dashboard/hr-admin"
           element={
             <ProtectedRoute allowedRoles={["hr_admin"]}>
-              <HRAdminDashboard />
+              <AppLayout>
+                <HRAdminDashboard />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -286,7 +291,9 @@ function App() {
           path="/dashboard/manager"
           element={
             <ProtectedRoute allowedRoles={["manager"]}>
-              <ManagerDashboard />
+              <AppLayout>
+                <ManagerDashboard />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -295,7 +302,9 @@ function App() {
           path="/dashboard/employee"
           element={
             <ProtectedRoute allowedRoles={["employee"]}>
-              <EmployeeDashboard />
+              <AppLayout>
+                <EmployeeDashboard />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -307,7 +316,9 @@ function App() {
           path="/invites"
           element={
             <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
-              <InviteTracker />
+              <AppLayout>
+                <InviteTracker />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -321,7 +332,9 @@ function App() {
             <ProtectedRoute
               minimumRole="employee" // any company role
             >
-              <ProfilePage />
+              <AppLayout>
+                <ProfilePage />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -331,7 +344,9 @@ function App() {
           path="/hr/people/approvals"
           element={
             <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
-              <PendingApprovals />
+              <AppLayout>
+                <PendingApprovals />
+              </AppLayout>
             </ProtectedRoute>
           }
         />

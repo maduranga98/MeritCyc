@@ -26,5 +26,16 @@ service cloud.firestore {
       // writes are only allowed from Cloud Functions (which bypass these rules)
       allow write: if false;
     }
+
+    // Feature 1.5: HR Approval System
+    match /companies/{companyId}/pendingRegistrations/{id} {
+      // allow read by hr_admin or super_admin of the same company
+      allow read: if request.auth != null &&
+                  request.auth.token.companyId == companyId &&
+                  (request.auth.token.role == 'hr_admin' || request.auth.token.role == 'super_admin');
+
+      // writes are only allowed from Cloud Functions
+      allow write: if false;
+    }
   }
 }

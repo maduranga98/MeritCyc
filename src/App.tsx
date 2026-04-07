@@ -18,6 +18,7 @@ import ManagerDashboard from "./pages/dashboards/ManagerDashboard";
 import EmployeeDashboard from "./pages/dashboards/EmployeeDashboard";
 import AcceptInvite from "./pages/auth/AcceptInvite";
 import InviteTracker from "./pages/people/InviteTracker";
+import PendingApprovals from "./pages/people/PendingApprovals";
 import ProfilePage from "./pages/settings/Profile";
 
 // Layout
@@ -44,6 +45,7 @@ function App() {
   const { user } = useAuth();
 
   return (
+    <>
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<LoginPage />} />
@@ -124,6 +126,16 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
             <InviteTracker />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Feature 1.5 HR Approval System */}
+      <Route
+        path="/hr/people/approvals"
+        element={
+          <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+            <PendingApprovals />
           </ProtectedRoute>
         }
       />
@@ -285,11 +297,22 @@ function App() {
           }
         />
 
+        {/* Feature 1.5 HR Approval System */}
+        <Route
+          path="/hr/people/approvals"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <PendingApprovals />
+            </ProtectedRoute>
+          }
+        />
+
         {/* ================================================================= */}
         {/* 404 catch-all                                                       */}
         {/* ================================================================= */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+    </>
     </>
   );
 }

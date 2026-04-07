@@ -11,20 +11,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function hasClaim(field) {
-      return request.auth.token[field] != null;
-    }
-
     function role() {
       return request.auth.token.role;
     }
 
-    function companyId() {
+    // Returns the companyId from the caller's JWT claims.
+    // Named callerCompanyId to avoid shadowing {companyId} path wildcards.
+    function callerCompanyId() {
       return request.auth.token.companyId;
     }
 
     function isSameCompany(cId) {
-      return isSignedIn() && companyId() == cId;
+      return isSignedIn() && callerCompanyId() == cId;
     }
 
     function isHrOrAdmin(cId) {
@@ -42,7 +40,7 @@ service cloud.firestore {
 
     match /companies/{companyId} {
       allow read: if isPlatformAdmin() ||
-                     (isSignedIn() && companyId() == companyId);
+                     (isSignedIn() && callerCompanyId() == companyId);
       allow write: if false; // Cloud Functions only
     }
 

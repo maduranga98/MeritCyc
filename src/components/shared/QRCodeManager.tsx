@@ -14,7 +14,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { jsPDF } from "jspdf";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../../config/firebase";
 import { useAuth } from "../../context/AuthContext";
@@ -73,10 +73,8 @@ const QRCodeManager: React.FC = () => {
     if (!companyId) return;
 
     // Fetch company name
-    import("firebase/firestore").then(({ doc: fsDoc, getDoc }) => {
-      getDoc(fsDoc(db, "companies", companyId)).then((snap) => {
-        if (snap.exists()) setFetchedCompanyName(snap.data().name ?? "");
-      });
+    getDoc(doc(db, "companies", companyId)).then((snap) => {
+      if (snap.exists()) setFetchedCompanyName((snap.data().name as string) ?? "");
     });
 
     const regRef = doc(

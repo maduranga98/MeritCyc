@@ -15,8 +15,10 @@ import {
   DollarSign,
   LogOut,
   X,
+  Bell,
 } from "lucide-react";
 import { type RoleCode } from "../../types/roles";
+import { useNotificationStore } from "../../stores/notificationStore";
 
 // --- Custom Logo for Dark Background ---
 const SidebarLogo: React.FC = () => {
@@ -46,6 +48,7 @@ interface NavItem {
   isBadge?: boolean;
   isEvalBadge?: boolean;
   isReviewBadge?: boolean;
+  isNotificationBadge?: boolean;
   subItems?: NavItem[];
 }
 
@@ -78,6 +81,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
           ]
         },
         { name: "Analytics", href: "/analytics", icon: BarChart2 },
+        { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
         { name: "Settings", href: "/settings/profile", icon: Settings },
       ];
     case "hr_admin":
@@ -105,6 +109,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
           ]
         },
         { name: "Analytics", href: "/analytics", icon: BarChart2 },
+        { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
         { name: "Settings", href: "/settings/profile", icon: Settings },
       ];
     case "manager":
@@ -112,6 +117,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
         { name: "Dashboard", href: "/dashboard/manager", icon: LayoutDashboard },
         { name: "My Team", href: "/team", icon: Users },
         { name: "Evaluations", href: "/evaluations", icon: ClipboardList, isEvalBadge: true },
+        { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
         { name: "Settings", href: "/settings/profile", icon: Settings },
       ];
     case "employee":
@@ -119,6 +125,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
         { name: "Dashboard", href: "/dashboard/employee", icon: LayoutDashboard },
         { name: "My Career", href: "/career", icon: TrendingUp },
         { name: "My Increments", href: "/increments", icon: DollarSign },
+        { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
         { name: "Settings", href: "/settings/profile", icon: Settings },
       ];
     default:
@@ -139,6 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const [pendingCount, setPendingCount] = useState(0);
   const [evalCount, setEvalCount] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
+  const unreadCount = useNotificationStore((state) => state.unreadCount);
 
   // Fetch pending count for hr_admin
   useEffect(() => {
@@ -237,6 +245,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
         {item.isReviewBadge && reviewCount > 0 && (
           <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
             {reviewCount}
+          </span>
+        )}
+        {item.isNotificationBadge && unreadCount > 0 && (
+          <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            {unreadCount}
           </span>
         )}
       </Link>

@@ -10,3 +10,4 @@ export * from './cycle';
 export * from './simulation';
 export * from './budgetTracking';
 export * from './evaluation';
+export * from './incrementStory';

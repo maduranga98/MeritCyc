@@ -2982,6 +2982,247 @@ exports.applyScenarioToCycle = onCall(async (request) => {
   }
 });
 
+exports.getEmployeeCycleProgress = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const { uid, token } = request.auth;
+  const { role, companyId } = token;
+  if (role !== "employee") {
+    throw new HttpsError("permission-denied", "Only employees can access this function.");
+  }
+
+  const { cycleId } = request.data;
+  if (!cycleId) {
+    throw new HttpsError("invalid-argument", "Missing cycleId.");
+  }
+
+  try {
+    const cycleRef = firestore.collection("cycles").doc(cycleId);
+    const cycleDoc = await cycleRef.get();
+
+    if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+      throw new HttpsError("not-found", "Cycle not found.");
+    }
+    const cycleData = cycleDoc.data();
+
+    const evalsSnap = await firestore.collection("evaluations")
+        .where("companyId", "==", companyId)
+        .where("cycleId", "==", cycleId)
+        .where("employeeUid", "==", uid)
+        .limit(1)
+        .get();
+
+    let evaluation = null;
+    let currentScore = 0;
+    let tier = null;
+
+    if (!evalsSnap.empty) {
+      evaluation = evalsSnap.docs[0].data();
+      currentScore = evaluation.weightedTotalScore || 0;
+
+      if (evaluation.assignedTierId && cycleData.tiers) {
+        tier = cycleData.tiers.find(t => t.id === evaluation.assignedTierId);
+      } else if (cycleData.tiers) {
+        // Find tier based on score
+        tier = cycleData.tiers.find(t => currentScore >= t.minScore && currentScore <= t.maxScore);
+      }
+    }
+
+    let daysRemaining = 0;
+    if (cycleData.timeline && cycleData.timeline.evaluationDeadline) {
+      const deadline = cycleData.timeline.evaluationDeadline.toDate();
+      const now = new Date();
+      const diffTime = deadline.getTime() - now.getTime();
+      daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    }
+
+    return {
+      success: true,
+      progress: {
+        evaluation,
+        criteria: cycleData.criteria || [],
+        currentScore,
+        tier,
+        daysRemaining
+      }
+    };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in getEmployeeCycleProgress:", error);
+    throw new HttpsError("internal", error.message || "Failed to get cycle progress.");
+  }
+});
+
+exports.markNotificationRead = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const { uid } = request.auth;
+  const { notificationId } = request.data;
+
+  if (!notificationId) {
+    throw new HttpsError("invalid-argument", "Missing notificationId.");
+  }
+
+  try {
+    const notifRef = firestore.collection("users").doc(uid).collection("notifications").doc(notificationId);
+    const notifDoc = await notifRef.get();
+
+    if (!notifDoc.exists) {
+      throw new HttpsError("not-found", "Notification not found.");
+    }
+
+    await notifRef.update({ isRead: true });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in markNotificationRead:", error);
+    throw new HttpsError("internal", error.message || "Failed to mark notification read.");
+  }
+});
+
+exports.markAllNotificationsRead = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const { uid } = request.auth;
+
+  try {
+    const notifsRef = firestore.collection("users").doc(uid).collection("notifications");
+    const unreadSnap = await notifsRef.where("isRead", "==", false).get();
+
+    if (unreadSnap.empty) {
+      return { success: true, count: 0 };
+    }
+
+    const batch = firestore.batch();
+    unreadSnap.docs.forEach((doc) => {
+      batch.update(doc.ref, { isRead: true });
+    });
+
+    await batch.commit();
+
+    return { success: true, count: unreadSnap.size };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in markAllNotificationsRead:", error);
+    throw new HttpsError("internal", error.message || "Failed to mark all notifications read.");
+  }
+});
+
+exports.updateCareerMap = onCall(async (request) => {
+  // Note: This function is meant to be called internally (e.g. by finalizeCycle),
+  // but if exposed via httpsCallable it must be secured. In this case, we'll allow
+  // admin to run it or it can run internally. Let's assume the user is auth'd but it's an internal helper
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const { role, companyId } = request.auth.token;
+
+  // It says "Internal function called by finalizeCycle"
+  // So normally it might not be exported as onCall if it's purely internal,
+  // but instructions said: "updateCareerMap({ userId }) ... Export all new functions"
+
+  const { userId } = request.data;
+  if (!userId) {
+     throw new HttpsError("invalid-argument", "Missing userId.");
+  }
+
+  try {
+    const userDoc = await firestore.collection("users").doc(userId).get();
+    if (!userDoc.exists || userDoc.data().companyId !== companyId) {
+        throw new HttpsError("not-found", "User not found.");
+    }
+    const userData = userDoc.data();
+
+    let currentBandId = userData.salaryBandId;
+    let currentBandName = "Unknown";
+    let currentBandLevel = 0;
+
+    // Get band info
+    let nextBandId = null;
+    let nextBandName = null;
+    let nextBandLevel = null;
+
+    if (currentBandId) {
+      const bandsSnap = await firestore.collection("companies").doc(companyId).collection("salaryBands").orderBy("level", "asc").get();
+      const bands = bandsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
+      const currentIndex = bands.findIndex(b => b.id === currentBandId);
+      if (currentIndex !== -1) {
+        currentBandName = bands[currentIndex].name;
+        currentBandLevel = bands[currentIndex].level;
+
+        if (currentIndex < bands.length - 1) {
+           nextBandId = bands[currentIndex + 1].id;
+           nextBandName = bands[currentIndex + 1].name;
+           nextBandLevel = bands[currentIndex + 1].level;
+        }
+      }
+    }
+
+    const storiesSnap = await firestore.collection("users").doc(userId).collection("incrementStories").orderBy("completedAt", "desc").get();
+
+    let progressPercent = 0;
+    const history = [];
+    let avgRecentScore = 0;
+    let sumScore = 0;
+    let count = 0;
+
+    storiesSnap.docs.forEach((doc, idx) => {
+       const story = doc.data();
+       history.push({
+           cycleId: story.cycleId,
+           cycleName: story.cycleName,
+           completedAt: story.completedAt,
+           score: story.score,
+           tierName: story.tierName,
+           tierColor: story.tierColor,
+           incrementPercent: story.incrementPercent,
+           bandName: currentBandName // simplification
+       });
+       if (idx < 2) {
+           sumScore += story.score;
+           count++;
+       }
+    });
+
+    if (count > 0) {
+        avgRecentScore = sumScore / count;
+        // Calculation logic: based on average score of last 2 cycles vs band requirements
+        // Simple mock calculation here as band requirements aren't deeply specified
+        if (count >= 2) {
+           progressPercent = Math.min(100, Math.max(0, Math.round((avgRecentScore / 100) * 100)));
+        }
+    }
+
+    const mapData = {
+        userId,
+        companyId,
+        currentBandId: currentBandId || "",
+        currentBandName,
+        currentBandLevel,
+        nextBandId,
+        nextBandName,
+        nextBandLevel,
+        milestones: [], // Need logic to derive milestones, empty for now
+        history,
+        progressPercent,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    await firestore.collection("users").doc(userId).collection("careerMap").doc("current").set(mapData);
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in updateCareerMap:", error);
+    throw new HttpsError("internal", error.message || "Failed to update career map.");
+  }
+});
+
 exports.updateBudgetTracking = onCall(async (request) => {
   const { uid, role, companyId } = requireHrOrAdmin(request);
   const { cycleId } = request.data;

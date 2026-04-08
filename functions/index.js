@@ -1833,3 +1833,570 @@ exports.cancelCycle = onCall(async (request) => {
     throw new HttpsError("internal", error.message || "Failed to cancel cycle.");
   }
 });
+
+// =============================================================================
+// Module 4 — Budget Simulation Engine
+// =============================================================================
+
+// Helper: normal distribution
+function randomNormal(mean, stdDev) {
+  let u = 0, v = 0;
+  while(u === 0) u = Math.random();
+  while(v === 0) v = Math.random();
+  let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  num = num / 10.0 + 0.5; // Translate to 0 -> 1
+  if (num > 1 || num < 0) return randomNormal(mean, stdDev); // resample
+  return mean + (num - 0.5) * stdDev * 2;
+}
+
+exports.runBudgetSimulation = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { cycleId, parameters, name, description } = request.data;
+
+  if (!cycleId || !parameters || !name) {
+    throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  const cycleData = cycleDoc.data();
+
+  if (cycleData.status !== 'draft') {
+    throw new HttpsError("failed-precondition", "Simulations can only be run on draft cycles.");
+  }
+
+  if (!cycleData.criteria || cycleData.criteria.length === 0 || !cycleData.tiers || cycleData.tiers.length === 0) {
+    throw new HttpsError("failed-precondition", "Cycle must have criteria and tiers configured.");
+  }
+
+  // Max simulations check
+  const simSnap = await cycleRef.collection("simulations").get();
+  if (simSnap.size >= 5) {
+    throw new HttpsError("resource-exhausted", "MAX_SIMULATIONS_REACHED");
+  }
+
+  try {
+    // 1. Fetch employees
+    let usersQuery = firestore.collection("users").where("companyId", "==", companyId).where("status", "==", "active");
+    const usersSnap = await usersQuery.get();
+    const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    let targetUsers = allUsers;
+    if (!cycleData.scope.allEmployees) {
+      targetUsers = allUsers.filter(u => {
+        const inDept = cycleData.scope.departmentIds.length === 0 || cycleData.scope.departmentIds.includes(u.departmentId);
+        const inBand = cycleData.scope.salaryBandIds.length === 0 || cycleData.scope.salaryBandIds.includes(u.salaryBandId);
+        return inDept && inBand;
+      });
+    }
+
+    if (targetUsers.length === 0) {
+      throw new HttpsError("failed-precondition", "No active employees found in cycle scope.");
+    }
+
+    // Default weights from cycle
+    const baseWeights = {};
+    for (const c of cycleData.criteria) {
+        baseWeights[c.id] = c.weight;
+    }
+
+    // Tiers logic
+    const tiersToUse = (parameters.tierThresholds && parameters.tierThresholds.length > 0)
+      ? parameters.tierThresholds
+      : cycleData.tiers;
+
+    // Create map for tier matching
+    const tierMap = tiersToUse.map(t => ({
+      ...t,
+      // fallback to cycle tier name/color if override
+      name: t.name || (cycleData.tiers.find(ct => ct.id === t.tierId)?.name || 'Unknown'),
+      color: t.color || (cycleData.tiers.find(ct => ct.id === t.tierId)?.color || '#94a3b8')
+    })).sort((a,b) => b.minScore - a.minScore); // Highest first
+
+    // Tiers mapping function
+    const getTierForScore = (score) => {
+        return tierMap.find(t => score >= t.minScore && score <= t.maxScore) || null;
+    };
+
+    // Salary estimation (mocking for simulation if real salary missing)
+    let defaultSalary = 50000;
+    let totalPayroll = 0;
+
+    // Employee simulation details
+    const simulatedEmployees = targetUsers.map(user => {
+      let score = 0;
+      switch (parameters.assumedDistribution) {
+        case 'uniform':
+          score = Math.random() * 100;
+          break;
+        case 'normal':
+          score = randomNormal(65, 15);
+          break;
+        case 'top_heavy':
+          score = randomNormal(75, 12); // skewed high
+          break;
+        case 'bottom_heavy':
+          score = randomNormal(45, 12); // skewed low
+          break;
+        default:
+          score = randomNormal(65, 15);
+      }
+
+      // Clamp 0-100
+      score = Math.max(0, Math.min(100, score));
+
+      const tier = getTierForScore(score);
+      const salary = user.currentSalary || defaultSalary;
+      totalPayroll += salary;
+
+      let incrementAmt = 0;
+      let incrementPct = 0;
+
+      if (tier) {
+         incrementPct = (tier.incrementMin + tier.incrementMax) / 2;
+         incrementAmt = salary * (incrementPct / 100);
+      }
+
+      return {
+        uid: user.id,
+        score,
+        tierId: tier ? (tier.id || tier.tierId) : null,
+        tierName: tier ? tier.name : 'Unqualified',
+        salary,
+        incrementAmt,
+        incrementPct
+      };
+    });
+
+    // Aggregate Results
+    let totalProjectedCost = 0;
+    let qualifyingCount = 0;
+    const employeesByTier = {};
+    const tierStats = {};
+
+    for (const t of tierMap) {
+        employeesByTier[t.id || t.tierId] = 0;
+        tierStats[t.id || t.tierId] = {
+           name: t.name,
+           color: t.color,
+           count: 0,
+           totalCost: 0,
+           totalPct: 0
+        };
+    }
+
+    for (const emp of simulatedEmployees) {
+       totalProjectedCost += emp.incrementAmt;
+       if (emp.incrementAmt > 0) qualifyingCount++;
+
+       if (emp.tierId && tierStats[emp.tierId]) {
+           employeesByTier[emp.tierId]++;
+           tierStats[emp.tierId].count++;
+           tierStats[emp.tierId].totalCost += emp.incrementAmt;
+           tierStats[emp.tierId].totalPct += emp.incrementPct;
+       }
+    }
+
+    const avgIncrement = qualifyingCount > 0 ? (totalProjectedCost / (totalPayroll * (qualifyingCount/targetUsers.length))) * 100 : 0;
+    // budgetUtilization: totalProjectedCost / budget.totalBudget * 100
+    let budgetUtilization = 0;
+    const totalBudget = parameters.budgetCap || cycleData.budget.totalBudget || (cycleData.budget.maxPercentage ? (totalPayroll * cycleData.budget.maxPercentage / 100) : 0);
+
+    if (totalBudget > 0) {
+        budgetUtilization = (totalProjectedCost / totalBudget) * 100;
+    }
+
+    // Distribution data
+    const distributionData = Object.values(tierStats).map(t => ({
+        tierName: t.name,
+        tierColor: t.color,
+        employeeCount: t.count,
+        projectedCost: t.totalCost,
+        averageIncrement: t.count > 0 ? t.totalPct / t.count : 0
+    }));
+
+    // Sensitivity Data
+    const sensitivityData = [];
+    for (let th = 50; th <= 95; th += 5) {
+       let sQualifyingCount = 0;
+       let sCost = 0;
+       for (const emp of simulatedEmployees) {
+          if (emp.score >= th) {
+             sQualifyingCount++;
+             const sTier = getTierForScore(emp.score);
+             if (sTier) {
+                 const sPct = (sTier.incrementMin + sTier.incrementMax) / 2;
+                 sCost += emp.salary * (sPct / 100);
+             }
+          }
+       }
+       sensitivityData.push({
+          threshold: th,
+          qualifyingCount: sQualifyingCount,
+          projectedCost: sCost
+       });
+    }
+
+    const results = {
+      totalProjectedCost,
+      totalProjectedCostPercent: totalPayroll > 0 ? (totalProjectedCost / totalPayroll) * 100 : 0,
+      employeesByTier,
+      averageIncrement: avgIncrement,
+      budgetUtilization,
+      qualifyingEmployees: qualifyingCount,
+      distributionData,
+      sensitivityData
+    };
+
+    const newSimRef = cycleRef.collection("simulations").doc();
+    const simData = {
+        companyId,
+        cycleId,
+        name,
+        description: description || null,
+        parameters,
+        results,
+        isApplied: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    await newSimRef.set(simData);
+
+    await writeAuditLog({
+        companyId,
+        action: "SIMULATION_RUN",
+        actorUid: uid,
+        actorEmail: request.auth.token.email || "",
+        actorRole: role,
+        targetType: "simulation",
+        targetId: newSimRef.id,
+        metadata: { name, cycleId }
+    });
+
+    return { success: true, simulationId: newSimRef.id, results };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in runBudgetSimulation:", error);
+    throw new HttpsError("internal", error.message || "Failed to run simulation.");
+  }
+});
+
+exports.saveSimulationScenario = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { cycleId, simulationId, name, description } = request.data;
+
+  if (!cycleId || !simulationId || !name) {
+    throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  const simRef = firestore.collection("cycles").doc(cycleId).collection("simulations").doc(simulationId);
+  const simDoc = await simRef.get();
+
+  if (!simDoc.exists || simDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Simulation not found.");
+  }
+
+  try {
+    const updates = { name, updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+    if (description !== undefined) updates.description = description;
+
+    await simRef.update(updates);
+
+    await writeAuditLog({
+        companyId,
+        action: "SIMULATION_SAVED",
+        actorUid: uid,
+        actorEmail: request.auth.token.email || "",
+        actorRole: role,
+        targetType: "simulation",
+        targetId: simulationId,
+        after: updates
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in saveSimulationScenario:", error);
+    throw new HttpsError("internal", error.message || "Failed to save simulation.");
+  }
+});
+
+exports.deleteSimulationScenario = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { cycleId, simulationId } = request.data;
+
+  if (!cycleId || !simulationId) {
+    throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  const simRef = firestore.collection("cycles").doc(cycleId).collection("simulations").doc(simulationId);
+  const simDoc = await simRef.get();
+
+  if (!simDoc.exists || simDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Simulation not found.");
+  }
+
+  if (simDoc.data().isApplied) {
+    throw new HttpsError("failed-precondition", "Cannot delete an applied scenario.");
+  }
+
+  try {
+    await simRef.delete();
+
+    await writeAuditLog({
+        companyId,
+        action: "SIMULATION_DELETED",
+        actorUid: uid,
+        actorEmail: request.auth.token.email || "",
+        actorRole: role,
+        targetType: "simulation",
+        targetId: simulationId,
+        before: { name: simDoc.data().name }
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in deleteSimulationScenario:", error);
+    throw new HttpsError("internal", error.message || "Failed to delete simulation.");
+  }
+});
+
+exports.applyScenarioToCycle = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { cycleId, simulationId } = request.data;
+
+  if (!cycleId || !simulationId) {
+    throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  if (cycleDoc.data().status !== 'draft') {
+    throw new HttpsError("failed-precondition", "Can only apply scenarios to draft cycles.");
+  }
+
+  const simRef = cycleRef.collection("simulations").doc(simulationId);
+  const simDoc = await simRef.get();
+
+  if (!simDoc.exists || simDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Simulation not found.");
+  }
+
+  const simData = simDoc.data();
+  const parameters = simData.parameters;
+  const cycleData = cycleDoc.data();
+
+  try {
+    await firestore.runTransaction(async (transaction) => {
+      // 1. Update the cycle with new criteria weights and tiers
+      const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+
+      if (parameters.criteriaWeights && Object.keys(parameters.criteriaWeights).length > 0) {
+          const updatedCriteria = cycleData.criteria.map(c => {
+             if (parameters.criteriaWeights[c.id] !== undefined) {
+                 return { ...c, weight: parameters.criteriaWeights[c.id] };
+             }
+             return c;
+          });
+          updates.criteria = updatedCriteria;
+          updates.totalWeight = updatedCriteria.reduce((sum, c) => sum + (c.weight || 0), 0);
+      }
+
+      if (parameters.tierThresholds && parameters.tierThresholds.length > 0) {
+          const updatedTiers = parameters.tierThresholds.map(t => ({
+              ...t,
+              name: t.name || (cycleData.tiers.find(ct => ct.id === t.tierId)?.name || 'Unknown'),
+              color: t.color || (cycleData.tiers.find(ct => ct.id === t.tierId)?.color || '#94a3b8')
+          }));
+          updates.tiers = updatedTiers;
+      }
+
+      transaction.update(cycleRef, updates);
+
+      // 2. Mark this simulation as applied, others as unapplied
+      const allSimsSnap = await transaction.get(cycleRef.collection("simulations"));
+      for (const sDoc of allSimsSnap.docs) {
+          transaction.update(sDoc.ref, { isApplied: sDoc.id === simulationId });
+      }
+
+      // Audit Log for Cycle Update
+      const auditRef = firestore.collection("auditLogs").doc();
+      transaction.set(auditRef, {
+        companyId,
+        action: "CRITERIA_UPDATED",
+        actorUid: uid,
+        actorEmail: request.auth.token.email || "",
+        actorRole: role,
+        targetType: "cycle",
+        targetId: cycleId,
+        after: updates,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Audit Log for Simulation Apply
+      const auditRefSim = firestore.collection("auditLogs").doc();
+      transaction.set(auditRefSim, {
+        companyId,
+        action: "SIMULATION_APPLIED",
+        actorUid: uid,
+        actorEmail: request.auth.token.email || "",
+        actorRole: role,
+        targetType: "simulation",
+        targetId: simulationId,
+        metadata: { name: simData.name, cycleId },
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in applyScenarioToCycle:", error);
+    throw new HttpsError("internal", error.message || "Failed to apply scenario.");
+  }
+});
+
+exports.updateBudgetTracking = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { cycleId } = request.data;
+
+  if (!cycleId) {
+    throw new HttpsError("invalid-argument", "Missing cycleId.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  const cycleData = cycleDoc.data();
+
+  try {
+    // 1. Fetch evaluations for this cycle
+    const evalsSnap = await firestore.collection("evaluations")
+        .where("companyId", "==", companyId)
+        .where("cycleId", "==", cycleId)
+        .get();
+
+    let committed = 0;
+    let projected = 0;
+    const byDepartment = {};
+    const byTier = {};
+
+    // Default tier tracking
+    if (cycleData.tiers) {
+        for (const t of cycleData.tiers) {
+            byTier[t.id] = { count: 0, totalAmount: 0 };
+        }
+    }
+
+    evalsSnap.docs.forEach(doc => {
+       const evalData = doc.data();
+       const amt = evalData.incrementAmount || 0;
+
+       if (evalData.status === 'finalized' || evalData.status === 'approved') {
+           committed += amt;
+       } else {
+           projected += amt;
+       }
+
+       // Department breakdown
+       if (evalData.departmentId) {
+           if (!byDepartment[evalData.departmentId]) {
+               byDepartment[evalData.departmentId] = { budget: 0, committed: 0, projected: 0 };
+           }
+           if (evalData.status === 'finalized' || evalData.status === 'approved') {
+               byDepartment[evalData.departmentId].committed += amt;
+           } else {
+               byDepartment[evalData.departmentId].projected += amt;
+           }
+       }
+
+       // Tier breakdown
+       if (evalData.tierId && byTier[evalData.tierId] !== undefined) {
+           byTier[evalData.tierId].count += 1;
+           byTier[evalData.tierId].totalAmount += amt;
+       }
+    });
+
+    let totalBudget = 0;
+    if (cycleData.budget.type === 'fixed_pool') {
+        totalBudget = cycleData.budget.totalBudget || 0;
+    } else {
+        // Need to approximate total payroll for percentage budget
+        const usersSnap = await firestore.collection("users").where("companyId", "==", companyId).where("status", "==", "active").get();
+        let payroll = 0;
+        usersSnap.docs.forEach(d => payroll += (d.data().currentSalary || 50000));
+        totalBudget = payroll * (cycleData.budget.maxPercentage || 0) / 100;
+    }
+
+    const remaining = Math.max(0, totalBudget - committed - projected);
+    const utilizationPercent = totalBudget > 0 ? ((committed + projected) / totalBudget) * 100 : 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const newBurnPoint = { date: today, committed, projected };
+
+    // Update Realtime Database
+    const db = admin.database();
+    const budgetRef = db.ref(`budgetTracking/${cycleId}`);
+
+    const currentBudgetSnap = await budgetRef.get();
+    let burnRateData = [];
+
+    if (currentBudgetSnap.exists()) {
+        const currentData = currentBudgetSnap.val();
+        if (currentData.burnRateData) {
+            burnRateData = currentData.burnRateData;
+            // Update today's point or append
+            const lastIndex = burnRateData.length - 1;
+            if (lastIndex >= 0 && burnRateData[lastIndex].date === today) {
+                burnRateData[lastIndex] = newBurnPoint;
+            } else {
+                burnRateData.push(newBurnPoint);
+            }
+        } else {
+             burnRateData = [newBurnPoint];
+        }
+    } else {
+        burnRateData = [newBurnPoint];
+    }
+
+    const updateData = {
+        companyId,
+        cycleId,
+        totalBudget,
+        currency: cycleData.budget.currency || "USD",
+        committed,
+        projected,
+        remaining,
+        utilizationPercent,
+        byDepartment,
+        byTier,
+        burnRateData,
+        lastUpdated: admin.database.ServerValue.TIMESTAMP
+    };
+
+    await budgetRef.set(updateData);
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in updateBudgetTracking:", error);
+    throw new HttpsError("internal", error.message || "Failed to update budget tracking.");
+  }
+});

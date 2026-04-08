@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../config/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc } from "firebase/firestore";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -14,6 +14,7 @@ import {
   TrendingUp,
   DollarSign,
   LogOut,
+  Scale,
   X,
   Bell,
 } from "lucide-react";
@@ -49,6 +50,7 @@ interface NavItem {
   isEvalBadge?: boolean;
   isReviewBadge?: boolean;
   isNotificationBadge?: boolean;
+  isFairnessBadge?: boolean;
   subItems?: NavItem[];
 }
 
@@ -80,9 +82,18 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
             { name: "Score Review", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
           ]
         },
-        { name: "Analytics", href: "/analytics", icon: BarChart2 },
+        {
+          name: "Analytics",
+          href: "/analytics",
+          icon: BarChart2,
+          subItems: [
+            { name: "Executive Dashboard", href: "/analytics", icon: BarChart2, exact: true },
+            { name: "Reports", href: "/analytics/reports", icon: BarChart2 },
+            { name: "Fairness", href: "/fairness", icon: Scale, isFairnessBadge: true },
+          ],
+        },
         { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
-        { name: "Settings", href: "/settings/profile", icon: Settings },
+        { name: "Settings", href: "/settings/general", icon: Settings },
       ];
     case "hr_admin":
       return [
@@ -108,9 +119,18 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
             { name: "Score Review", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
           ]
         },
-        { name: "Analytics", href: "/analytics", icon: BarChart2 },
+        {
+          name: "Analytics",
+          href: "/analytics",
+          icon: BarChart2,
+          subItems: [
+            { name: "Executive Dashboard", href: "/analytics", icon: BarChart2, exact: true },
+            { name: "Reports", href: "/analytics/reports", icon: BarChart2 },
+            { name: "Fairness", href: "/fairness", icon: Scale, isFairnessBadge: true },
+          ],
+        },
         { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
-        { name: "Settings", href: "/settings/profile", icon: Settings },
+        { name: "Settings", href: "/settings/notifications", icon: Settings },
       ];
     case "manager":
       return [
@@ -146,6 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const [pendingCount, setPendingCount] = useState(0);
   const [evalCount, setEvalCount] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
+  const [fairnessScore, setFairnessScore] = useState<number | null>(null);
   const unreadCount = useNotificationStore((state) => state.unreadCount);
 
   // Fetch pending count for hr_admin
@@ -159,6 +180,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setPendingCount(snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Fetch fairness score for super/hr admin
+  useEffect(() => {
+    if ((user?.role !== "hr_admin" && user?.role !== "super_admin") || !user?.companyId) return;
+
+    const unsubscribe = onSnapshot(doc(db, "companies", user.companyId), (docSnap) => {
+      if (docSnap.exists() && docSnap.data().fairnessScore !== undefined) {
+        setFairnessScore(docSnap.data().fairnessScore);
+      }
     });
 
     return () => unsubscribe();
@@ -250,6 +284,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
         {item.isNotificationBadge && unreadCount > 0 && (
           <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
             {unreadCount}
+          </span>
+        )}
+        {item.isFairnessBadge && fairnessScore !== null && fairnessScore < 75 && (
+          <span className={`text-white text-xs font-bold px-2 py-0.5 rounded-full ${fairnessScore < 60 ? 'bg-red-500' : 'bg-amber-500'}`}>
+            !
           </span>
         )}
       </Link>

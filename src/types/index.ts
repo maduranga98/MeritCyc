@@ -11,3 +11,6 @@ export * from './simulation';
 export * from './budgetTracking';
 export * from './evaluation';
 export * from './incrementStory';
+export * from './fairness';
+export * from './analytics';
+export * from './settings';

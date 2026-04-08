@@ -310,12 +310,10 @@ exports.deleteCompany = onCall(async (request) => {
 // =============================================================================
 
 const crypto = require("crypto");
-const brevo = require("@getbrevo/brevo");
+const { BrevoClient } = require("@getbrevo/brevo");
 
-// Brevo transactional email client (v5.x: auth is set per API instance)
-const transactionalEmailApi = new brevo.TransactionalEmailsApi();
-transactionalEmailApi.authentications["api-key"].apiKey =
-  process.env.BREVO_API_KEY || "";
+// Brevo transactional email client (v5.x)
+const transactionalEmailApi = new BrevoClient({ apiKey: process.env.BREVO_API_KEY || "" }).transactionalEmails;
 
 // ---------------------------------------------------------------------------
 // Rate-limit helper
@@ -413,11 +411,12 @@ async function resolveCompanyCode(companyCode) {
 // ---------------------------------------------------------------------------
 
 async function sendOtpEmail(toEmail, toName, otp, companyName) {
-  const email = new brevo.SendSmtpEmail();
-  email.sender = { name: "MeritCyc", email: "noreply@meritcyc.com" };
-  email.to = [{ email: toEmail, name: toName }];
-  email.subject = "Your MeritCyc Verification Code";
-  email.htmlContent = `
+  try {
+    await transactionalEmailApi.sendTransacEmail({
+      sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
+      to: [{ email: toEmail, name: toName }],
+      subject: "Your MeritCyc Verification Code",
+      htmlContent: `
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#0F172A">Your verification code</h2>
       <p>Hi ${toName},</p>
@@ -431,10 +430,8 @@ async function sendOtpEmail(toEmail, toName, otp, companyName) {
         This code is valid for <strong>10 minutes</strong>.
         If you did not request this, please ignore this email.
       </p>
-    </div>`;
-
-  try {
-    await transactionalEmailApi.sendTransacEmail(email);
+    </div>`,
+    });
   } catch (e) {
     // Log but don't surface Brevo errors to the caller
     logger.error("Brevo send failed:", e);

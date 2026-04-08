@@ -7,14 +7,10 @@ const brevo = require("@getbrevo/brevo");
 // We assume firebase-admin is initialized in index.js
 const firestore = admin.firestore();
 
-// Set up Brevo
-// We should normally get the key from firebase functions config or secret manager
-// For this codebase we'll initialize a dummy or assume process.env.BREVO_API_KEY
-const defaultClient = brevo.ApiClient.instance;
-const apiKey = defaultClient.authentications["api-key"];
-apiKey.apiKey = process.env.BREVO_API_KEY || "dummy-key";
-
+// Set up Brevo (v5.x: auth is set per API instance, not on a singleton ApiClient)
 const transactionalEmailsApi = new brevo.TransactionalEmailsApi();
+transactionalEmailsApi.authentications["api-key"].apiKey =
+  process.env.BREVO_API_KEY || "";
 
 // =============================================================================
 // Helper: write audit log entry

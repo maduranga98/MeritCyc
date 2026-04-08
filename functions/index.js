@@ -312,11 +312,10 @@ exports.deleteCompany = onCall(async (request) => {
 const crypto = require("crypto");
 const brevo = require("@getbrevo/brevo");
 
-// Brevo transactional email client (key from environment)
-const brevoClient = brevo.ApiClient.instance;
-brevoClient.authentications["api-key"].apiKey =
-  process.env.BREVO_API_KEY || "";
+// Brevo transactional email client (v5.x: auth is set per API instance)
 const transactionalEmailApi = new brevo.TransactionalEmailsApi();
+transactionalEmailApi.authentications["api-key"].apiKey =
+  process.env.BREVO_API_KEY || "";
 
 // ---------------------------------------------------------------------------
 // Rate-limit helper

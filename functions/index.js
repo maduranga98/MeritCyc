@@ -1402,3 +1402,434 @@ exports.reactivateEmployee = onCall(async (request) => {
 
     return { success: true };
 });
+// =============================================================================
+// Module 3 — Increment Cycle Engine
+// =============================================================================
+
+// =============================================================================
+// createCycle — hr_admin | super_admin
+// =============================================================================
+
+exports.createCycle = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+
+  const { name, description, scope, budget, timeline } = request.data;
+
+  if (!name || !scope || !budget || !timeline) {
+    throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  if (!timeline.startDate || !timeline.endDate || !timeline.evaluationDeadline) {
+    throw new HttpsError("invalid-argument", "All timeline dates are required.");
+  }
+
+  const start = new Date(timeline.startDate);
+  const end = new Date(timeline.endDate);
+  const evalDeadline = new Date(timeline.evaluationDeadline);
+
+  if (end <= start) {
+    throw new HttpsError("invalid-argument", "endDate must be after startDate.");
+  }
+  if (evalDeadline > end) {
+    throw new HttpsError("invalid-argument", "evaluationDeadline must be on or before endDate.");
+  }
+
+  try {
+    // Calculate employeeCount based on scope
+    let employeeCount = 0;
+    let usersQuery = firestore.collection("users").where("companyId", "==", companyId).where("status", "==", "active");
+    const usersSnap = await usersQuery.get();
+    const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if (scope.allEmployees) {
+      employeeCount = allUsers.length;
+    } else {
+      employeeCount = allUsers.filter(u => {
+        const inDept = scope.departmentIds.length === 0 || scope.departmentIds.includes(u.departmentId);
+        const inBand = scope.salaryBandIds.length === 0 || scope.salaryBandIds.includes(u.salaryBandId);
+        return inDept && inBand;
+      }).length;
+    }
+
+    const cycleRef = await firestore.collection("cycles").add({
+      companyId,
+      name,
+      description: description || null,
+      status: "draft",
+      scope,
+      budget,
+      criteria: [],
+      tiers: [],
+      timeline: {
+        startDate: admin.firestore.Timestamp.fromDate(start),
+        endDate: admin.firestore.Timestamp.fromDate(end),
+        evaluationDeadline: admin.firestore.Timestamp.fromDate(evalDeadline),
+      },
+      employeeCount,
+      totalWeight: 0,
+      createdBy: uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await writeAuditLog({
+      companyId,
+      action: "CYCLE_CREATED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "cycle",
+      targetId: cycleRef.id,
+      after: { name, status: "draft" },
+    });
+
+    return { success: true, cycleId: cycleRef.id };
+  } catch (error) {
+    logger.error("Error in createCycle:", error);
+    throw new HttpsError("internal", error.message || "Failed to create cycle.");
+  }
+});
+
+// =============================================================================
+// updateCycle — hr_admin | super_admin
+// BLOCK if status !== 'draft'
+// =============================================================================
+
+exports.updateCycle = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+
+  const { cycleId, name, description, scope, budget, timeline } = request.data;
+
+  if (!cycleId) {
+    throw new HttpsError("invalid-argument", "cycleId is required.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  if (cycleDoc.data().status !== "draft") {
+    throw new HttpsError("failed-precondition", "CYCLE_NOT_EDITABLE");
+  }
+
+  try {
+    const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (budget !== undefined) updates.budget = budget;
+
+    if (scope !== undefined) {
+      updates.scope = scope;
+      // Recalculate employeeCount
+      const usersSnap = await firestore.collection("users")
+        .where("companyId", "==", companyId)
+        .where("status", "==", "active")
+        .get();
+      const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (scope.allEmployees) {
+        updates.employeeCount = allUsers.length;
+      } else {
+        updates.employeeCount = allUsers.filter(u => {
+          const inDept = scope.departmentIds.length === 0 || scope.departmentIds.includes(u.departmentId);
+          const inBand = scope.salaryBandIds.length === 0 || scope.salaryBandIds.includes(u.salaryBandId);
+          return inDept && inBand;
+        }).length;
+      }
+    }
+
+    if (timeline !== undefined) {
+      const start = new Date(timeline.startDate);
+      const end = new Date(timeline.endDate);
+      const evalDeadline = new Date(timeline.evaluationDeadline);
+      if (end <= start) throw new HttpsError("invalid-argument", "endDate must be after startDate.");
+      if (evalDeadline > end) throw new HttpsError("invalid-argument", "evaluationDeadline must be on or before endDate.");
+      updates.timeline = {
+        startDate: admin.firestore.Timestamp.fromDate(start),
+        endDate: admin.firestore.Timestamp.fromDate(end),
+        evaluationDeadline: admin.firestore.Timestamp.fromDate(evalDeadline),
+      };
+    }
+
+    await cycleRef.update(updates);
+
+    await writeAuditLog({
+      companyId,
+      action: "CYCLE_UPDATED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "cycle",
+      targetId: cycleId,
+      after: updates,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in updateCycle:", error);
+    throw new HttpsError("internal", error.message || "Failed to update cycle.");
+  }
+});
+
+// =============================================================================
+// updateCycleCriteria — hr_admin | super_admin
+// BLOCK if status !== 'draft'
+// =============================================================================
+
+exports.updateCycleCriteria = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+
+  const { cycleId, criteria, tiers } = request.data;
+
+  if (!cycleId) {
+    throw new HttpsError("invalid-argument", "cycleId is required.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  if (cycleDoc.data().status !== "draft") {
+    throw new HttpsError("failed-precondition", "CYCLE_NOT_EDITABLE");
+  }
+
+  // Validate criteria
+  const validMeasurementTypes = ["numeric", "boolean", "rating", "percentage"];
+  const validDataSources = ["manager", "system", "self"];
+
+  if (criteria && criteria.length > 0) {
+    const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
+    if (Math.round(totalWeight) !== 100) {
+      throw new HttpsError("invalid-argument", "Criteria weights must sum to exactly 100.");
+    }
+    for (const c of criteria) {
+      if (!validMeasurementTypes.includes(c.measurementType)) {
+        throw new HttpsError("invalid-argument", `Invalid measurementType: ${c.measurementType}`);
+      }
+      if (!validDataSources.includes(c.dataSource)) {
+        throw new HttpsError("invalid-argument", `Invalid dataSource: ${c.dataSource}`);
+      }
+    }
+  }
+
+  // Validate tiers
+  if (tiers && tiers.length > 0) {
+    for (const t of tiers) {
+      if (t.minScore >= t.maxScore) {
+        throw new HttpsError("invalid-argument", `Tier "${t.name}": minScore must be less than maxScore.`);
+      }
+    }
+    // Check for overlaps
+    const sorted = [...tiers].sort((a, b) => a.minScore - b.minScore);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (sorted[i].maxScore > sorted[i + 1].minScore) {
+        throw new HttpsError("invalid-argument", `Tiers "${sorted[i].name}" and "${sorted[i+1].name}" overlap.`);
+      }
+    }
+  }
+
+  try {
+    const totalWeight = criteria && criteria.length > 0
+      ? criteria.reduce((sum, c) => sum + (c.weight || 0), 0)
+      : 0;
+
+    await cycleRef.update({
+      criteria: criteria || [],
+      tiers: tiers || [],
+      totalWeight,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await writeAuditLog({
+      companyId,
+      action: "CRITERIA_UPDATED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "cycle",
+      targetId: cycleId,
+      after: { criteriaCount: criteria ? criteria.length : 0, totalWeight, tierCount: tiers ? tiers.length : 0 },
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in updateCycleCriteria:", error);
+    throw new HttpsError("internal", error.message || "Failed to update criteria.");
+  }
+});
+
+// =============================================================================
+// publishAndLockCycle — hr_admin | super_admin
+// Two-step: confirmationCode must match cycle name exactly
+// =============================================================================
+
+exports.publishAndLockCycle = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+
+  const { cycleId, confirmationCode } = request.data;
+
+  if (!cycleId || !confirmationCode) {
+    throw new HttpsError("invalid-argument", "cycleId and confirmationCode are required.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  const cycleData = cycleDoc.data();
+
+  if (cycleData.status !== "draft") {
+    throw new HttpsError("failed-precondition", "Only draft cycles can be published.");
+  }
+
+  // Confirm name matches
+  if (confirmationCode !== cycleData.name) {
+    throw new HttpsError("invalid-argument", "Confirmation code does not match cycle name.");
+  }
+
+  // Pre-flight validations
+  if (!cycleData.criteria || cycleData.criteria.length === 0) {
+    throw new HttpsError("failed-precondition", "Cycle must have at least one criteria.");
+  }
+
+  const totalWeight = cycleData.criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
+  if (Math.round(totalWeight) !== 100) {
+    throw new HttpsError("failed-precondition", "Criteria weights must sum to 100.");
+  }
+
+  if (!cycleData.tiers || cycleData.tiers.length === 0) {
+    throw new HttpsError("failed-precondition", "Cycle must have at least one tier.");
+  }
+
+  if (!cycleData.employeeCount || cycleData.employeeCount === 0) {
+    throw new HttpsError("failed-precondition", "Cycle must have at least one employee in scope.");
+  }
+
+  try {
+    const now = admin.firestore.Timestamp.now();
+
+    await cycleRef.update({
+      status: "locked",
+      lockedAt: now,
+      lockedBy: uid,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send notifications to all employees in scope
+    const usersSnap = await firestore.collection("users")
+      .where("companyId", "==", companyId)
+      .where("status", "==", "active")
+      .get();
+
+    const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let targetUsers = allUsers;
+
+    if (!cycleData.scope.allEmployees) {
+      targetUsers = allUsers.filter(u => {
+        const inDept = cycleData.scope.departmentIds.length === 0 || cycleData.scope.departmentIds.includes(u.departmentId);
+        const inBand = cycleData.scope.salaryBandIds.length === 0 || cycleData.scope.salaryBandIds.includes(u.salaryBandId);
+        return inDept && inBand;
+      });
+    }
+
+    const batch = firestore.batch();
+    for (const u of targetUsers) {
+      const notifRef = firestore.collection("users").doc(u.id).collection("notifications").doc();
+      batch.set(notifRef, {
+        type: "CYCLE_LOCKED",
+        title: "New Increment Cycle Started",
+        message: `The increment cycle "${cycleData.name}" has been published. Evaluations will begin soon.`,
+        cycleId,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+
+    await writeAuditLog({
+      companyId,
+      action: "CYCLE_LOCKED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "cycle",
+      targetId: cycleId,
+      after: {
+        status: "locked",
+        lockedAt: now,
+        criteriaSnapshot: cycleData.criteria,
+        tiersSnapshot: cycleData.tiers,
+        employeeCount: cycleData.employeeCount,
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in publishAndLockCycle:", error);
+    throw new HttpsError("internal", error.message || "Failed to publish cycle.");
+  }
+});
+
+// =============================================================================
+// cancelCycle — hr_admin | super_admin
+// BLOCK if status === 'completed'
+// =============================================================================
+
+exports.cancelCycle = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+
+  const { cycleId, reason } = request.data;
+
+  if (!cycleId || !reason) {
+    throw new HttpsError("invalid-argument", "cycleId and reason are required.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  if (cycleDoc.data().status === "completed") {
+    throw new HttpsError("failed-precondition", "Completed cycles cannot be cancelled.");
+  }
+
+  try {
+    await cycleRef.update({
+      status: "cancelled",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await writeAuditLog({
+      companyId,
+      action: "CYCLE_CANCELLED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "cycle",
+      targetId: cycleId,
+      before: { status: cycleDoc.data().status },
+      after: { status: "cancelled", reason },
+      metadata: { reason },
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in cancelCycle:", error);
+    throw new HttpsError("internal", error.message || "Failed to cancel cycle.");
+  }
+});

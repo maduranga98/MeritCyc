@@ -23,6 +23,8 @@ import DepartmentManagement from "./pages/people/DepartmentManagement";
 import SalaryBandManagement from "./pages/people/SalaryBandManagement";
 import EmployeeDirectory from "./pages/people/EmployeeDirectory";
 import ProfilePage from "./pages/settings/Profile";
+import CyclesList from "./pages/cycles/CyclesList";
+import CycleDetail from "./pages/cycles/CycleDetail";
 
 // Join / self-registration pages (public)
 import ManualJoin from "./pages/join/ManualJoin";
@@ -383,6 +385,30 @@ function App() {
             <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
               <AppLayout>
                 <PendingApprovals />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================================================================= */}
+        {/* Module 3 — Increment Cycle Engine                                  */}
+        {/* ================================================================= */}
+        <Route
+          path="/cycles"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <CyclesList />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cycles/:cycleId"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <CycleDetail />
               </AppLayout>
             </ProtectedRoute>
           }

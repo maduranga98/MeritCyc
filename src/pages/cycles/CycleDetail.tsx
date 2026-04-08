@@ -4,7 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { cycleService } from '../../services/cycleService';
 import { departmentService } from '../../services/departmentService';
 import { salaryBandService } from '../../services/salaryBandService';
+import { evaluationService } from '../../services/evaluationService';
 import { type Cycle, type CycleStatus } from '../../types/cycle';
+import { type Evaluation } from '../../types/evaluation';
 import { type Department } from '../../types/department';
 import { type SalaryBand } from '../../types/salaryBand';
 import { db } from '../../config/firebase';
@@ -526,16 +528,93 @@ function AuditLogTab({ cycleId, companyId }: { cycleId: string; companyId: strin
 }
 
 // ---------------------------------------------------------------------------
+// TAB 6 — Evaluations
+// ---------------------------------------------------------------------------
+
+function EvaluationsTab({ cycle, evaluations, onInitialize }: { cycle: Cycle, evaluations: Evaluation[], onInitialize: () => void }) {
+  const navigate = useNavigate();
+  const [initializing, setInitializing] = useState(false);
+
+  const handleInit = async () => {
+     setInitializing(true);
+     await onInitialize();
+     setInitializing(false);
+  };
+
+  const total = evaluations.length;
+  const submitted = evaluations.filter(e => e.status === 'submitted' || e.status === 'overridden' || e.status === 'finalized').length;
+  const progress = total > 0 ? (submitted / total) * 100 : 0;
+
+  if (cycle.status === 'draft') {
+      return (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
+              <ClipboardList className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-sm font-bold text-slate-900 mb-1">Evaluations will appear here</h3>
+              <p className="text-xs text-slate-500">Publish and lock this cycle to begin the evaluation phase.</p>
+          </div>
+      );
+  }
+
+  if (total === 0 && cycle.status === 'active') {
+       return (
+          <div className="bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
+              <Users className="w-10 h-10 text-amber-300 mx-auto mb-3" />
+              <h3 className="text-sm font-bold text-slate-900 mb-2">Evaluations not initialized</h3>
+              <p className="text-xs text-slate-500 mb-4 max-w-sm mx-auto">
+                 The cycle is active but evaluations haven't been assigned to managers yet. Click the button below to assign them.
+              </p>
+              <button
+                  onClick={handleInit}
+                  disabled={initializing}
+                  className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mx-auto"
+              >
+                  {initializing ? <Loader2 className="w-4 h-4 animate-spin"/> : <ClipboardList className="w-4 h-4"/>}
+                  {initializing ? 'Initializing...' : 'Initialize Evaluations'}
+              </button>
+          </div>
+       );
+  }
+
+  return (
+      <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                  <div>
+                      <h3 className="text-lg font-bold text-slate-900">Evaluation Progress</h3>
+                      <p className="text-sm text-slate-500 mt-1">Managers are currently evaluating their teams.</p>
+                  </div>
+                  <button
+                      onClick={() => navigate('/evaluations/review')}
+                      className="px-4 py-2 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors text-sm"
+                  >
+                      Go to Score Review
+                  </button>
+              </div>
+
+              <div className="mb-2 flex justify-between text-sm font-medium">
+                  <span className="text-slate-600">{submitted} of {total} evaluations completed</span>
+                  <span className="text-emerald-600">{Math.round(progress)}%</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-3">
+                  <div className="bg-emerald-500 h-3 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+              </div>
+          </div>
+      </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // CycleDetail Page
 // ---------------------------------------------------------------------------
 
-type TabId = 'overview' | 'criteria' | 'scope' | 'timeline' | 'audit' | 'simulation' | 'budget';
+type TabId = 'overview' | 'criteria' | 'scope' | 'timeline' | 'evaluations' | 'audit' | 'simulation' | 'budget';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'criteria', label: 'Criteria' },
   { id: 'scope', label: 'Scope & Budget' },
   { id: 'timeline', label: 'Timeline' },
+  { id: 'evaluations', label: 'Evaluations' },
   { id: 'audit', label: 'Audit Log' },
 ];
 
@@ -549,6 +628,7 @@ export default function CycleDetail() {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [salaryBands, setSalaryBands] = useState<SalaryBand[]>([]);
+  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [cancellingReason, setCancellingReason] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -560,7 +640,13 @@ export default function CycleDetail() {
       setCycle(data);
       setLoading(false);
     });
-    return () => unsub();
+    const unsubEvals = evaluationService.getCycleEvaluations(cycleId, (data) => {
+        setEvaluations(data);
+    });
+    return () => {
+        unsub();
+        unsubEvals();
+    };
   }, [cycleId]);
 
   useEffect(() => {
@@ -739,6 +825,21 @@ export default function CycleDetail() {
         <ScopeBudgetTab cycle={cycle} departments={departments} salaryBands={salaryBands} />
       )}
       {activeTab === 'timeline' && <TimelineTab cycle={cycle} />}
+      {activeTab === 'evaluations' && (
+        <EvaluationsTab
+            cycle={cycle}
+            evaluations={evaluations}
+            onInitialize={async () => {
+                try {
+                    await evaluationService.initializeEvaluations(cycle.id);
+                    toast.success('Evaluations initialized');
+                } catch (error) {
+                    const msg = error instanceof Error ? error.message : 'Failed to initialize';
+                    toast.error(msg);
+                }
+            }}
+        />
+      )}
       {activeTab === 'audit' && (
         <AuditLogTab cycleId={cycle.id} companyId={cycle.companyId} />
       )}

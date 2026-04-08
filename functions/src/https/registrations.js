@@ -3,14 +3,12 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
-const brevo = require("@getbrevo/brevo");
+const { BrevoClient } = require("@getbrevo/brevo");
 
 const firestore = admin.firestore();
 
-// Set up Brevo (v5.x: auth is set per API instance, not on a singleton ApiClient)
-const transactionalEmailsApi = new brevo.TransactionalEmailsApi();
-transactionalEmailsApi.authentications["api-key"].apiKey =
-  process.env.BREVO_API_KEY || "";
+// Set up Brevo v5.x client
+const transactionalEmailsApi = new BrevoClient({ apiKey: process.env.BREVO_API_KEY || "" }).transactionalEmails;
 
 async function writeAuditLog({
   companyId,
@@ -147,9 +145,10 @@ exports.approveRegistration = onCall(async (request) => {
     const companyDoc = await firestore.collection("companies").doc(companyId).get();
     const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
-    let sendSmtpEmail = new brevo.SendSmtpEmail();
-    sendSmtpEmail.subject = `Welcome to ${companyName} on MeritCyc!`;
-    sendSmtpEmail.htmlContent = `
+    try {
+      await transactionalEmailsApi.sendTransacEmail({
+        subject: `Welcome to ${companyName} on MeritCyc!`,
+        htmlContent: `
       <html>
         <body>
           <h1>Welcome to ${companyName}!</h1>
@@ -161,12 +160,10 @@ exports.approveRegistration = onCall(async (request) => {
           <p><em>Please change your password after your first login.</em></p>
         </body>
       </html>
-    `;
-    sendSmtpEmail.sender = { name: companyName, email: "noreply@meritcyc.com" };
-    sendSmtpEmail.to = [{ email: pendingData.email, name: pendingData.name }];
-
-    try {
-      await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+    `,
+        sender: { name: companyName, email: "noreply@meritcyc.com" },
+        to: [{ email: pendingData.email, name: pendingData.name }],
+      });
     } catch (e) {
       logger.error("Failed to send approval email", e);
     }
@@ -279,9 +276,10 @@ exports.bulkApprove = onCall(async (request) => {
       const companyDoc = await firestore.collection("companies").doc(companyId).get();
       const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
-      let sendSmtpEmail = new brevo.SendSmtpEmail();
-      sendSmtpEmail.subject = `Welcome to ${companyName} on MeritCyc!`;
-      sendSmtpEmail.htmlContent = `
+      try {
+        await transactionalEmailsApi.sendTransacEmail({
+          subject: `Welcome to ${companyName} on MeritCyc!`,
+          htmlContent: `
         <html>
           <body>
             <h1>Welcome to ${companyName}!</h1>
@@ -293,12 +291,10 @@ exports.bulkApprove = onCall(async (request) => {
             <p><em>Please change your password after your first login.</em></p>
           </body>
         </html>
-      `;
-      sendSmtpEmail.sender = { name: companyName, email: "noreply@meritcyc.com" };
-      sendSmtpEmail.to = [{ email: pendingData.email, name: pendingData.name }];
-
-      try {
-        await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+      `,
+          sender: { name: companyName, email: "noreply@meritcyc.com" },
+          to: [{ email: pendingData.email, name: pendingData.name }],
+        });
       } catch (e) {
         logger.error("Failed to send approval email", e);
       }
@@ -377,9 +373,10 @@ exports.bulkReject = onCall(async (request) => {
     await batch.commit();
 
     await Promise.all(emailsToSend.map(async (u) => {
-      let sendSmtpEmail = new brevo.SendSmtpEmail();
-      sendSmtpEmail.subject = "Your MeritCyc registration was not approved";
-      sendSmtpEmail.htmlContent = `
+      try {
+        await transactionalEmailsApi.sendTransacEmail({
+          subject: "Your MeritCyc registration was not approved",
+          htmlContent: `
         <html>
           <body>
             <p>Hi ${u.name},</p>
@@ -388,12 +385,10 @@ exports.bulkReject = onCall(async (request) => {
             <p>Contact your HR team for more information.</p>
           </body>
         </html>
-      `;
-      sendSmtpEmail.sender = { name: "MeritCyc", email: "noreply@meritcyc.com" };
-      sendSmtpEmail.to = [{ email: u.email, name: u.name }];
-
-      try {
-        await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+      `,
+          sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
+          to: [{ email: u.email, name: u.name }],
+        });
       } catch (e) {
         logger.error("Failed to send rejection email", e);
       }
@@ -450,9 +445,10 @@ exports.rejectRegistration = onCall(async (request) => {
       rejectedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    let sendSmtpEmail = new brevo.SendSmtpEmail();
-    sendSmtpEmail.subject = "Your MeritCyc registration was not approved";
-    sendSmtpEmail.htmlContent = `
+    try {
+      await transactionalEmailsApi.sendTransacEmail({
+        subject: "Your MeritCyc registration was not approved",
+        htmlContent: `
       <html>
         <body>
           <p>Hi ${pendingData.name},</p>
@@ -461,12 +457,10 @@ exports.rejectRegistration = onCall(async (request) => {
           <p>Contact your HR team for more information.</p>
         </body>
       </html>
-    `;
-    sendSmtpEmail.sender = { name: "MeritCyc", email: "noreply@meritcyc.com" };
-    sendSmtpEmail.to = [{ email: pendingData.email, name: pendingData.name }];
-
-    try {
-      await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+    `,
+        sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
+        to: [{ email: pendingData.email, name: pendingData.name }],
+      });
     } catch (e) {
       logger.error("Failed to send rejection email", e);
     }
@@ -519,9 +513,10 @@ exports.pendingApprovalReminder = onSchedule("every 12 hours", async (event) => 
         if (!hrAdminsSnapshot.empty) {
           const toEmails = hrAdminsSnapshot.docs.map(doc => ({ email: doc.data().email, name: doc.data().name }));
 
-          let sendSmtpEmail = new brevo.SendSmtpEmail();
-          sendSmtpEmail.subject = "Pending Registration Reminders";
-          sendSmtpEmail.htmlContent = `
+          try {
+            await transactionalEmailsApi.sendTransacEmail({
+              subject: "Pending Registration Reminders",
+              htmlContent: `
             <html>
               <body>
                 <p>Hello,</p>
@@ -529,12 +524,10 @@ exports.pendingApprovalReminder = onSchedule("every 12 hours", async (event) => 
                 <p>Please log in to review them.</p>
               </body>
             </html>
-          `;
-          sendSmtpEmail.sender = { name: "MeritCyc", email: "noreply@meritcyc.com" };
-          sendSmtpEmail.to = toEmails;
-
-          try {
-            await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+          `,
+              sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
+              to: toEmails,
+            });
           } catch (e) {
             logger.error(`Failed to send reminder email for company ${companyId}`, e);
           }
@@ -583,9 +576,10 @@ exports.requestMoreInfo = onCall(async (request) => {
     const companyDoc = await firestore.collection("companies").doc(companyId).get();
     const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
-    let sendSmtpEmail = new brevo.SendSmtpEmail();
-    sendSmtpEmail.subject = `Information requested for your ${companyName} registration`;
-    sendSmtpEmail.htmlContent = `
+    try {
+      await transactionalEmailsApi.sendTransacEmail({
+        subject: `Information requested for your ${companyName} registration`,
+        htmlContent: `
       <html>
         <body>
           <p>Hi ${pendingData.name},</p>
@@ -595,12 +589,10 @@ exports.requestMoreInfo = onCall(async (request) => {
           <p>Please contact your HR team with the requested information.</p>
         </body>
       </html>
-    `;
-    sendSmtpEmail.sender = { name: companyName, email: "noreply@meritcyc.com" };
-    sendSmtpEmail.to = [{ email: pendingData.email, name: pendingData.name }];
-
-    try {
-      await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+    `,
+        sender: { name: companyName, email: "noreply@meritcyc.com" },
+        to: [{ email: pendingData.email, name: pendingData.name }],
+      });
     } catch (e) {
       logger.error("Failed to send info requested email", e);
     }

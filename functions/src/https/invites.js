@@ -2,15 +2,13 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
-const brevo = require("@getbrevo/brevo");
+const { BrevoClient } = require("@getbrevo/brevo");
 
 // We assume firebase-admin is initialized in index.js
 const firestore = admin.firestore();
 
-// Set up Brevo (v5.x: auth is set per API instance, not on a singleton ApiClient)
-const transactionalEmailsApi = new brevo.TransactionalEmailsApi();
-transactionalEmailsApi.authentications["api-key"].apiKey =
-  process.env.BREVO_API_KEY || "";
+// Set up Brevo v5.x client
+const transactionalEmailsApi = new BrevoClient({ apiKey: process.env.BREVO_API_KEY || "" }).transactionalEmails;
 
 // =============================================================================
 // Helper: write audit log entry
@@ -132,9 +130,9 @@ exports.sendEmployeeInvite = onCall(async (request) => {
     const companyDoc = await firestore.collection("companies").doc(companyId).get();
     const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
-    let sendSmtpEmail = new brevo.SendSmtpEmail();
-    sendSmtpEmail.subject = `You've been invited to ${companyName}`;
-    sendSmtpEmail.htmlContent = `
+    await transactionalEmailsApi.sendTransacEmail({
+      subject: `You've been invited to ${companyName}`,
+      htmlContent: `
       <html>
         <body>
           <h1>Welcome to ${companyName}!</h1>
@@ -145,11 +143,10 @@ exports.sendEmployeeInvite = onCall(async (request) => {
           <p>This link expires in 7 days.</p>
         </body>
       </html>
-    `;
-    sendSmtpEmail.sender = { name: companyName, email: "invites@meritcyc.com" }; // Replace with actual sender
-    sendSmtpEmail.to = [{ email: email, name: name }];
-
-    await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+    `,
+      sender: { name: companyName, email: "invites@meritcyc.com" },
+      to: [{ email: email, name: name }],
+    });
 
     // Audit log
     await writeAuditLog({
@@ -374,9 +371,9 @@ exports.resendInvite = onCall(async (request) => {
     const companyDoc = await firestore.collection("companies").doc(companyId).get();
     const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
-    let sendSmtpEmail = new brevo.SendSmtpEmail();
-    sendSmtpEmail.subject = `Reminder: You've been invited to ${companyName}`;
-    sendSmtpEmail.htmlContent = `
+    await transactionalEmailsApi.sendTransacEmail({
+      subject: `Reminder: You've been invited to ${companyName}`,
+      htmlContent: `
       <html>
         <body>
           <h1>Welcome to ${companyName}!</h1>
@@ -387,11 +384,10 @@ exports.resendInvite = onCall(async (request) => {
           <p>This link expires in 7 days.</p>
         </body>
       </html>
-    `;
-    sendSmtpEmail.sender = { name: companyName, email: "invites@meritcyc.com" };
-    sendSmtpEmail.to = [{ email: invite.email, name: invite.name }];
-
-    await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+    `,
+      sender: { name: companyName, email: "invites@meritcyc.com" },
+      to: [{ email: invite.email, name: invite.name }],
+    });
 
     // Audit log
     await writeAuditLog({
@@ -582,13 +578,13 @@ exports.bulkImportEmployees = onCall(async (request) => {
     // real batch might require an array of SendSmtpEmail or specific batch endpoint)
     // Send in parallel
     await Promise.all(emailsToSend.map(async (emailObj) => {
-      let sendSmtpEmail = new brevo.SendSmtpEmail();
-      sendSmtpEmail.subject = emailObj.subject;
-      sendSmtpEmail.htmlContent = emailObj.htmlContent;
-      sendSmtpEmail.sender = emailObj.sender;
-      sendSmtpEmail.to = emailObj.to;
       try {
-        await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+        await transactionalEmailsApi.sendTransacEmail({
+          subject: emailObj.subject,
+          htmlContent: emailObj.htmlContent,
+          sender: emailObj.sender,
+          to: emailObj.to,
+        });
       } catch (e) {
         logger.error("Failed to send email via Brevo", e);
       }

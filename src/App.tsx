@@ -27,6 +27,9 @@ import CyclesList from "./pages/cycles/CyclesList";
 import CycleDetail from "./pages/cycles/CycleDetail";
 import SimulationDashboard from "./pages/cycles/SimulationDashboard";
 import BudgetTracker from "./pages/cycles/BudgetTracker";
+import ManagerEvaluationsHub from "./pages/evaluations/ManagerEvaluationsHub";
+import TeamEvaluationPage from "./pages/evaluations/TeamEvaluationPage";
+import HRScoreReview from "./pages/evaluations/HRScoreReview";
 
 // Join / self-registration pages (public)
 import ManualJoin from "./pages/join/ManualJoin";
@@ -431,6 +434,40 @@ function App() {
             <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
               <AppLayout>
                 <CycleDetail />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================================================================= */}
+        {/* Module 5 — Evaluation & Scoring                                    */}
+        {/* ================================================================= */}
+        <Route
+          path="/evaluations"
+          element={
+            <ProtectedRoute allowedRoles={["manager"]}>
+              <AppLayout>
+                <ManagerEvaluationsHub />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/evaluations/review"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <HRScoreReview />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/evaluations/:cycleId"
+          element={
+            <ProtectedRoute allowedRoles={["manager"]}>
+              <AppLayout>
+                <TeamEvaluationPage />
               </AppLayout>
             </ProtectedRoute>
           }

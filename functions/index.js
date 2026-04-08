@@ -1403,6 +1403,719 @@ exports.reactivateEmployee = onCall(async (request) => {
     return { success: true };
 });
 // =============================================================================
+// Module 5 — Evaluation & Scoring
+// =============================================================================
+
+// Helper: Calculate increment amount from salary and percentage
+function calculateIncrementAmount(currentSalary, incrementPercent) {
+  return (currentSalary * incrementPercent) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// initializeCycleEvaluations
+// ---------------------------------------------------------------------------
+
+exports.initializeCycleEvaluations = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { cycleId } = request.data;
+
+  if (!cycleId) {
+    throw new HttpsError("invalid-argument", "cycleId is required.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  const cycleData = cycleDoc.data();
+
+  if (cycleData.status === "completed" || cycleData.status === "cancelled") {
+    throw new HttpsError("failed-precondition", "Cannot initialize evaluations for completed or cancelled cycles.");
+  }
+
+  try {
+    // Fetch active employees
+    let usersQuery = firestore.collection("users").where("companyId", "==", companyId).where("status", "==", "active");
+    const usersSnap = await usersQuery.get();
+    const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Filter by scope
+    let targetUsers = allUsers;
+    if (!cycleData.scope.allEmployees) {
+      targetUsers = allUsers.filter(u => {
+        const inDept = cycleData.scope.departmentIds.length === 0 || cycleData.scope.departmentIds.includes(u.departmentId);
+        const inBand = cycleData.scope.salaryBandIds.length === 0 || cycleData.scope.salaryBandIds.includes(u.salaryBandId);
+        return inDept && inBand;
+      });
+    }
+
+    if (targetUsers.length === 0) {
+      throw new HttpsError("failed-precondition", "No active employees found in cycle scope.");
+    }
+
+    // Fetch departments to get default manager if user doc doesn't have one
+    const deptsSnap = await firestore.collection("companies").doc(companyId).collection("departments").get();
+    const depts = {};
+    deptsSnap.forEach(d => depts[d.id] = d.data());
+
+    // Batch write
+    const batch = firestore.batch();
+    let evaluationCount = 0;
+
+    for (const user of targetUsers) {
+      let managerId = user.managerId;
+      if (!managerId && user.departmentId && depts[user.departmentId]) {
+        managerId = depts[user.departmentId].managerId;
+      }
+
+      // If no manager found, default to hr admin creating this
+      if (!managerId) managerId = uid;
+
+      const evalRef = firestore.collection("evaluations").doc(`${cycleId}_${user.id}`);
+
+      batch.set(evalRef, {
+        companyId,
+        cycleId,
+        employeeUid: user.id,
+        employeeName: user.name || "",
+        employeeEmail: user.email || "",
+        departmentId: user.departmentId || "",
+        salaryBandId: user.salaryBandId || null,
+        currentSalary: user.currentSalary || null,
+        managerId,
+        managerName: "", // We'd need to fetch this if we want it denormalized reliably, but UI can resolve it
+        scores: {},
+        weightedTotalScore: 0,
+        status: "not_started",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      evaluationCount++;
+    }
+
+    // Update cycle status if it was locked
+    if (cycleData.status === "locked") {
+      batch.update(cycleRef, {
+        status: "active",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    await batch.commit();
+
+    await writeAuditLog({
+      companyId,
+      action: "EVALUATIONS_INITIALIZED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "cycle",
+      targetId: cycleId,
+      after: { evaluationCount },
+    });
+
+    return { success: true, evaluationCount };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in initializeCycleEvaluations:", error);
+    throw new HttpsError("internal", error.message || "Failed to initialize evaluations.");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// saveDraftEvaluation
+// ---------------------------------------------------------------------------
+
+exports.saveDraftEvaluation = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const uid = request.auth.uid;
+  const companyId = request.auth.token.companyId;
+
+  const { evaluationId, scores } = request.data;
+
+  if (!evaluationId || !scores) {
+    throw new HttpsError("invalid-argument", "evaluationId and scores are required.");
+  }
+
+  const evalRef = firestore.collection("evaluations").doc(evaluationId);
+  const evalDoc = await evalRef.get();
+
+  if (!evalDoc.exists || evalDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Evaluation not found.");
+  }
+
+  const evalData = evalDoc.data();
+
+  // Verify caller is the assigned manager
+  if (evalData.managerId !== uid) {
+    throw new HttpsError("permission-denied", "Only the assigned manager can edit this evaluation.");
+  }
+
+  if (evalData.status !== "not_started" && evalData.status !== "draft") {
+    throw new HttpsError("failed-precondition", "Evaluation is not in an editable state.");
+  }
+
+  // Fetch cycle to validate criteria and get tiers
+  const cycleRef = firestore.collection("cycles").doc(evalData.cycleId);
+  const cycleDoc = await cycleRef.get();
+  const cycleData = cycleDoc.data();
+
+  // Validate scores match criteria
+  const cycleCriteriaIds = cycleData.criteria.map(c => c.id);
+  for (const scoreKey of Object.keys(scores)) {
+    if (!cycleCriteriaIds.includes(scoreKey)) {
+      throw new HttpsError("invalid-argument", `Score provided for unknown criteria: ${scoreKey}`);
+    }
+  }
+
+  try {
+    // Calculate weighted total score
+    let weightedTotalScore = 0;
+    for (const s of Object.values(scores)) {
+      weightedTotalScore += (s.weightedScore || 0);
+    }
+
+    // Cap at 100 due to potential float math issues
+    weightedTotalScore = Math.min(100, Math.max(0, weightedTotalScore));
+
+    // Determine assigned tier
+    let assignedTierId = null;
+    let assignedTierName = null;
+    let incrementPercent = 0;
+    let incrementAmount = 0;
+
+    const tier = cycleData.tiers.find(t => weightedTotalScore >= t.minScore && weightedTotalScore <= t.maxScore);
+    if (tier) {
+      assignedTierId = tier.id;
+      assignedTierName = tier.name;
+      incrementPercent = (tier.incrementMin + tier.incrementMax) / 2;
+
+      if (evalData.currentSalary) {
+         incrementAmount = calculateIncrementAmount(evalData.currentSalary, incrementPercent);
+      }
+    }
+
+    const updates = {
+      scores,
+      weightedTotalScore,
+      assignedTierId,
+      assignedTierName,
+      incrementPercent,
+      incrementAmount,
+      status: "draft",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await evalRef.update(updates);
+
+    await writeAuditLog({
+      companyId,
+      action: "EVALUATION_DRAFT_SAVED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: request.auth.token.role,
+      targetType: "evaluation",
+      targetId: evaluationId,
+      after: { weightedTotalScore, assignedTierId, status: "draft" },
+    });
+
+    // Budget tracking will be handled by a trigger or separate call, but we can attempt it here
+    try {
+        await exports.updateBudgetTracking.run({ data: { cycleId: evalData.cycleId }, auth: request.auth });
+    } catch (e) {
+        logger.warn("Failed to update budget tracking after save draft:", e);
+    }
+
+    return { success: true, weightedTotalScore, assignedTierId };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in saveDraftEvaluation:", error);
+    throw new HttpsError("internal", error.message || "Failed to save draft.");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// submitEvaluation
+// ---------------------------------------------------------------------------
+
+exports.submitEvaluation = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const uid = request.auth.uid;
+  const companyId = request.auth.token.companyId;
+
+  const { evaluationId, scores } = request.data;
+
+  if (!evaluationId || !scores) {
+    throw new HttpsError("invalid-argument", "evaluationId and scores are required.");
+  }
+
+  const evalRef = firestore.collection("evaluations").doc(evaluationId);
+  const evalDoc = await evalRef.get();
+
+  if (!evalDoc.exists || evalDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Evaluation not found.");
+  }
+
+  const evalData = evalDoc.data();
+
+  // Verify caller is the assigned manager
+  if (evalData.managerId !== uid) {
+    throw new HttpsError("permission-denied", "Only the assigned manager can submit this evaluation.");
+  }
+
+  if (evalData.status !== "not_started" && evalData.status !== "draft") {
+    throw new HttpsError("failed-precondition", "Evaluation is already submitted or finalized.");
+  }
+
+  // Fetch cycle to validate criteria
+  const cycleRef = firestore.collection("cycles").doc(evalData.cycleId);
+  const cycleDoc = await cycleRef.get();
+  const cycleData = cycleDoc.data();
+
+  // Validate all criteria have scores
+  const cycleCriteriaIds = cycleData.criteria.map(c => c.id);
+  const providedScoreIds = Object.keys(scores);
+
+  for (const criteriaId of cycleCriteriaIds) {
+    if (!providedScoreIds.includes(criteriaId)) {
+      throw new HttpsError("invalid-argument", `Missing score for criteria: ${criteriaId}`);
+    }
+  }
+
+  for (const scoreKey of providedScoreIds) {
+    if (!cycleCriteriaIds.includes(scoreKey)) {
+      throw new HttpsError("invalid-argument", `Score provided for unknown criteria: ${scoreKey}`);
+    }
+  }
+
+  try {
+    // Calculate weighted total score
+    let weightedTotalScore = 0;
+    for (const s of Object.values(scores)) {
+      weightedTotalScore += (s.weightedScore || 0);
+    }
+    weightedTotalScore = Math.min(100, Math.max(0, weightedTotalScore));
+
+    // Determine assigned tier
+    let assignedTierId = null;
+    let assignedTierName = null;
+    let incrementPercent = 0;
+    let incrementAmount = 0;
+
+    const tier = cycleData.tiers.find(t => weightedTotalScore >= t.minScore && weightedTotalScore <= t.maxScore);
+    if (tier) {
+      assignedTierId = tier.id;
+      assignedTierName = tier.name;
+      incrementPercent = (tier.incrementMin + tier.incrementMax) / 2;
+
+      if (evalData.currentSalary) {
+         incrementAmount = calculateIncrementAmount(evalData.currentSalary, incrementPercent);
+      }
+    }
+
+    const updates = {
+      scores,
+      weightedTotalScore,
+      assignedTierId,
+      assignedTierName,
+      incrementPercent,
+      incrementAmount,
+      status: "submitted",
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await evalRef.update(updates);
+
+    await writeAuditLog({
+      companyId,
+      action: "EVALUATION_SUBMITTED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: request.auth.token.role,
+      targetType: "evaluation",
+      targetId: evaluationId,
+      after: { weightedTotalScore, assignedTierId, status: "submitted" },
+    });
+
+    // Send in-app notification to employee
+    const notifRef = firestore.collection("users").doc(evalData.employeeUid).collection("notifications").doc();
+    await notifRef.set({
+      type: "EVALUATION_SUBMITTED",
+      title: "Evaluation Submitted",
+      message: "Your manager has submitted your evaluation for the current increment cycle.",
+      cycleId: evalData.cycleId,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Update budget tracking
+    try {
+        await exports.updateBudgetTracking.run({ data: { cycleId: evalData.cycleId }, auth: request.auth });
+    } catch (e) {
+        logger.warn("Failed to update budget tracking after submit:", e);
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in submitEvaluation:", error);
+    throw new HttpsError("internal", error.message || "Failed to submit evaluation.");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// overrideScore
+// ---------------------------------------------------------------------------
+
+exports.overrideScore = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { evaluationId, scores, reason } = request.data;
+
+  if (!evaluationId || !scores || !reason) {
+    throw new HttpsError("invalid-argument", "evaluationId, scores, and reason are required.");
+  }
+
+  if (reason.length < 10) {
+    throw new HttpsError("invalid-argument", "Override reason must be at least 10 characters.");
+  }
+
+  const evalRef = firestore.collection("evaluations").doc(evaluationId);
+  const evalDoc = await evalRef.get();
+
+  if (!evalDoc.exists || evalDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Evaluation not found.");
+  }
+
+  const evalData = evalDoc.data();
+
+  // Fetch cycle to validate criteria
+  const cycleRef = firestore.collection("cycles").doc(evalData.cycleId);
+  const cycleDoc = await cycleRef.get();
+  const cycleData = cycleDoc.data();
+
+  // Validate all criteria have scores (HR should provide all)
+  const cycleCriteriaIds = cycleData.criteria.map(c => c.id);
+  const providedScoreIds = Object.keys(scores);
+
+  for (const criteriaId of cycleCriteriaIds) {
+    if (!providedScoreIds.includes(criteriaId)) {
+      throw new HttpsError("invalid-argument", `Missing score for criteria: ${criteriaId}`);
+    }
+  }
+
+  for (const scoreKey of providedScoreIds) {
+    if (!cycleCriteriaIds.includes(scoreKey)) {
+      throw new HttpsError("invalid-argument", `Score provided for unknown criteria: ${scoreKey}`);
+    }
+  }
+
+  try {
+    // Calculate new weighted total score
+    let weightedTotalScore = 0;
+    for (const s of Object.values(scores)) {
+      weightedTotalScore += (s.weightedScore || 0);
+    }
+    weightedTotalScore = Math.min(100, Math.max(0, weightedTotalScore));
+
+    // Determine new assigned tier
+    let assignedTierId = null;
+    let assignedTierName = null;
+    let incrementPercent = 0;
+    let incrementAmount = 0;
+
+    const tier = cycleData.tiers.find(t => weightedTotalScore >= t.minScore && weightedTotalScore <= t.maxScore);
+    if (tier) {
+      assignedTierId = tier.id;
+      assignedTierName = tier.name;
+      incrementPercent = (tier.incrementMin + tier.incrementMax) / 2;
+
+      if (evalData.currentSalary) {
+         incrementAmount = calculateIncrementAmount(evalData.currentSalary, incrementPercent);
+      }
+    }
+
+    const updates = {
+      scores,
+      weightedTotalScore,
+      assignedTierId,
+      assignedTierName,
+      incrementPercent,
+      incrementAmount,
+      status: "overridden",
+      overrideReason: reason,
+      overriddenBy: uid,
+      overriddenAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await evalRef.update(updates);
+
+    await writeAuditLog({
+      companyId,
+      action: "SCORE_OVERRIDDEN",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "evaluation",
+      targetId: evaluationId,
+      before: {
+         scores: evalData.scores,
+         weightedTotalScore: evalData.weightedTotalScore,
+         assignedTierId: evalData.assignedTierId
+      },
+      after: {
+         scores,
+         weightedTotalScore,
+         assignedTierId,
+         status: "overridden",
+         reason
+      },
+      metadata: { reason }
+    });
+
+    // Update budget tracking
+    try {
+        await exports.updateBudgetTracking.run({ data: { cycleId: evalData.cycleId }, auth: request.auth });
+    } catch (e) {
+        logger.warn("Failed to update budget tracking after override:", e);
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in overrideScore:", error);
+    throw new HttpsError("internal", error.message || "Failed to override score.");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// finalizeCycle
+// ---------------------------------------------------------------------------
+
+exports.finalizeCycle = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { cycleId } = request.data;
+
+  if (!cycleId) {
+    throw new HttpsError("invalid-argument", "cycleId is required.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  const cycleData = cycleDoc.data();
+
+  if (cycleData.status !== "active" && cycleData.status !== "locked") {
+    throw new HttpsError("failed-precondition", "Cycle is not in a state to be finalized.");
+  }
+
+  // 1. Fetch all evaluations for this cycle
+  const evalsSnap = await firestore.collection("evaluations")
+    .where("companyId", "==", companyId)
+    .where("cycleId", "==", cycleId)
+    .get();
+
+  if (evalsSnap.empty) {
+     throw new HttpsError("failed-precondition", "No evaluations found for this cycle.");
+  }
+
+  const evals = evalsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // 2. Check if any are incomplete (not_started, draft)
+  let incompleteCount = 0;
+  for (const ev of evals) {
+     if (ev.status === "not_started" || ev.status === "draft") {
+        incompleteCount++;
+     }
+  }
+
+  if (incompleteCount > 0) {
+      throw new HttpsError("failed-precondition", `Cannot finalize. ${incompleteCount} evaluations are incomplete.`);
+  }
+
+  try {
+    const batch = firestore.batch();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    let totalIncrementsProcessed = 0;
+
+    // 3. Mark all evaluations as finalized
+    for (const ev of evals) {
+      const evalRef = firestore.collection("evaluations").doc(ev.id);
+      batch.update(evalRef, {
+         status: "finalized",
+         finalizedAt: now,
+         updatedAt: now
+      });
+
+      // 4. Generate increment stories
+      const storyRef = firestore.collection("users").doc(ev.employeeUid).collection("incrementStories").doc(cycleId);
+
+      const scoreBreakdown = [];
+      if (ev.scores) {
+          for (const [cId, cData] of Object.entries(ev.scores)) {
+             scoreBreakdown.push({
+                 criteriaName: cData.criteriaName,
+                 weightedScore: cData.weightedScore,
+                 maxWeight: cData.weight
+             });
+          }
+      }
+
+      batch.set(storyRef, {
+         cycleId,
+         cycleName: cycleData.name,
+         score: ev.weightedTotalScore,
+         tierId: ev.assignedTierId || null,
+         tierName: ev.assignedTierName || "Unqualified",
+         incrementPercent: ev.incrementPercent || 0,
+         incrementAmount: ev.incrementAmount || 0,
+         scoreBreakdown,
+         recommendations: "Continue delivering excellent results.", // Placeholder, could be dynamic
+         generatedAt: now
+      });
+
+      // 5. Apply new salary to user doc
+      if (ev.incrementAmount && ev.incrementAmount > 0) {
+          const userRef = firestore.collection("users").doc(ev.employeeUid);
+          batch.update(userRef, {
+             currentSalary: admin.firestore.FieldValue.increment(ev.incrementAmount),
+             updatedAt: now
+          });
+          totalIncrementsProcessed++;
+      }
+
+      // 6. Send notification to employee
+      const notifRef = firestore.collection("users").doc(ev.employeeUid).collection("notifications").doc();
+      batch.set(notifRef, {
+        type: "CYCLE_FINALIZED",
+        title: "Increment Decision Ready",
+        message: `The increment cycle "${cycleData.name}" has been finalized. View your increment story now.`,
+        cycleId,
+        read: false,
+        createdAt: now,
+      });
+    }
+
+    // 7. Mark cycle as completed
+    batch.update(cycleRef, {
+       status: "completed",
+       completedAt: now,
+       updatedAt: now
+    });
+
+    await batch.commit();
+
+    await writeAuditLog({
+      companyId,
+      action: "CYCLE_FINALIZED",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "cycle",
+      targetId: cycleId,
+      after: { status: "completed", totalIncrementsProcessed },
+    });
+
+    return { success: true, totalIncrementsProcessed };
+
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in finalizeCycle:", error);
+    throw new HttpsError("internal", error.message || "Failed to finalize cycle.");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// requestEvaluationDeadlineReminder
+// ---------------------------------------------------------------------------
+
+exports.requestEvaluationDeadlineReminder = onCall(async (request) => {
+  const { uid, role, companyId } = requireHrOrAdmin(request);
+  const { cycleId } = request.data;
+
+  if (!cycleId) {
+    throw new HttpsError("invalid-argument", "cycleId is required.");
+  }
+
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new HttpsError("not-found", "Cycle not found.");
+  }
+
+  // Find incomplete evaluations
+  const evalsSnap = await firestore.collection("evaluations")
+    .where("companyId", "==", companyId)
+    .where("cycleId", "==", cycleId)
+    .where("status", "in", ["not_started", "draft"])
+    .get();
+
+  if (evalsSnap.empty) {
+     return { success: true, managersNotified: 0 };
+  }
+
+  // Group by manager
+  const managerUids = new Set();
+  evalsSnap.docs.forEach(doc => {
+     if (doc.data().managerId) {
+         managerUids.add(doc.data().managerId);
+     }
+  });
+
+  try {
+    const batch = firestore.batch();
+    let managersNotified = 0;
+
+    for (const managerUid of managerUids) {
+        // Send in-app notification to manager
+        const notifRef = firestore.collection("users").doc(managerUid).collection("notifications").doc();
+        batch.set(notifRef, {
+          type: "EVALUATION_REMINDER",
+          title: "Evaluation Deadline Reminder",
+          message: `You have incomplete evaluations for the cycle "${cycleDoc.data().name}". Please complete them before the deadline.`,
+          cycleId,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        managersNotified++;
+        // Note: Real implementation would also send email via Brevo here
+    }
+
+    await batch.commit();
+
+    await writeAuditLog({
+      companyId,
+      action: "DEADLINE_REMINDER_SENT",
+      actorUid: uid,
+      actorEmail: request.auth.token.email || "",
+      actorRole: role,
+      targetType: "cycle",
+      targetId: cycleId,
+      metadata: { managersNotified },
+    });
+
+    return { success: true, managersNotified };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("Error in requestEvaluationDeadlineReminder:", error);
+    throw new HttpsError("internal", error.message || "Failed to send reminders.");
+  }
+});
+
+// =============================================================================
 // Module 3 — Increment Cycle Engine
 // =============================================================================
 

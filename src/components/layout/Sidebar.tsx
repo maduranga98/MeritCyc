@@ -35,6 +35,8 @@ const SidebarLogo: React.FC = () => {
   );
 };
 
+import { CheckSquare } from "lucide-react";
+
 // --- Navigation Config ---
 interface NavItem {
   name: string;
@@ -42,6 +44,8 @@ interface NavItem {
   icon: React.ElementType;
   exact?: boolean;
   isBadge?: boolean;
+  isEvalBadge?: boolean;
+  isReviewBadge?: boolean;
   subItems?: NavItem[];
 }
 
@@ -64,7 +68,15 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
             { name: "Invite Tracker", href: "/invites", icon: Users },
           ],
         },
-        { name: "Cycles", href: "/cycles", icon: RefreshCw },
+        {
+          name: "Cycles",
+          href: "/cycles",
+          icon: RefreshCw,
+          subItems: [
+            { name: "All Cycles", href: "/cycles", icon: RefreshCw, exact: true },
+            { name: "Score Review", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
+          ]
+        },
         { name: "Analytics", href: "/analytics", icon: BarChart2 },
         { name: "Settings", href: "/settings/profile", icon: Settings },
       ];
@@ -83,7 +95,15 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
             { name: "Invite Tracker", href: "/invites", icon: Users },
           ],
         },
-        { name: "Cycles", href: "/cycles", icon: RefreshCw },
+        {
+          name: "Cycles",
+          href: "/cycles",
+          icon: RefreshCw,
+          subItems: [
+            { name: "All Cycles", href: "/cycles", icon: RefreshCw, exact: true },
+            { name: "Score Review", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
+          ]
+        },
         { name: "Analytics", href: "/analytics", icon: BarChart2 },
         { name: "Settings", href: "/settings/profile", icon: Settings },
       ];
@@ -91,7 +111,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
       return [
         { name: "Dashboard", href: "/dashboard/manager", icon: LayoutDashboard },
         { name: "My Team", href: "/team", icon: Users },
-        { name: "Evaluations", href: "/evaluations", icon: ClipboardList },
+        { name: "Evaluations", href: "/evaluations", icon: ClipboardList, isEvalBadge: true },
         { name: "Settings", href: "/settings/profile", icon: Settings },
       ];
     case "employee":
@@ -117,10 +137,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
   const navItems = getNavItems(user?.role);
   const [pendingCount, setPendingCount] = useState(0);
+  const [evalCount, setEvalCount] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
 
   // Fetch pending count for hr_admin
   useEffect(() => {
-    if (user?.role !== "hr_admin" || !user?.companyId) return;
+    if (user?.role !== "hr_admin" && user?.role !== "super_admin" || !user?.companyId) return;
 
     const q = query(
       collection(db, "companies", user.companyId, "pendingRegistrations"),
@@ -129,6 +151,48 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setPendingCount(snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Fetch evaluations count for manager
+  useEffect(() => {
+    if (user?.role !== "manager" || !user?.uid) return;
+
+    const q = query(
+      collection(db, "evaluations"),
+      where("managerId", "==", user.uid),
+      where("status", "==", "not_started")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setEvalCount(snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Fetch review count for HR
+  useEffect(() => {
+    if (user?.role !== "hr_admin" && user?.role !== "super_admin" || !user?.companyId) return;
+
+    // A simpler query since we can't reliably join on active cycle without complex setup
+    // For now we'll just count submitted and draft for active cycles implicitly if we track state
+    // To keep it simple based on requirements, let's just count 'unsubmitted' as draft + not_started
+    // However, since we can't do OR in onSnapshot easily without index, we just fetch all
+    const q = query(
+      collection(db, "evaluations"),
+      where("companyId", "==", user.companyId)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.forEach(doc => {
+         const status = doc.data().status;
+         if (status === 'not_started' || status === 'draft') count++;
+      });
+      setReviewCount(count);
     });
 
     return () => unsubscribe();
@@ -163,6 +227,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
         {item.isBadge && pendingCount > 0 && (
           <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
             {pendingCount}
+          </span>
+        )}
+        {item.isEvalBadge && evalCount > 0 && (
+          <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            {evalCount}
+          </span>
+        )}
+        {item.isReviewBadge && reviewCount > 0 && (
+          <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            {reviewCount}
           </span>
         )}
       </Link>

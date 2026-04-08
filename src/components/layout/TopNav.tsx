@@ -34,13 +34,24 @@ const getPageTitle = (pathname: string): string => {
   if (pathname.startsWith("/dashboard/employee")) return "Employee Dashboard";
   if (pathname.startsWith("/invites")) return "Invite Tracker";
   if (pathname.startsWith("/hr/people/approvals")) return "Pending Approvals";
+  if (pathname.startsWith("/settings/general")) return "General Settings";
+  if (pathname.startsWith("/settings/registration")) return "Registration Settings";
+  if (pathname.startsWith("/settings/notifications")) return "Notification Settings";
+  if (pathname.startsWith("/settings/security")) return "Security Settings";
+  if (pathname.startsWith("/settings/data")) return "Data & Privacy";
   if (pathname.startsWith("/settings/profile")) return "Profile Settings";
+  if (pathname.startsWith("/settings")) return "Settings";
   if (pathname.startsWith("/people/directory")) return "Employee Directory";
+  if (pathname.startsWith("/people/departments")) return "Departments";
+  if (pathname.startsWith("/people/salary-bands")) return "Salary Bands";
   if (pathname.startsWith("/people")) return "People";
   if (pathname.startsWith("/cycles")) return "Cycles";
+  if (pathname.startsWith("/analytics/reports")) return "Reports";
   if (pathname.startsWith("/analytics")) return "Analytics";
-  if (pathname.startsWith("/team")) return "My Team";
+  if (pathname.startsWith("/fairness")) return "Fairness Dashboard";
+  if (pathname.startsWith("/evaluations/review")) return "Score Review";
   if (pathname.startsWith("/evaluations")) return "Evaluations";
+  if (pathname.startsWith("/notifications")) return "Notifications";
   if (pathname.startsWith("/career")) return "My Career";
   if (pathname.startsWith("/increments")) return "My Increments";
 

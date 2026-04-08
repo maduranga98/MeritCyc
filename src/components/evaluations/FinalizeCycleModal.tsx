@@ -64,6 +64,7 @@ export const FinalizeCycleModal: React.FC<FinalizeCycleModalProps> = ({
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to finalize cycle';
       toast.error(msg);
+    } finally {
       setIsFinalizing(false);
     }
   };

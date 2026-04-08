@@ -17,6 +17,7 @@ import {
   Scale,
   X,
   Bell,
+  CheckSquare,
 } from "lucide-react";
 import { type RoleCode } from "../../types/roles";
 import { useNotificationStore } from "../../stores/notificationStore";
@@ -37,8 +38,6 @@ const SidebarLogo: React.FC = () => {
     </div>
   );
 };
-
-import { CheckSquare } from "lucide-react";
 
 // --- Navigation Config ---
 interface NavItem {
@@ -135,7 +134,6 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
     case "manager":
       return [
         { name: "Dashboard", href: "/dashboard/manager", icon: LayoutDashboard },
-        { name: "My Team", href: "/team", icon: Users },
         { name: "Evaluations", href: "/evaluations", icon: ClipboardList, isEvalBadge: true },
         { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
         { name: "Settings", href: "/settings/profile", icon: Settings },
@@ -171,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
   // Fetch pending count for hr_admin
   useEffect(() => {
-    if (user?.role !== "hr_admin" && user?.role !== "super_admin" || !user?.companyId) return;
+    if ((user?.role !== "hr_admin" && user?.role !== "super_admin") || !user?.companyId) return;
 
     const q = query(
       collection(db, "companies", user.companyId, "pendingRegistrations"),
@@ -217,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
   // Fetch review count for HR
   useEffect(() => {
-    if (user?.role !== "hr_admin" && user?.role !== "super_admin" || !user?.companyId) return;
+    if ((user?.role !== "hr_admin" && user?.role !== "super_admin") || !user?.companyId) return;
 
     // A simpler query since we can't reliably join on active cycle without complex setup
     // For now we'll just count submitted and draft for active cycles implicitly if we track state

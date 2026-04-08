@@ -11,6 +11,7 @@ import { Loader2, ArrowLeft, Clock, Users, Mail, CheckCircle2, AlertCircle } fro
 import { differenceInDays } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
 import { EvaluationForm } from '../../components/evaluations/EvaluationForm';
+import { toast } from 'sonner';
 
 export default function TeamEvaluationPage() {
   const { cycleId } = useParams<{ cycleId: string }>();
@@ -22,6 +23,7 @@ export default function TeamEvaluationPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null);
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
 
   useEffect(() => {
     if (!user?.companyId || !user?.uid || !cycleId) return;
@@ -50,6 +52,19 @@ export default function TeamEvaluationPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId, user]); // removing selectedEvaluation?.id for same reason.
+
+  const handleSendReminder = async () => {
+    if (!cycleId) return;
+    setIsSendingReminder(true);
+    try {
+      await evaluationService.requestEvaluationDeadlineReminder(cycleId);
+      toast.success('Reminder sent to team members with pending evaluations');
+    } catch (err) {
+      toast.error('Failed to send reminder');
+    } finally {
+      setIsSendingReminder(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -143,15 +158,19 @@ export default function TeamEvaluationPage() {
                       </p>
                   </div>
               )}
-              <button disabled className="px-4 py-2 bg-white border border-slate-300 text-slate-400 font-medium rounded-lg opacity-50 cursor-not-allowed flex items-center gap-2">
-                  <Mail className="w-4 h-4"/>
+              <button
+                  onClick={handleSendReminder}
+                  disabled={isSendingReminder || cycle.status === 'completed'}
+                  className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+              >
+                  {isSendingReminder ? <Loader2 className="w-4 h-4 animate-spin"/> : <Mail className="w-4 h-4"/>}
                   Send Reminder
               </button>
           </div>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white border border-slate-200 p-5 rounded-xl flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                   <Users className="w-5 h-5"/>

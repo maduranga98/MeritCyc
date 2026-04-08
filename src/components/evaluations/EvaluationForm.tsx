@@ -85,7 +85,7 @@ export const EvaluationForm: React.FC<EvaluationFormProps> = ({
       } finally {
         setIsSaving(false);
       }
-    }, 30000); // 30 seconds
+    }, 5000); // 5 seconds
 
     return () => clearTimeout(timeoutId);
   }, [scores, isPristine, readOnly, evaluation.id]);
@@ -347,13 +347,10 @@ export const EvaluationForm: React.FC<EvaluationFormProps> = ({
                  </button>
              </div>
          )}
-         {readOnly && evaluation.status === 'submitted' && (
-             <button
-                onClick={() => toast.error('Edit flow to be implemented')} // Typically sets status back to draft, or opens locally
-                className="w-full py-2.5 bg-white border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors"
-             >
-                Edit Evaluation
-             </button>
+         {readOnly && (evaluation.status === 'submitted' || evaluation.status === 'overridden') && (
+             <p className="text-center text-xs text-slate-500 py-1">
+               {evaluation.status === 'overridden' ? 'Score overridden by HR — read only.' : 'Submitted — contact HR to request changes.'}
+             </p>
          )}
       </div>
     </motion.div>

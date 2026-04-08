@@ -529,7 +529,7 @@ function AuditLogTab({ cycleId, companyId }: { cycleId: string; companyId: strin
 // CycleDetail Page
 // ---------------------------------------------------------------------------
 
-type TabId = 'overview' | 'criteria' | 'scope' | 'timeline' | 'audit';
+type TabId = 'overview' | 'criteria' | 'scope' | 'timeline' | 'audit' | 'simulation' | 'budget';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -615,6 +615,10 @@ export default function CycleDetail() {
   const tiersOk = cycle.tiers.length > 0;
   const canPublish = isDraft && weightsOk && tiersOk && cycle.employeeCount > 0;
 
+  const simulationTabs = isDraft
+    ? [...TABS, { id: 'simulation' as TabId, label: 'Simulation' }]
+    : [...TABS, { id: 'budget' as TabId, label: 'Budget Tracker' }];
+
   return (
     <div>
       {/* Back nav */}
@@ -645,6 +649,14 @@ export default function CycleDetail() {
         <div className="flex flex-wrap gap-2 flex-shrink-0">
           {isDraft && (
             <>
+              {weightsOk && tiersOk && (
+                <button
+                  onClick={() => navigate(`/cycles/${cycle.id}/simulate`)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+                >
+                  Run Simulation
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('criteria')}
                 className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
@@ -695,10 +707,18 @@ export default function CycleDetail() {
       {/* Tabs */}
       <div className="border-b border-slate-200 mb-6">
         <div className="flex gap-0 overflow-x-auto">
-          {TABS.map((tab) => (
+          {simulationTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                 if (tab.id === 'budget') {
+                    navigate(`/cycles/${cycle.id}/budget`);
+                 } else if (tab.id === 'simulation') {
+                    navigate(`/cycles/${cycle.id}/simulate`);
+                 } else {
+                    setActiveTab(tab.id as TabId);
+                 }
+              }}
               className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'border-emerald-500 text-emerald-600'

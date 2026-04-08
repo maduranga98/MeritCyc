@@ -1,0 +1,414 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { cycleService } from '../../services/cycleService';
+import { simulationService } from '../../services/simulationService';
+import { type Cycle } from '../../types/cycle';
+import { type Simulation } from '../../types/simulation';
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Loader2,
+  BarChart2,
+  TrendingUp,
+  DollarSign,
+  Users
+} from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  BarChart,
+  Bar,
+  Cell,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
+import RunSimulationModal from '../../components/cycles/RunSimulationModal';
+
+const formatCurrency = (amount: number, currency: string = 'USD') => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
+export default function SimulationDashboard() {
+  const { cycleId } = useParams<{ cycleId: string }>();
+  const navigate = useNavigate();
+  const [cycle, setCycle] = useState<Cycle | null>(null);
+  const [simulations, setSimulations] = useState<Simulation[]>([]);
+  const [selectedSimId, setSelectedSimId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    if (!cycleId) return;
+
+    const unsubCycle = cycleService.subscribeToCycle(cycleId, (data) => {
+      setCycle(data);
+      if (data && data.status !== 'draft') {
+        toast.error("Simulations are only available for draft cycles.");
+        navigate(`/cycles/${cycleId}`);
+      }
+    });
+
+    const unsubSims = simulationService.getSimulations(cycleId, (data) => {
+      setSimulations(data);
+      if (data.length > 0 && !selectedSimId) {
+         // Auto-select the applied one or the first one
+         const applied = data.find(s => s.isApplied);
+         setSelectedSimId(applied ? applied.id : data[0].id);
+      } else if (data.length === 0) {
+          setSelectedSimId(null);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      unsubCycle();
+      unsubSims();
+    };
+  }, [cycleId, navigate, selectedSimId]);
+
+  const handleDelete = async (sim: Simulation) => {
+    if (sim.isApplied) {
+      toast.error('Cannot delete an applied scenario.');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete "${sim.name}"?`)) {
+      try {
+        await simulationService.deleteSimulation({ cycleId: cycle!.id, simulationId: sim.id });
+        toast.success('Simulation deleted.');
+        if (selectedSimId === sim.id) {
+          setSelectedSimId(simulations.length > 1 ? simulations.find(s => s.id !== sim.id)!.id : null);
+        }
+      } catch (e: unknown) {
+        toast.error((e as Error).message || 'Failed to delete simulation.');
+      }
+    }
+  };
+
+  const handleApply = async (simId: string) => {
+    if (!cycle || cycle.status !== 'draft') return;
+    setApplying(true);
+    try {
+      await simulationService.applyScenario({ cycleId: cycle.id, simulationId: simId });
+      toast.success('Scenario applied to cycle successfully.');
+    } catch (e: unknown) {
+      toast.error((e as Error).message || 'Failed to apply scenario.');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  if (loading || !cycle) {
+    return (
+      <div className="flex justify-center items-center h-full py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
+
+  const selectedSim = simulations.find(s => s.id === selectedSimId);
+
+  return (
+    <div className="h-full flex flex-col font-brand">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <button
+            onClick={() => navigate(`/cycles/${cycle.id}`)}
+            className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 mb-2 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Cycle
+          </button>
+          <h1 className="text-2xl font-bold text-slate-900">Budget Simulation</h1>
+          <p className="text-slate-500 text-sm mt-1">{cycle.name}</p>
+        </div>
+
+        <div className="flex flex-col items-end">
+          <button
+            onClick={() => setShowModal(true)}
+            disabled={simulations.length >= 5}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Run New Simulation
+          </button>
+          <span className="text-xs font-medium text-slate-500 mt-2">
+            {simulations.length}/5 scenarios used
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-1 gap-6 min-h-0">
+        {/* Left Sidebar: Scenarios List */}
+        <div className="w-72 flex-shrink-0 flex flex-col gap-3 overflow-y-auto pr-2 pb-4">
+          {simulations.map(sim => (
+            <div
+              key={sim.id}
+              onClick={() => setSelectedSimId(sim.id)}
+              className={`bg-white rounded-xl border p-4 cursor-pointer transition-all ${
+                selectedSimId === sim.id
+                  ? 'border-emerald-500 shadow-md ring-1 ring-emerald-500'
+                  : 'border-slate-200 hover:border-slate-300 shadow-sm'
+              } ${sim.isApplied ? 'border-l-4 border-l-emerald-500' : ''}`}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-semibold text-slate-900 text-sm truncate pr-2">{sim.name}</h3>
+                {sim.isApplied && (
+                   <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                     Applied
+                   </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mb-3 truncate">
+                {new Date(sim.createdAt.toDate()).toLocaleDateString()}
+              </p>
+
+              <div className="flex items-center justify-between mt-auto">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(sim); }}
+                  disabled={sim.isApplied}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors"
+                  title="Delete Scenario"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleApply(sim.id); }}
+                  disabled={sim.isApplied || applying}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                    sim.isApplied
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                  }`}
+                >
+                  {sim.isApplied ? 'Applied' : 'Apply to Cycle'}
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {simulations.length === 0 && (
+            <div className="bg-slate-50 rounded-xl border border-slate-200 border-dashed p-6 text-center">
+              <p className="text-sm text-slate-500">No saved scenarios.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Right Area: Results */}
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-y-auto">
+          {!selectedSim ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8">
+              <BarChart2 className="w-16 h-16 mb-4 text-slate-300" />
+              <h2 className="text-lg font-semibold text-slate-700 mb-2">No Simulation Selected</h2>
+              <p className="text-sm text-center max-w-sm">
+                Run your first simulation to see budget projections, employee distributions, and sensitivity analysis.
+              </p>
+            </div>
+          ) : (
+            <div className="p-6 space-y-8">
+              {/* Top Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <div className="flex items-center gap-2 text-slate-500 mb-1">
+                    <DollarSign className="w-4 h-4" />
+                    <span className="text-xs font-medium uppercase tracking-wider">Projected Total Cost</span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {formatCurrency(selectedSim.results.totalProjectedCost, cycle.budget.currency)}
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <div className="flex items-center gap-2 text-slate-500 mb-1">
+                    <Users className="w-4 h-4" />
+                    <span className="text-xs font-medium uppercase tracking-wider">Qualifying Employees</span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {selectedSim.results.qualifyingEmployees}
+                    <span className="text-sm font-normal text-slate-500 ml-1">of {cycle.employeeCount}</span>
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <div className="flex items-center gap-2 text-slate-500 mb-1">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-xs font-medium uppercase tracking-wider">Average Increment</span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {selectedSim.results.averageIncrement.toFixed(1)}%
+                  </p>
+                </div>
+
+                <div className={`rounded-xl p-4 border ${
+                  selectedSim.results.budgetUtilization >= 95 ? 'bg-red-50 border-red-100' :
+                  selectedSim.results.budgetUtilization >= 80 ? 'bg-amber-50 border-amber-100' :
+                  'bg-emerald-50 border-emerald-100'
+                }`}>
+                  <div className="flex items-center gap-2 text-slate-500 mb-1">
+                    <BarChart2 className="w-4 h-4" />
+                    <span className="text-xs font-medium uppercase tracking-wider">Budget Utilization</span>
+                  </div>
+                  <p className={`text-2xl font-bold ${
+                    selectedSim.results.budgetUtilization >= 95 ? 'text-red-700' :
+                    selectedSim.results.budgetUtilization >= 80 ? 'text-amber-700' :
+                    'text-emerald-700'
+                  }`}>
+                    {selectedSim.results.budgetUtilization.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+
+              {/* Charts Row */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                {/* Distribution Chart */}
+                <div className="min-h-[350px]">
+                  <h3 className="text-base font-bold text-slate-900 mb-4">Employee Distribution by Tier</h3>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer>
+                      <BarChart data={selectedSim.results.distributionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="tierName" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis yAxisId="left" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis yAxisId="right" orientation="right" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCurrency(v, cycle.budget.currency)} />
+                        <Tooltip
+                          cursor={{fill: '#f8fafc'}}
+                          contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                        />
+                        <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="employeeCount"
+                          name="Employees"
+                          radius={[4,4,0,0]}
+                          maxBarSize={50}
+                        >
+                          {
+                            selectedSim.results.distributionData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.tierColor || '#10B981'} />
+                            ))
+                          }
+                        </Bar>
+                        <Line yAxisId="right" type="monotone" dataKey="projectedCost" name="Projected Cost" stroke="#3B82F6" strokeWidth={2} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Sensitivity Chart */}
+                <div className="min-h-[350px]">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Sensitivity Analysis</h3>
+                    <p className="text-xs text-slate-500 mb-4">Shows projected cost vs qualifying employees at different top-score thresholds</p>
+                  </div>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer>
+                      <LineChart data={selectedSim.results.sensitivityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="threshold" tickFormatter={(v) => `${v}%`} tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis yAxisId="left" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis yAxisId="right" orientation="right" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCurrency(v, cycle.budget.currency).replace(/\D00(?=\D*$)/, '')} />
+                        <Tooltip
+                          contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                          labelFormatter={(v) => `Threshold: ${v}%`}
+                        />
+                        <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
+                        <Line yAxisId="left" type="monotone" dataKey="qualifyingCount" name="Qualifying Employees" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{r: 6}} />
+                        <Line yAxisId="right" type="monotone" dataKey="projectedCost" name="Projected Cost" stroke="#3B82F6" strokeWidth={2} dot={false} activeDot={{r: 6}} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Comparison Table (if multiple simulations) */}
+              {simulations.length > 1 && (
+                <div className="mt-8">
+                  <h3 className="text-base font-bold text-slate-900 mb-4">Scenario Comparison</h3>
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-semibold">
+                        <tr>
+                          <th className="px-4 py-3 sticky left-0 bg-slate-50 z-10 border-r border-slate-200">Metric</th>
+                          {simulations.map(sim => (
+                            <th key={sim.id} className={`px-4 py-3 min-w-[140px] ${sim.isApplied ? 'bg-emerald-50 text-emerald-800' : ''}`}>
+                              {sim.name}
+                              {sim.isApplied && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-emerald-500"></span>}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        <tr className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-200">Total Cost</td>
+                          {simulations.map(sim => (
+                            <td key={sim.id} className={`px-4 py-3 ${sim.isApplied ? 'bg-emerald-50/30' : ''}`}>
+                              {formatCurrency(sim.results.totalProjectedCost, cycle.budget.currency)}
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-200">Avg Increment</td>
+                          {simulations.map(sim => (
+                            <td key={sim.id} className={`px-4 py-3 ${sim.isApplied ? 'bg-emerald-50/30' : ''}`}>
+                              {sim.results.averageIncrement.toFixed(1)}%
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-200">Qualifying</td>
+                          {simulations.map(sim => (
+                            <td key={sim.id} className={`px-4 py-3 ${sim.isApplied ? 'bg-emerald-50/30' : ''}`}>
+                              {sim.results.qualifyingEmployees}
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-200">Budget Utilization</td>
+                          {simulations.map(sim => (
+                            <td key={sim.id} className={`px-4 py-3 ${sim.isApplied ? 'bg-emerald-50/30' : ''}`}>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                sim.results.budgetUtilization >= 95 ? 'bg-red-100 text-red-700' :
+                                sim.results.budgetUtilization >= 80 ? 'bg-amber-100 text-amber-700' :
+                                'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {sim.results.budgetUtilization.toFixed(1)}%
+                              </span>
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showModal && (
+        <RunSimulationModal
+          cycle={cycle}
+          onClose={() => setShowModal(false)}
+          onSuccess={(newSimId) => {
+            setShowModal(false);
+            setSelectedSimId(newSimId);
+          }}
+        />
+      )}
+    </div>
+  );
+}

@@ -25,6 +25,8 @@ import EmployeeDirectory from "./pages/people/EmployeeDirectory";
 import ProfilePage from "./pages/settings/Profile";
 import CyclesList from "./pages/cycles/CyclesList";
 import CycleDetail from "./pages/cycles/CycleDetail";
+import SimulationDashboard from "./pages/cycles/SimulationDashboard";
+import BudgetTracker from "./pages/cycles/BudgetTracker";
 
 // Join / self-registration pages (public)
 import ManualJoin from "./pages/join/ManualJoin";
@@ -309,6 +311,26 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <AppLayout>
                 <EmployeeDashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cycles/:cycleId/simulate"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <SimulationDashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cycles/:cycleId/budget"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <BudgetTracker />
               </AppLayout>
             </ProtectedRoute>
           }

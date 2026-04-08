@@ -43,6 +43,19 @@ import OTPVerification from "./pages/join/OTPVerification";
 // Layout
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AppLayout } from "./components/layout/AppLayout";
+import { SettingsLayout } from "./components/layout/SettingsLayout";
+
+// Analytics & Fairness
+import FairnessDashboard from "./pages/analytics/FairnessDashboard";
+import ExecutiveDashboard from "./pages/analytics/ExecutiveDashboard";
+import ReportsGenerator from "./pages/analytics/ReportsGenerator";
+
+// Settings
+import GeneralSettings from "./pages/settings/GeneralSettings";
+import RegistrationSettings from "./pages/settings/RegistrationSettings";
+import NotificationSettings from "./pages/settings/NotificationSettings";
+import SecuritySettings from "./pages/settings/SecuritySettings";
+import DataPrivacySettings from "./pages/settings/DataPrivacySettings";
 
 // Session management (idle timeout — only active for logged-in users)
 import { useIdleTimeout } from "./hooks/useIdleTimeout";
@@ -66,101 +79,6 @@ function App() {
 
   return (
     <>
-    <Routes>
-      {/* Public routes */}
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/login" element={<Navigate to="/" replace />} />
-      <Route path="/accept-invite" element={<AcceptInvite />} />
-
-      {/* Pending approval placeholder (feature 1.5) */}
-      <Route
-        path="/pending-approval"
-        element={
-          <div className="min-h-screen flex items-center justify-center font-brand">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-merit-navy mb-2">
-                Pending Approval
-              </h1>
-              <p className="text-merit-slate">
-                Your account is awaiting HR approval.
-              </p>
-            </div>
-          </div>
-        }
-      />
-
-      {/* ============================================================= */}
-      {/* PLATFORM-LEVEL (Lumora Ventures only — no companyId)           */}
-      {/* ============================================================= */}
-      <Route
-        path="/platform/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={["platform_admin"]}>
-            <PlatformDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ============================================================= */}
-      {/* COMPANY-LEVEL (scoped to companyId)                            */}
-      {/* ============================================================= */}
-      <Route
-        path="/dashboard/super-admin"
-        element={
-          <ProtectedRoute allowedRoles={["super_admin"]}>
-            <SuperAdminDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/hr-admin"
-        element={
-          <ProtectedRoute allowedRoles={["hr_admin"]}>
-            <HRAdminDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/manager"
-        element={
-          <ProtectedRoute allowedRoles={["manager"]}>
-            <ManagerDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/employee"
-        element={
-          <ProtectedRoute allowedRoles={["employee"]}>
-            <EmployeeDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Feature 1.2 HR Invite System Tracker */}
-      <Route
-        path="/invites"
-        element={
-          <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
-            <InviteTracker />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Feature 1.5 HR Approval System */}
-      <Route
-        path="/hr/people/approvals"
-        element={
-          <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
-            <PendingApprovals />
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
-    <>
       {/* Mount idle-timeout tracker only when a user is signed in */}
       {user && <SessionManager />}
 
@@ -168,8 +86,8 @@ function App() {
         {/* ================================================================= */}
         {/* Public routes                                                       */}
         {/* ================================================================= */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
@@ -395,13 +313,115 @@ function App() {
         {/* Settings — accessible to all authenticated, approved users         */}
         {/* ================================================================= */}
         <Route
+           path="/settings"
+           element={
+               <ProtectedRoute minimumRole="employee">
+                   {user?.role === 'super_admin' ? <Navigate to="/settings/general" replace /> : <Navigate to="/settings/profile" replace />}
+               </ProtectedRoute>
+           }
+        />
+        <Route
           path="/settings/profile"
           element={
-            <ProtectedRoute
-              minimumRole="employee" // any company role
-            >
+            <ProtectedRoute minimumRole="employee">
               <AppLayout>
-                <ProfilePage />
+                <SettingsLayout>
+                  <ProfilePage />
+                </SettingsLayout>
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/general"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <AppLayout>
+                <SettingsLayout>
+                  <GeneralSettings />
+                </SettingsLayout>
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/registration"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <SettingsLayout>
+                  <RegistrationSettings />
+                </SettingsLayout>
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/notifications"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <SettingsLayout>
+                  <NotificationSettings />
+                </SettingsLayout>
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/security"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <AppLayout>
+                <SettingsLayout>
+                  <SecuritySettings />
+                </SettingsLayout>
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/data"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <AppLayout>
+                <SettingsLayout>
+                  <DataPrivacySettings />
+                </SettingsLayout>
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================================================================= */}
+        {/* Analytics & Fairness                                               */}
+        {/* ================================================================= */}
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <ExecutiveDashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/reports"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <ReportsGenerator />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fairness"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <FairnessDashboard />
               </AppLayout>
             </ProtectedRoute>
           }
@@ -528,7 +548,6 @@ function App() {
         {/* ================================================================= */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
-    </>
     </>
   );
 }

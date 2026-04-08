@@ -813,6 +813,27 @@ exports.verifyEmailOTP = onCall(async (request) => {
 });
 
 // =============================================================================
+// Modules 7, 8, 11
+// =============================================================================
+const modules = require("./src/https/modules");
+
+// Module 7
+exports.generateFairnessReport = modules.generateFairnessReport;
+exports.exportFairnessReport = modules.exportFairnessReport;
+
+// Module 8
+exports.generateCycleSummaryReport = modules.generateCycleSummaryReport;
+exports.generateCompanyReport = modules.generateCompanyReport;
+
+// Module 11
+exports.updateCompanySettings = modules.updateCompanySettings;
+exports.updateNotificationSettings = modules.updateNotificationSettings;
+exports.updateSecuritySettings = modules.updateSecuritySettings;
+exports.exportCompanyData = modules.exportCompanyData;
+exports.scheduleCompanyDeletion = modules.scheduleCompanyDeletion;
+exports.cancelCompanyDeletion = modules.cancelCompanyDeletion;
+
+// =============================================================================
 // Module 2 — Company & People Management
 // =============================================================================
 

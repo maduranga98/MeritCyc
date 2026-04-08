@@ -10,6 +10,8 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import { type RoleCode } from "../types/roles";
 import { type AuthUser, type CustomClaims } from "../types/user";
+import { getNotifications } from "../services/notificationService";
+import { useNotificationStore } from "./notificationStore";
 
 // ---------------------------------------------------------------------------
 // Store shape
@@ -37,6 +39,9 @@ interface AuthStore {
   initialize: () => () => void;
 }
 
+// Store a reference to the active notification listener so we can unsubscribe
+let notificationUnsubscribe: (() => void) | null = null;
+
 // ---------------------------------------------------------------------------
 // Store implementation
 // ---------------------------------------------------------------------------
@@ -53,6 +58,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   logout: async () => {
     try {
+      if (notificationUnsubscribe) {
+        notificationUnsubscribe();
+        notificationUnsubscribe = null;
+      }
+      useNotificationStore.getState().setNotifications([]);
       await signOut(auth);
     } catch (err) {
       console.error("Auth signOut error:", err);
@@ -96,6 +106,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
             };
 
             set({ user, firebaseUser, claims, loading: false });
+
+            // Initialize notification listener
+            if (notificationUnsubscribe) notificationUnsubscribe();
+            notificationUnsubscribe = getNotifications(firebaseUser.uid, (notifs) => {
+              useNotificationStore.getState().setNotifications(notifs);
+            });
           } else {
             // ----------------------------------------------------------------
             // 2. Fallback: read from Firestore /users/{uid}
@@ -125,6 +141,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
                 firebaseUser,
                 claims: null,
                 loading: false,
+              });
+
+              // Initialize notification listener
+              if (notificationUnsubscribe) notificationUnsubscribe();
+              notificationUnsubscribe = getNotifications(firebaseUser.uid, (notifs) => {
+                useNotificationStore.getState().setNotifications(notifs);
               });
             } else {
               console.error(

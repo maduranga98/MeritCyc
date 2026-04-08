@@ -12,6 +12,10 @@ import ResetPasswordPage from "./pages/auth/ResetPassword";
 
 // Protected pages
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
+import CareerMap from "./pages/career/CareerMap";
+import IncrementStories from "./pages/increments/IncrementStories";
+import IncrementStoryDetail from "./pages/increments/IncrementStoryDetail";
+import NotificationsPage from "./pages/notifications/NotificationsPage";
 import SuperAdminDashboard from "./pages/dashboards/SuperAdminDashboard";
 import HRAdminDashboard from "./pages/dashboards/HRAdminDashboard";
 import ManagerDashboard from "./pages/dashboards/ManagerDashboard";
@@ -434,6 +438,52 @@ function App() {
             <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
               <AppLayout>
                 <CycleDetail />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================================================================= */}
+        {/* Module 6 — Employee Experience Portal                              */}
+        {/* ================================================================= */}
+        <Route
+          path="/career"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <AppLayout>
+                <CareerMap />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/increments"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <AppLayout>
+                <IncrementStories />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/increments/:cycleId"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <AppLayout>
+                <IncrementStoryDetail />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Notifications (All authenticated company roles) */}
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute minimumRole="employee">
+              <AppLayout>
+                <NotificationsPage />
               </AppLayout>
             </ProtectedRoute>
           }

@@ -320,9 +320,7 @@ export default function PendingApprovals() {
     <div className="p-8 font-brand max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-6">Pending Approvals</h1>
 
-      {/* Stats Bar Placeholder */}
-      {/* Stats Bar Placeholder */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
           <div className="text-slate-500 text-sm font-medium mb-1">Pending</div>
           <div className="text-2xl font-bold text-amber-600">{allData.filter(d => d.status === 'pending_approval').length}</div>

@@ -7,6 +7,7 @@ import { useNotificationStore } from '../../stores/notificationStore';
 import { type IncrementStory, type CareerMap } from '../../types/incrementStory';
 import { type Evaluation } from '../../types/evaluation';
 import { Clock, TrendingUp, Award, DollarSign, Bell } from 'lucide-react';
+import { markNotificationRead } from '../../services/notificationService';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -218,6 +219,7 @@ const EmployeeDashboard: React.FC = () => {
                   <p className="text-slate-600 text-sm mt-0.5">{notif.message}</p>
                 </div>
                 <button
+                  onClick={() => markNotificationRead(notif.id)}
                   className="text-xs font-medium text-emerald-600 hover:bg-emerald-100 px-2 py-1 rounded"
                 >
                   Mark Read

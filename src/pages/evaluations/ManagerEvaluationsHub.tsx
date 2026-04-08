@@ -16,22 +16,25 @@ export default function ManagerEvaluationsHub() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.companyId || !user?.uid) return;
+    if (!user?.companyId) return;
 
-    // Subscribe to all cycles to find active/completed ones
     const unsubCycles = cycleService.subscribeToCycles(user.companyId, (cyclesData) => {
       setCycles(cyclesData);
-
-      // Subscribe to all evaluations for this manager
-      const unsubEvals = evaluationService.getManagerEvaluations(user.uid, undefined, (evalsData) => {
-         setEvaluations(evalsData);
-         setLoading(false);
-      });
-      return () => unsubEvals();
     });
 
     return () => unsubCycles();
-  }, [user]);
+  }, [user?.companyId]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubEvals = evaluationService.getManagerEvaluations(user.uid, undefined, (evalsData) => {
+      setEvaluations(evalsData);
+      setLoading(false);
+    });
+
+    return () => unsubEvals();
+  }, [user?.uid]);
 
   if (loading) {
     return (

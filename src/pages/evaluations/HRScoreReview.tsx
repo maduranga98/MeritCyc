@@ -177,12 +177,25 @@ export default function HRScoreReview() {
                   ))}
               </select>
           </div>
-          <button
-              onClick={() => setShowFinalizeModal(true)}
-              className="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-          >
-              Finalize Cycle
-          </button>
+          {selectedCycle?.status === 'locked' ? (
+              <button
+                  onClick={() => setShowFinalizeModal(true)}
+                  className="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+              >
+                  Finalize Cycle
+              </button>
+          ) : (
+              <div className="text-right">
+                  <button
+                      disabled
+                      className="px-5 py-2.5 bg-slate-200 text-slate-400 font-bold rounded-lg cursor-not-allowed"
+                      title="Cycle must be locked before finalizing"
+                  >
+                      Finalize Cycle
+                  </button>
+                  <p className="text-xs text-slate-400 mt-1">Lock the cycle first to finalize</p>
+              </div>
+          )}
       </div>
 
       {/* Stats Row */}

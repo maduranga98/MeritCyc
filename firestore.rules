@@ -65,17 +65,21 @@ service cloud.firestore {
       allow write: if false; // Cloud Functions only
     }
 
-    // Pending registrations: /companies/{companyId}/pendingRegistrations/{email}
-    // Contains hashed OTP — no client should ever read or write this.
-    match /companies/{companyId}/pendingRegistrations/{email} {
-      allow read:  if false; // Cloud Functions only
-      allow write: if false; // Cloud Functions only
-    }
-
     // Departments: public read so the join form can populate the dropdown.
     // Only HR/admin can write (through Cloud Functions in practice).
     match /companies/{companyId}/departments/{deptId} {
       allow read: if true; // Public — used by unauthenticated join flow
+      allow write: if false; // Cloud Functions only
+    }
+
+    // =========================================================================
+    // Feature 1.5: HR Approval System
+    // Pending registrations readable by HR admins and super admins of the same
+    // company. All writes are Cloud Functions only.
+    // =========================================================================
+
+    match /companies/{companyId}/pendingRegistrations/{id} {
+      allow read: if isHrOrAdmin(companyId);
       allow write: if false; // Cloud Functions only
     }
 
@@ -117,16 +121,6 @@ service cloud.firestore {
 
     match /{document=**} {
       allow read, write: if false;
-    }
-    // Feature 1.5: HR Approval System
-    match /companies/{companyId}/pendingRegistrations/{id} {
-      // allow read by hr_admin or super_admin of the same company
-      allow read: if request.auth != null &&
-                  request.auth.token.companyId == companyId &&
-                  (request.auth.token.role == 'hr_admin' || request.auth.token.role == 'super_admin');
-
-      // writes are only allowed from Cloud Functions
-      allow write: if false;
     }
   }
 }

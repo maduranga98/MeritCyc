@@ -312,10 +312,11 @@ const OTPForm: React.FC<{ state: LocationState }> = ({ state }) => {
   // ── Success screen ─────────────────────────────────────────────────────
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-50 font-brand flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-slate-50 font-brand flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
           <Logo />
 
+          {/* Animated check circle */}
           <div className="mt-8 mb-5 mx-auto w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center">
             <svg
               width="40"
@@ -332,25 +333,64 @@ const OTPForm: React.FC<{ state: LocationState }> = ({ state }) => {
             </svg>
           </div>
 
-          <h1 className="text-2xl font-bold text-slate-900 mb-3">
-            Registration Submitted!
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">
+            You're Almost In!
           </h1>
-          <p className="text-slate-500 text-sm leading-relaxed max-w-xs mx-auto">
-            Your account is pending HR approval for{" "}
+          <p className="text-slate-500 text-sm mb-6">
+            Registration submitted for{" "}
             <span className="font-semibold text-slate-700">
-              {state.companyName}
+              {state.companyName || "your company"}
             </span>
-            . You'll receive an email once it's approved.
+            .
           </p>
 
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <Link
-              to="/login"
-              className="text-sm font-medium text-emerald-600 hover:underline"
-            >
-              Back to Sign In
-            </Link>
+          {/* Info card */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left mb-6">
+            <p className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-3">
+              What happens next:
+            </p>
+            <ul className="space-y-2">
+              {[
+                "Your HR team has been notified",
+                "They will review and approve your account",
+                `You'll receive an email at ${state.email} once approved`,
+                "This usually takes 1–2 business days",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2 text-sm text-slate-600">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#10B981"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mt-0.5 shrink-0"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
+
+          <button
+            type="button"
+            onClick={() => navigate("/login")}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl transition-colors active:scale-[0.98] mb-4"
+          >
+            Back to Login
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/join", { replace: true, state: null })}
+            className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            Registered at the wrong company?
+          </button>
         </div>
       </div>
     );

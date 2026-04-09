@@ -438,6 +438,34 @@ async function sendOtpEmail(toEmail, toName, otp, companyName) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Send "registration received, awaiting approval" email via Brevo
+// ---------------------------------------------------------------------------
+
+async function sendApprovalPendingEmail(toEmail, toName, companyName) {
+  try {
+    await transactionalEmailApi.sendTransacEmail({
+      sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
+      to: [{ email: toEmail, name: toName }],
+      subject: "Registration received — awaiting HR approval",
+      htmlContent: `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#0F172A">You're almost in!</h2>
+      <p>Hi ${toName},</p>
+      <p>Your registration for <strong>${companyName}</strong> on MeritCyc has been received.</p>
+      <p>Your HR team will review and approve your request shortly.
+         You'll receive an email once your account is activated.</p>
+      <p style="color:#64748B;font-size:14px">
+        This usually takes 1-2 business days. If you have any questions,
+        please contact your HR department directly.
+      </p>
+    </div>`,
+    });
+  } catch (e) {
+    logger.error("Brevo approval-pending email send failed:", e);
+  }
+}
+
 // =============================================================================
 // generateCompanyQRCode — hr_admin | super_admin
 // Creates or regenerates the company registration code.
@@ -571,13 +599,25 @@ exports.validateCompanyCode = onCall(async (request) => {
   try {
     const resolved = await resolveCompanyCode(normalized);
 
-    if (!resolved || !resolved.qrEnabled) {
+    if (!resolved) {
       return {
         success: false,
         error: {
           code: "INVALID_CODE",
           message: "Invalid or inactive company code",
         },
+      };
+    }
+
+    if (!resolved.qrEnabled) {
+      return {
+        success: false,
+        error: {
+          code: "REGISTRATION_DISABLED",
+          message: "Registration is currently disabled.",
+        },
+        companyName: resolved.companyName,
+        companyId: resolved.companyId,
       };
     }
 
@@ -614,10 +654,24 @@ exports.submitSelfRegistration = onCall(async (request) => {
     );
   }
 
-  const { companyCode, name, email, departmentId, jobTitle } = request.data;
+  const { companyCode, name, email, departmentId, jobTitle, password, phoneNumber, employeeId } = request.data;
 
-  if (!companyCode || !name || !email || !jobTitle) {
+  if (!companyCode || !name || !email || !jobTitle || !password) {
     throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  // Server-side password validation
+  if (
+    typeof password !== "string" ||
+    password.length < 8 ||
+    !/[A-Z]/.test(password) ||
+    !/[a-z]/.test(password) ||
+    !/[0-9]/.test(password)
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Password does not meet requirements. Must be at least 8 characters with uppercase, lowercase, and a number.",
+    );
   }
 
   const normalized = companyCode.toUpperCase().trim();
@@ -666,6 +720,9 @@ exports.submitSelfRegistration = onCall(async (request) => {
     email: normalizedEmail,
     departmentId: departmentId || "",
     jobTitle: jobTitle.trim(),
+    phoneNumber: phoneNumber || "",
+    employeeId: employeeId || "",
+    password: password, // plaintext — protected by Firestore rules, deleted after OTP verification
     companyCode: normalized,
     companyId,
     otp: hashedOtp,
@@ -718,7 +775,7 @@ exports.verifyEmailOTP = onCall(async (request) => {
     throw new HttpsError("not-found", "Invalid company code.");
   }
 
-  const { companyId } = resolved;
+  const { companyId, companyName } = resolved;
 
   const pendingRef = firestore
     .collection("companies")
@@ -784,26 +841,99 @@ exports.verifyEmailOTP = onCall(async (request) => {
     );
   }
 
-  // OTP correct — promote to pending_approval
-  await pendingRef.update({
-    status: "pending_approval",
-    otp: admin.firestore.FieldValue.delete(),
-    otpAttempts: admin.firestore.FieldValue.delete(),
-    otpExpiresAt: admin.firestore.FieldValue.delete(),
-    cooldownUntil: admin.firestore.FieldValue.delete(),
-    verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+  // OTP correct — create Firebase Auth account and finalize registration
+
+  // STEP A: Create Firebase Auth account
+  let firebaseUid;
+  try {
+    const authUser = await admin.auth().createUser({
+      email: normalizedEmail,
+      password: reg.password,
+      displayName: reg.name,
+      emailVerified: true, // OTP has verified the email
+    });
+    firebaseUid = authUser.uid;
+  } catch (authErr) {
+    if (authErr.code === "auth/email-already-exists") {
+      const existing = await admin.auth().getUserByEmail(normalizedEmail);
+      firebaseUid = existing.uid;
+    } else {
+      logger.error("createUser error:", authErr);
+      throw new HttpsError("internal", "Failed to create account. Please try again.");
+    }
+  }
+
+  // STEP B: Set custom claims (approved: false — pending HR review)
+  await admin.auth().setCustomUserClaims(firebaseUid, {
+    role: "employee",
+    companyId,
+    approved: false,
   });
 
+  // STEP C: Write user doc to /users/{uid}
+  await firestore.collection("users").doc(firebaseUid).set({
+    uid: firebaseUid,
+    name: reg.name,
+    email: normalizedEmail,
+    phoneNumber: reg.phoneNumber || "",
+    employeeId: reg.employeeId || "",
+    companyId,
+    departmentId: reg.departmentId || "",
+    jobTitle: reg.jobTitle,
+    role: "employee",
+    status: "pending_approval",
+    registrationPath: "qr_self_register",
+    approved: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  // STEP D: Write audit log
   await writeAuditLog({
     companyId,
-    action: "SELF_REGISTRATION_SUBMITTED",
-    actorUid: "anonymous",
+    action: "USER_SELF_REGISTERED",
+    actorUid: firebaseUid,
     actorEmail: normalizedEmail,
-    actorRole: "applicant",
-    targetType: "pendingRegistration",
-    targetId: normalizedEmail,
-    metadata: { name: reg.name },
+    actorRole: "employee",
+    targetType: "user",
+    targetId: firebaseUid,
+    after: { status: "pending_approval", registrationPath: "qr_self_register" },
   });
+
+  // STEP E: Notify all HR admins and super admins of the new registration
+  const hrAdmins = await firestore
+    .collection("users")
+    .where("companyId", "==", companyId)
+    .where("role", "in", ["hr_admin", "super_admin"])
+    .get();
+
+  const notifBatch = firestore.batch();
+  hrAdmins.forEach((hrDoc) => {
+    const notifRef = firestore
+      .collection("users")
+      .doc(hrDoc.id)
+      .collection("notifications")
+      .doc();
+    notifBatch.set(notifRef, {
+      type: "new_registration",
+      title: "New Registration Request",
+      message: `${reg.name} has requested to join via self-registration.`,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      metadata: {
+        applicantUid: firebaseUid,
+        applicantName: reg.name,
+        applicantEmail: normalizedEmail,
+      },
+    });
+  });
+  await notifBatch.commit();
+
+  // STEP F: Delete the pendingRegistration doc (user doc now exists)
+  await pendingRef.delete();
+
+  // STEP G: Send approval-pending confirmation email to the employee
+  await sendApprovalPendingEmail(normalizedEmail, reg.name, companyName);
 
   return { success: true };
 });

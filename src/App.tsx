@@ -9,6 +9,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/auth/Login";
 import ForgotPasswordPage from "./pages/auth/ForgotPassword";
 import ResetPasswordPage from "./pages/auth/ResetPassword";
+import PendingApproval from "./pages/auth/PendingApproval";
 
 // Protected pages
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
@@ -104,44 +105,7 @@ function App() {
         {/* ================================================================= */}
         {/* Pending approval                                                    */}
         {/* ================================================================= */}
-        <Route
-          path="/pending-approval"
-          element={
-            <div className="min-h-screen bg-merit-bg flex items-center justify-center font-brand px-4">
-              <div className="bg-white rounded-2xl border border-gray-100 p-10 max-w-md w-full text-center shadow-sm">
-                <div className="mx-auto mb-5 w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#F59E0B"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </div>
-                <h1 className="text-xl font-bold text-merit-navy mb-2">
-                  Pending Approval
-                </h1>
-                <p className="text-merit-slate text-sm leading-relaxed">
-                  Your account is awaiting HR approval. You will receive an
-                  email once your account has been activated.
-                </p>
-                <a
-                  href="/login"
-                  className="inline-block mt-6 text-sm text-merit-emerald font-bold hover:underline"
-                >
-                  Back to Sign In
-                </a>
-              </div>
-            </div>
-          }
-        />
+        <Route path="/pending-approval" element={<PendingApproval />} />
 
         {/* Unauthorized */}
         <Route

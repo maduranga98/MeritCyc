@@ -8,7 +8,7 @@
 //
 // Flow:
 //   Step 1 — validate company code (auto or manual)
-//   Step 2 — registration form (name, email, department, jobTitle)
+//   Step 2 — registration form (name, email, phone, department, jobTitle, employeeId, password)
 //   Step 3 — navigate to /join/verify
 // =============================================================================
 
@@ -57,6 +57,29 @@ const Spinner: React.FC<{ size?: string }> = ({ size = "h-8 w-8" }) => (
 );
 
 // ---------------------------------------------------------------------------
+// Password strength helpers
+// ---------------------------------------------------------------------------
+
+interface PasswordStrength {
+  score: number;
+  label: string;
+  barColor: string;
+  labelColor: string;
+  width: string;
+}
+
+function getPasswordStrength(pwd: string): PasswordStrength {
+  if (!pwd) return { score: 0, label: "", barColor: "", labelColor: "", width: "0%" };
+  const hasUpper = /[A-Z]/.test(pwd);
+  const hasLower = /[a-z]/.test(pwd);
+  const hasNumber = /[0-9]/.test(pwd);
+  const score = [hasUpper, hasLower, hasNumber].filter(Boolean).length;
+  if (score === 1) return { score: 1, label: "Weak", barColor: "bg-red-400", labelColor: "text-red-400", width: "33%" };
+  if (score === 2) return { score: 2, label: "Medium", barColor: "bg-amber-400", labelColor: "text-amber-400", width: "66%" };
+  return { score: 3, label: "Strong", barColor: "bg-emerald-500", labelColor: "text-emerald-500", width: "100%" };
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -67,7 +90,7 @@ const QRLanding: React.FC = () => {
   const locState = (location.state ?? {}) as LocationState;
 
   // ── Step 1: validation ─────────────────────────────────────────────────
-  type Step = "validating" | "invalid" | "form";
+  type Step = "validating" | "invalid" | "form" | "disabled";
   const [step, setStep] = useState<Step>(
     locState.preValidated ? "form" : companyCode ? "validating" : "invalid",
   );
@@ -79,13 +102,21 @@ const QRLanding: React.FC = () => {
   // ── Step 2: form ───────────────────────────────────────────────────────
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [deptLoading, setDeptLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const pwdStrength = getPasswordStrength(password);
 
   // ── Auto-validate on mount ─────────────────────────────────────────────
   useEffect(() => {
@@ -105,6 +136,9 @@ const QRLanding: React.FC = () => {
           setCompanyId(data.companyId);
           setCompanyName(data.companyName);
           setStep("form");
+        } else if (data.error?.code === "REGISTRATION_DISABLED") {
+          setCompanyName(data.companyName ?? "");
+          setStep("disabled");
         } else {
           setValidationError(
             data.error?.message ??
@@ -148,6 +182,23 @@ const QRLanding: React.FC = () => {
       errs.email = "Please enter a valid email.";
     }
     if (!jobTitle.trim()) errs.jobTitle = "Job title is required.";
+
+    // Password
+    if (!password) {
+      errs.password = "Password is required.";
+    } else if (password.length < 8) {
+      errs.password = "Password must be at least 8 characters.";
+    } else if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      errs.password = "Must include uppercase, lowercase, and a number.";
+    }
+
+    // Confirm password
+    if (!confirmPassword) {
+      errs.confirmPassword = "Please confirm your password.";
+    } else if (password !== confirmPassword) {
+      errs.confirmPassword = "Passwords do not match.";
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -168,6 +219,9 @@ const QRLanding: React.FC = () => {
           email: string;
           departmentId: string;
           jobTitle: string;
+          password: string;
+          phoneNumber: string;
+          employeeId: string;
         },
         SubmitResult
       >(functions, "submitSelfRegistration");
@@ -178,6 +232,9 @@ const QRLanding: React.FC = () => {
         email: email.trim().toLowerCase(),
         departmentId,
         jobTitle: jobTitle.trim(),
+        password,
+        phoneNumber: phoneNumber.trim(),
+        employeeId: employeeId.trim(),
       });
 
       navigate("/join/verify", {
@@ -194,6 +251,8 @@ const QRLanding: React.FC = () => {
         setSubmitError("Too many attempts. Please try again in a few minutes.");
       } else if (fnErr.code === "functions/already-exists") {
         setSubmitError("An account with this email already exists in this company.");
+      } else if (fnErr.code === "functions/invalid-argument" && fnErr.message?.includes("Password")) {
+        setSubmitError("Password does not meet the requirements.");
       } else {
         setSubmitError("Registration failed. Please try again.");
       }
@@ -255,6 +314,45 @@ const QRLanding: React.FC = () => {
           </div>
         )}
 
+        {/* ── Registration disabled ── */}
+        {step === "disabled" && (
+          <div className="text-center py-4">
+            <div className="mx-auto mb-6 w-20 h-20 flex items-center justify-center">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
+                stroke="#CBD5E1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-3">
+              Registration Currently Disabled
+            </h2>
+            <p className="text-slate-500 text-sm leading-relaxed mb-2">
+              Self-registration for{" "}
+              {companyName ? (
+                <span className="font-semibold text-slate-700">{companyName}</span>
+              ) : (
+                "this company"
+              )}{" "}
+              is not accepting new requests at this time.
+            </p>
+            <p className="text-slate-500 text-sm leading-relaxed mb-8">
+              Please contact your HR department directly to get access.
+            </p>
+            <Link
+              to="/join"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+              Back
+            </Link>
+          </div>
+        )}
+
         {/* ── Registration form ── */}
         {step === "form" && (
           <>
@@ -279,7 +377,7 @@ const QRLanding: React.FC = () => {
             </p>
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
-              {/* Full Name */}
+              {/* 1. Full Name */}
               <Field label="Full Name" error={errors.name}>
                 <input
                   type="text"
@@ -295,7 +393,7 @@ const QRLanding: React.FC = () => {
                 />
               </Field>
 
-              {/* Work Email */}
+              {/* 2. Work Email */}
               <Field label="Work Email" error={errors.email}>
                 <input
                   type="email"
@@ -312,7 +410,24 @@ const QRLanding: React.FC = () => {
                 />
               </Field>
 
-              {/* Department */}
+              {/* 3. Phone Number (optional) */}
+              <Field label="Phone Number" hint="(optional)">
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="+1 555 000 0000"
+                  autoComplete="tel"
+                  disabled={submitting}
+                  className={inputCls(false)}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  Used by HR if they need to reach you
+                </p>
+              </Field>
+
+              {/* 4. Department (optional) */}
               <Field label="Department" hint="(optional)">
                 {deptLoading ? (
                   <div className="flex items-center gap-2 h-12 px-4 rounded-xl border border-slate-200 bg-slate-50">
@@ -336,7 +451,7 @@ const QRLanding: React.FC = () => {
                 )}
               </Field>
 
-              {/* Job Title */}
+              {/* 5. Job Title */}
               <Field label="Job Title" error={errors.jobTitle}>
                 <input
                   type="text"
@@ -349,6 +464,114 @@ const QRLanding: React.FC = () => {
                   disabled={submitting}
                   className={inputCls(!!errors.jobTitle)}
                 />
+              </Field>
+
+              {/* 6. Employee ID (optional) */}
+              <Field label="Employee ID" hint="(optional)">
+                <input
+                  type="text"
+                  value={employeeId}
+                  onChange={(e) => setEmployeeId(e.target.value)}
+                  placeholder="e.g. EMP-1234"
+                  disabled={submitting}
+                  className={inputCls(false)}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  Your company's internal employee ID if you know it
+                </p>
+              </Field>
+
+              {/* 7. Password */}
+              <Field label="Password" error={errors.password}>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setErrors((p) => ({ ...p, password: "" }));
+                    }}
+                    placeholder="Min 8 characters"
+                    autoComplete="new-password"
+                    disabled={submitting}
+                    className={inputCls(!!errors.password) + " pr-11"}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    disabled={submitting}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-40"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                {/* Password strength meter */}
+                {password.length > 0 && (
+                  <div className="mt-2">
+                    <div className="w-full bg-slate-100 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full transition-all duration-300 ${pwdStrength.barColor}`}
+                        style={{ width: pwdStrength.width }}
+                      />
+                    </div>
+                    <p className={`text-xs mt-1 ${pwdStrength.labelColor}`}>
+                      {pwdStrength.label}
+                    </p>
+                  </div>
+                )}
+              </Field>
+
+              {/* 8. Confirm Password */}
+              <Field label="Confirm Password" error={errors.confirmPassword}>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setErrors((p) => ({ ...p, confirmPassword: "" }));
+                    }}
+                    placeholder="Re-enter your password"
+                    autoComplete="new-password"
+                    disabled={submitting}
+                    className={inputCls(!!errors.confirmPassword) + " pr-11"}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    disabled={submitting}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-40"
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </Field>
 
               {/* Submit error */}

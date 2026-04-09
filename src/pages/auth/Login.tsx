@@ -268,6 +268,55 @@ const LoginPage: React.FC = () => {
             )}
           </button>
         </form>
+
+        {/* ── Registration links footer ── */}
+        <div className="mt-8 space-y-3">
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-100" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-3 bg-merit-bg text-merit-slate">
+                New to MeritCyc?
+              </span>
+            </div>
+          </div>
+
+          {/* Join with company code — for employees */}
+          <Link
+            to="/join"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-merit-navy font-medium transition-all active:scale-[0.98] text-sm"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3" />
+            </svg>
+            Join with a company code
+          </Link>
+
+          {/* Register a new company — for HR / founders */}
+          <p className="text-center text-xs text-merit-slate">
+            Setting up MeritCyc for your company?{" "}
+            <Link
+              to="/signup"
+              className="text-merit-emerald font-semibold hover:underline"
+            >
+              Register your company →
+            </Link>
+          </p>
+        </div>
       </div>
     </AuthLayout>
   );

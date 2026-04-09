@@ -10,6 +10,7 @@ import LoginPage from "./pages/auth/Login";
 import ForgotPasswordPage from "./pages/auth/ForgotPassword";
 import ResetPasswordPage from "./pages/auth/ResetPassword";
 import PendingApproval from "./pages/auth/PendingApproval";
+import SignupPage from "./pages/auth/Signup";
 
 // Protected pages
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
@@ -89,6 +90,7 @@ function App() {
         {/* ================================================================= */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />

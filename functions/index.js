@@ -236,6 +236,143 @@ exports.toggleCompanyStatus = onCall(async (request) => {
 });
 
 // =============================================================================
+// completeOnboarding — PUBLIC but requires authenticated user
+// Creates company, user document, and generates QR code for new company signup
+// Input: { company: {name, industry, size, country, currency, logoUrl?}, departments[], salaryBands[] }
+// =============================================================================
+
+exports.completeOnboarding = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const uid = request.auth.uid;
+  const email = request.auth.token.email || "";
+  const displayName = request.auth.token.name || email.split("@")[0];
+
+  const { company, departments, salaryBands } = request.data;
+
+  // Validate inputs
+  if (!company || !company.companyName) {
+    throw new HttpsError("invalid-argument", "Company name is required.");
+  }
+
+  if (!Array.isArray(departments) || departments.length === 0) {
+    throw new HttpsError("invalid-argument", "At least one department is required.");
+  }
+
+  if (!Array.isArray(salaryBands) || salaryBands.length === 0) {
+    throw new HttpsError("invalid-argument", "At least one salary band is required.");
+  }
+
+  try {
+    // Create company document
+    const companyRef = firestore.collection("companies").doc();
+    const companyId = companyRef.id;
+
+    const companyDoc = {
+      name: company.companyName,
+      industry: company.industry || "Technology",
+      size: company.size || "50-100",
+      country: company.country || "United States",
+      currency: company.currency || "USD",
+      ...(company.logoUrl && { logoUrl: company.logoUrl }),
+      status: "active",
+      employeeCount: 1, // The creator counts as 1
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: uid,
+    };
+
+    await companyRef.set(companyDoc);
+
+    // Create user document for the company creator (as super_admin)
+    await firestore.collection("users").doc(uid).set({
+      uid,
+      email,
+      name: displayName,
+      companyId,
+      role: "super_admin",
+      approved: true,
+      status: "active",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Set custom claims on Firebase Auth user
+    await admin.auth().setCustomUserClaims(uid, {
+      role: "super_admin",
+      companyId,
+      approved: true,
+    });
+
+    // Create departments
+    const deptBatch = firestore.batch();
+    departments.forEach((dept) => {
+      const deptRef = companyRef.collection("departments").doc();
+      deptBatch.set(deptRef, {
+        name: dept.name,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    await deptBatch.commit();
+
+    // Create salary bands
+    const bandBatch = firestore.batch();
+    salaryBands.forEach((band) => {
+      const bandRef = companyRef.collection("salaryBands").doc();
+      bandBatch.set(bandRef, {
+        name: band.name,
+        level: band.level,
+        min: band.min,
+        max: band.max,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    await bandBatch.commit();
+
+    // Generate QR code for the company
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
+    let suffix = "";
+    for (let i = 0; i < 6; i++) {
+      suffix += chars[Math.floor(Math.random() * chars.length)];
+    }
+    const companyCode = `MC-${suffix}`;
+
+    const regRef = companyRef.collection("registration").doc(companyId);
+    await regRef.set({
+      companyCode,
+      qrEnabled: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      regeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
+      regeneratedBy: uid,
+    });
+
+    // Audit log
+    await writeAuditLog({
+      companyId,
+      action: "COMPANY_CREATED",
+      actorUid: uid,
+      actorEmail: email,
+      actorRole: "super_admin",
+      targetType: "company",
+      targetId: companyId,
+      after: { name: company.companyName },
+    });
+
+    logger.info(`Company created: ${companyId} by ${uid}`);
+
+    return {
+      success: true,
+      companyId,
+      companyCode,
+      message: "Company created successfully!",
+    };
+  } catch (error) {
+    logger.error("Error in completeOnboarding:", error);
+    throw new HttpsError("internal", error.message || "An error occurred during onboarding.");
+  }
+});
+
+// =============================================================================
 // Invites
 // =============================================================================
 

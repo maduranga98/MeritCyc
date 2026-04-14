@@ -399,10 +399,12 @@ async function resolveCompanyCode(companyCode) {
 
   if (!companyDoc.exists) return null;
 
+  const regData = regDoc.data();
   return {
     companyId: companyDoc.id,
     companyName: companyDoc.data().name,
-    qrEnabled: regDoc.data().qrEnabled === true,
+    // Default to true for backward compatibility if qrEnabled is missing
+    qrEnabled: regData.qrEnabled !== false,
   };
 }
 
@@ -494,6 +496,7 @@ exports.generateCompanyQRCode = onCall(async (request) => {
   if (existing.exists) {
     await regRef.update({
       companyCode,
+      qrEnabled: true,
       regeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
       regeneratedBy: uid,
     });

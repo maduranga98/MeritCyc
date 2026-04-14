@@ -389,23 +389,37 @@ async function resolveCompanyCode(companyCode) {
     .limit(1)
     .get();
 
-  if (snap.empty) return null;
+  if (snap.empty) {
+    logger.warn(`Company code not found: ${companyCode}`);
+    return null;
+  }
 
   const regDoc = snap.docs[0];
+  logger.info(`Found registration doc for code ${companyCode}:`, {
+    docId: regDoc.id,
+    qrEnabled: regDoc.data().qrEnabled,
+  });
+
   // The registration doc lives at companies/{companyId}/registration/{companyId}
   // regDoc.ref.parent.parent gives the company DocumentReference
   const companyRef = regDoc.ref.parent.parent;
   const companyDoc = await companyRef.get();
 
-  if (!companyDoc.exists) return null;
+  if (!companyDoc.exists) {
+    logger.warn(`Company document not found for registration: ${companyRef.id}`);
+    return null;
+  }
 
   const regData = regDoc.data();
-  return {
+  const result = {
     companyId: companyDoc.id,
     companyName: companyDoc.data().name,
     // Default to true for backward compatibility if qrEnabled is missing
     qrEnabled: regData.qrEnabled !== false,
   };
+
+  logger.info(`Resolved company code ${companyCode}:`, result);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -574,12 +588,15 @@ exports.toggleQRRegistration = onCall(async (request) => {
 exports.validateCompanyCode = onCall(async (request) => {
   const ip = (request.rawRequest && request.rawRequest.ip) || "unknown";
 
+  logger.info(`validateCompanyCode called from IP: ${ip}`);
+
   const limited = await checkRateLimit(
     `validate:${ip}`,
     10,
     15 * 60 * 1000,
   );
   if (limited) {
+    logger.warn(`Rate limit exceeded for IP: ${ip}`);
     return {
       success: false,
       error: {
@@ -591,6 +608,7 @@ exports.validateCompanyCode = onCall(async (request) => {
 
   const { companyCode } = request.data;
   if (!companyCode || typeof companyCode !== "string") {
+    logger.warn(`Invalid company code provided: ${companyCode}`);
     return {
       success: false,
       error: { code: "INVALID_CODE", message: "Company code is required." },
@@ -598,11 +616,13 @@ exports.validateCompanyCode = onCall(async (request) => {
   }
 
   const normalized = companyCode.toUpperCase().trim();
+  logger.info(`Validating company code: ${companyCode} (normalized: ${normalized})`);
 
   try {
     const resolved = await resolveCompanyCode(normalized);
 
     if (!resolved) {
+      logger.warn(`Company code not resolved: ${normalized}`);
       return {
         success: false,
         error: {
@@ -613,6 +633,7 @@ exports.validateCompanyCode = onCall(async (request) => {
     }
 
     if (!resolved.qrEnabled) {
+      logger.warn(`QR registration disabled for company: ${resolved.companyId}`);
       return {
         success: false,
         error: {
@@ -624,6 +645,7 @@ exports.validateCompanyCode = onCall(async (request) => {
       };
     }
 
+    logger.info(`Company code validated successfully: ${normalized} -> ${resolved.companyId}`);
     return {
       success: true,
       companyId: resolved.companyId,

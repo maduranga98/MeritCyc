@@ -6,8 +6,12 @@ import { getIncrementStories, getCareerMap } from '../../services/incrementStory
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type IncrementStory, type CareerMap } from '../../types/incrementStory';
 import { type Evaluation } from '../../types/evaluation';
-import { Clock, TrendingUp, Award, DollarSign, Bell } from 'lucide-react';
+import { type Cycle } from '../../types/cycle';
+import { Clock, TrendingUp, Award, DollarSign, Bell, Pulse } from 'lucide-react';
 import { markNotificationRead } from '../../services/notificationService';
+import { db } from '../../config/firebase';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { cycleService } from '../../services/cycleService';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -21,7 +25,10 @@ const EmployeeDashboard: React.FC = () => {
   const [stories, setStories] = useState<IncrementStory[]>([]);
   const [careerMap, setCareerMap] = useState<CareerMap | null>(null);
   const { notifications, unreadCount } = useNotificationStore();
-  const [activeCycleData] = useState<{ evaluation: Evaluation, criteria: unknown[], currentScore: number, tier: unknown, daysRemaining: number } | null>(null);
+  const [activeCycle, setActiveCycle] = useState<(Cycle & { isLocked: boolean }) | null>(null);
+  const [activeEvaluation, setActiveEvaluation] = useState<Evaluation | null>(null);
+  const [currentWeightedScore, setCurrentWeightedScore] = useState<number>(0);
+  const [estimatedTier, setEstimatedTier] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -41,14 +48,61 @@ const EmployeeDashboard: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    // Attempt to fetch active cycle progress if there is one
-    // We don't have a direct way to find the active cycle ID without fetching all cycles,
-    // For this dashboard, let's assume we find it via an internal api or just show empty if not known.
-    // In a real app, we'd query cycles where status == 'active'.
-    // Given the constraints and lack of direct activeCycleId, we might skip showing it if we can't find it,
-    // or we'll mock it if needed. The instructions mention "If employee has an active cycle evaluation".
-    // We will leave the active cycle card muted if activeCycleData is null.
-  }, [user]);
+    if (!user?.uid || !user?.companyId) return;
+
+    const loadActiveCycle = async () => {
+      try {
+        const cyclesSnapshot = await getDocs(
+          query(collection(db, 'cycles'), where('companyId', '==', user.companyId), where('status', 'in', ['active', 'locked']))
+        );
+
+        if (cyclesSnapshot.empty) {
+          setActiveCycle(null);
+          setActiveEvaluation(null);
+          return;
+        }
+
+        const cycleDoc = cyclesSnapshot.docs[0];
+        const cycleData = cycleDoc.data() as Cycle;
+        setActiveCycle({ ...cycleData, isLocked: cycleData.status === 'locked' });
+
+        // Subscribe to real-time evaluation updates for this employee in this cycle
+        const evalUnsubscribe = onSnapshot(
+          query(collection(db, 'evaluations'), where('cycleId', '==', cycleDoc.id), where('employeeId', '==', user.uid)),
+          (snapshot) => {
+            if (!snapshot.empty) {
+              const evalData = snapshot.docs[0].data() as Evaluation;
+              setActiveEvaluation(evalData);
+
+              // Calculate weighted score from criteria
+              if (evalData.criteriaScores && Array.isArray(evalData.criteriaScores)) {
+                const totalWeighted = evalData.criteriaScores.reduce((sum, c: any) => {
+                  const weight = c.weight || 1;
+                  const score = c.score || 0;
+                  return sum + (score * weight);
+                }, 0);
+                const totalWeight = evalData.criteriaScores.reduce((sum, c: any) => sum + (c.weight || 1), 0);
+                const weighted = totalWeight > 0 ? totalWeighted / totalWeight : 0;
+                setCurrentWeightedScore(weighted);
+
+                // Estimate tier based on weighted score
+                if (weighted >= 90) setEstimatedTier('Exceptional');
+                else if (weighted >= 75) setEstimatedTier('Exceeds');
+                else if (weighted >= 60) setEstimatedTier('Meets');
+                else setEstimatedTier('Developing');
+              }
+            }
+          }
+        );
+
+        return evalUnsubscribe;
+      } catch (err) {
+        console.error('Error loading active cycle:', err);
+      }
+    };
+
+    loadActiveCycle().then(unsub => () => unsub?.());
+  }, [user?.uid, user?.companyId]);
 
   const bestScore = stories.length > 0 ? Math.max(...stories.map(s => s.score)) : 0;
   const bestStory = stories.find(s => s.score === bestScore);
@@ -78,30 +132,47 @@ const EmployeeDashboard: React.FC = () => {
       </div>
 
       {/* SECTION 2 — Active Cycle Card */}
-      {activeCycleData ? (
+      {activeCycle && activeEvaluation ? (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500"></div>
+          <div className={`absolute top-0 left-0 w-1.5 h-full ${activeCycle.isLocked ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
           <div className="flex justify-between items-start mb-4">
             <div>
-              <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider mb-2 inline-block">
-                Active Increment Cycle
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider mb-2 inline-block ${activeCycle.isLocked ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                {activeCycle.isLocked ? 'Evaluation Locked' : 'Active Increment Cycle'}
               </span>
-              <h2 className="text-xl font-bold text-merit-navy">2026 Annual Review</h2>
-              <p className="text-slate-500 text-sm mt-1">Jan 1 – Mar 31, 2026</p>
+              <h2 className="text-xl font-bold text-merit-navy">{activeCycle.name}</h2>
+              <p className="text-slate-500 text-sm mt-1">
+                {new Date(activeCycle.startDate).toLocaleDateString()} – {new Date(activeCycle.endDate).toLocaleDateString()}
+              </p>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-black text-amber-500">{activeCycleData.daysRemaining}</div>
-              <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">Days Remaining</div>
+              <div className="text-3xl font-black text-amber-500">{Math.ceil(currentWeightedScore)}</div>
+              <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">Current Score</div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-slate-50 p-3 rounded-lg">
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Estimated Tier</p>
+              <p className="text-sm font-bold text-merit-navy mt-1">{estimatedTier || 'Calculating...'}</p>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg">
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Status</p>
+              <p className="text-sm font-bold text-emerald-600 mt-1 flex items-center gap-1">
+                <Pulse className="w-4 h-4" /> In Progress
+              </p>
             </div>
           </div>
 
           <div className="mt-6 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-emerald-600 text-sm font-medium bg-emerald-50 px-3 py-2 rounded-lg">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600">✓</span>
-              Criteria locked — your evaluation rules won't change
+            <div className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg ${activeCycle.isLocked ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-700'}`}>
+              <span className={`flex items-center justify-center w-5 h-5 rounded-full ${activeCycle.isLocked ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-700'}`}>
+                {activeCycle.isLocked ? '✓' : '○'}
+              </span>
+              {activeCycle.isLocked ? 'Criteria locked — your evaluation rules won\'t change' : 'Evaluation in progress'}
             </div>
             <Link to="/career" className="text-sm font-bold text-merit-navy hover:text-merit-emerald transition-colors px-4 py-2 border border-slate-200 rounded-lg hover:border-emerald-200 hover:bg-emerald-50">
-              View My Progress
+              View Details →
             </Link>
           </div>
         </div>

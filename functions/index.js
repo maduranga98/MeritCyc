@@ -527,53 +527,61 @@ function requireHrOrAdmin(request) {
 // ---------------------------------------------------------------------------
 
 async function resolveCompanyCode(companyCode) {
+  logger.info(`[resolveCompanyCode] START — searching for code: "${companyCode}"`);
   try {
     // Query in registration subcollections using collectionGroup
     // Path: companies/{companyId}/registration/{docID}
+    logger.info(`[resolveCompanyCode] Running collectionGroup("registration").where("companyCode","==","${companyCode}")`);
     const snap = await firestore
       .collectionGroup("registration")
       .where("companyCode", "==", companyCode)
       .limit(1)
       .get();
 
+    logger.info(`[resolveCompanyCode] Query complete — docs found: ${snap.size}, empty: ${snap.empty}`);
+
     if (snap.empty) {
-      logger.warn(`Company code not found in registration: ${companyCode}`);
+      logger.warn(`[resolveCompanyCode] No document matched companyCode="${companyCode}"`);
       return null;
     }
 
     const registrationDoc = snap.docs[0];
     const registrationData = registrationDoc.data();
 
+    logger.info(`[resolveCompanyCode] Found doc path: ${registrationDoc.ref.path}`);
+    logger.info(`[resolveCompanyCode] Registration doc data:`, JSON.stringify(registrationData));
+
     // Extract companyId from the path: companies/{companyId}/registration/{docID}
     const companyId = registrationDoc.ref.parent.parent.id;
-
-    logger.info(`Found registration for code ${companyCode}, companyId: ${companyId}`);
+    logger.info(`[resolveCompanyCode] Extracted companyId: "${companyId}"`);
 
     // Get company data for name
     const companyDoc = await firestore.collection("companies").doc(companyId).get();
+    logger.info(`[resolveCompanyCode] Company doc exists: ${companyDoc.exists}`);
 
     if (!companyDoc.exists) {
-      logger.warn(`Company document not found: ${companyId}`);
+      logger.warn(`[resolveCompanyCode] Company document not found: "${companyId}"`);
       return null;
     }
 
     const companyData = companyDoc.data();
+    logger.info(`[resolveCompanyCode] Company name: "${companyData.name}", status: "${companyData.status}"`);
 
     if (!companyData.name) {
-      logger.warn(`Company document missing name: ${companyId}`);
+      logger.warn(`[resolveCompanyCode] Company document missing name: "${companyId}"`);
       return null;
     }
 
     const result = {
-      companyId: companyId,
+      companyId,
       companyName: companyData.name,
       qrEnabled: registrationData.qrEnabled !== false,
     };
 
-    logger.info(`Resolved company code ${companyCode}:`, result);
+    logger.info(`[resolveCompanyCode] SUCCESS — result:`, JSON.stringify(result));
     return result;
   } catch (error) {
-    logger.error(`Error resolving company code ${companyCode}:`, error);
+    logger.error(`[resolveCompanyCode] ERROR for code "${companyCode}":`, error.message, error.code || "", error.stack || "");
     return null;
   }
 }
@@ -754,28 +762,23 @@ exports.toggleQRRegistration = onCall(async (request) => {
 
 exports.validateCompanyCode = onCall(async (request) => {
   const ip = (request.rawRequest && request.rawRequest.ip) || "unknown";
+  logger.info(`[validateCompanyCode] START — IP: ${ip}`);
+  logger.info(`[validateCompanyCode] Raw request.data:`, JSON.stringify(request.data));
 
-  logger.info(`validateCompanyCode called from IP: ${ip}`);
-
-  const limited = await checkRateLimit(
-    `validate:${ip}`,
-    10,
-    15 * 60 * 1000,
-  );
+  const limited = await checkRateLimit(`validate:${ip}`, 10, 15 * 60 * 1000);
   if (limited) {
-    logger.warn(`Rate limit exceeded for IP: ${ip}`);
+    logger.warn(`[validateCompanyCode] RATE LIMITED — IP: ${ip}`);
     return {
       success: false,
-      error: {
-        code: "RATE_LIMITED",
-        message: "Too many attempts. Please try again in a few minutes.",
-      },
+      error: { code: "RATE_LIMITED", message: "Too many attempts. Please try again in a few minutes." },
     };
   }
 
   const { companyCode } = request.data;
+  logger.info(`[validateCompanyCode] Received companyCode: "${companyCode}" (type: ${typeof companyCode})`);
+
   if (!companyCode || typeof companyCode !== "string") {
-    logger.warn(`Invalid company code provided: ${companyCode}`);
+    logger.warn(`[validateCompanyCode] Invalid input — companyCode is missing or not a string`);
     return {
       success: false,
       error: { code: "INVALID_CODE", message: "Company code is required." },
@@ -783,43 +786,38 @@ exports.validateCompanyCode = onCall(async (request) => {
   }
 
   const normalized = companyCode.toUpperCase().trim();
-  logger.info(`Validating company code: ${companyCode} (normalized: ${normalized})`);
+  logger.info(`[validateCompanyCode] Normalized code: "${normalized}" (length: ${normalized.length})`);
 
   try {
     const resolved = await resolveCompanyCode(normalized);
+    logger.info(`[validateCompanyCode] resolveCompanyCode returned:`, JSON.stringify(resolved));
 
     if (!resolved) {
-      logger.warn(`Company code not resolved: ${normalized}`);
+      logger.warn(`[validateCompanyCode] FAIL — code not found: "${normalized}"`);
       return {
         success: false,
-        error: {
-          code: "INVALID_CODE",
-          message: "Invalid or inactive company code",
-        },
+        error: { code: "INVALID_CODE", message: "Invalid or inactive company code" },
       };
     }
 
     if (!resolved.qrEnabled) {
-      logger.warn(`QR registration disabled for company: ${resolved.companyId}`);
+      logger.warn(`[validateCompanyCode] FAIL — QR registration disabled for companyId: "${resolved.companyId}"`);
       return {
         success: false,
-        error: {
-          code: "REGISTRATION_DISABLED",
-          message: "Registration is currently disabled.",
-        },
+        error: { code: "REGISTRATION_DISABLED", message: "Registration is currently disabled." },
         companyName: resolved.companyName,
         companyId: resolved.companyId,
       };
     }
 
-    logger.info(`Company code validated successfully: ${normalized} -> ${resolved.companyId}`);
+    logger.info(`[validateCompanyCode] SUCCESS — "${normalized}" -> companyId: "${resolved.companyId}", companyName: "${resolved.companyName}"`);
     return {
       success: true,
       companyId: resolved.companyId,
       companyName: resolved.companyName,
     };
   } catch (e) {
-    logger.error("validateCompanyCode error:", e);
+    logger.error(`[validateCompanyCode] UNEXPECTED ERROR:`, e.message, e.stack || "");
     return {
       success: false,
       error: { code: "INVALID_CODE", message: "Invalid or inactive company code" },
@@ -837,18 +835,25 @@ exports.validateCompanyCode = onCall(async (request) => {
 
 exports.submitSelfRegistration = onCall(async (request) => {
   const ip = (request.rawRequest && request.rawRequest.ip) || "unknown";
+  logger.info(`[submitSelfRegistration] START — IP: ${ip}`);
+  logger.info(`[submitSelfRegistration] Raw request.data:`, JSON.stringify({
+    ...request.data,
+    password: request.data.password ? "***REDACTED***" : undefined,
+  }));
 
   const limited = await checkRateLimit(`register:${ip}`, 10, 15 * 60 * 1000);
   if (limited) {
-    throw new HttpsError(
-      "resource-exhausted",
-      "Too many attempts. Please try again in a few minutes.",
-    );
+    logger.warn(`[submitSelfRegistration] RATE LIMITED — IP: ${ip}`);
+    throw new HttpsError("resource-exhausted", "Too many attempts. Please try again in a few minutes.");
   }
 
   const { companyCode, name, email, departmentId, jobTitle, password, phoneNumber, employeeId } = request.data;
 
+  logger.info(`[submitSelfRegistration] Fields — companyCode: "${companyCode}", name: "${name}", email: "${email}", jobTitle: "${jobTitle}", password present: ${!!password}`);
+
   if (!companyCode || !name || !email || !jobTitle || !password) {
+    const missing = ["companyCode","name","email","jobTitle","password"].filter(f => !request.data[f]);
+    logger.error(`[submitSelfRegistration] FAIL — missing required fields: ${missing.join(", ")}`);
     throw new HttpsError("invalid-argument", "Missing required fields.");
   }
 
@@ -860,27 +865,33 @@ exports.submitSelfRegistration = onCall(async (request) => {
     !/[a-z]/.test(password) ||
     !/[0-9]/.test(password)
   ) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Password does not meet requirements. Must be at least 8 characters with uppercase, lowercase, and a number.",
-    );
+    logger.error(`[submitSelfRegistration] FAIL — password does not meet requirements (len: ${password?.length})`);
+    throw new HttpsError("invalid-argument", "Password does not meet requirements. Must be at least 8 characters with uppercase, lowercase, and a number.");
   }
 
   const normalized = companyCode.toUpperCase().trim();
   const normalizedEmail = email.toLowerCase().trim();
+  logger.info(`[submitSelfRegistration] Normalized — code: "${normalized}", email: "${normalizedEmail}"`);
 
   // Re-validate company code
+  logger.info(`[submitSelfRegistration] Calling resolveCompanyCode("${normalized}")`);
   const resolved = await resolveCompanyCode(normalized);
-  if (!resolved || !resolved.qrEnabled) {
-    throw new HttpsError(
-      "not-found",
-      "Invalid or inactive company code.",
-    );
+  logger.info(`[submitSelfRegistration] resolveCompanyCode result:`, JSON.stringify(resolved));
+
+  if (!resolved) {
+    logger.error(`[submitSelfRegistration] FAIL — resolveCompanyCode returned null for code: "${normalized}"`);
+    throw new HttpsError("not-found", "Invalid or inactive company code.");
+  }
+  if (!resolved.qrEnabled) {
+    logger.error(`[submitSelfRegistration] FAIL — QR registration disabled for companyId: "${resolved.companyId}"`);
+    throw new HttpsError("not-found", "Invalid or inactive company code.");
   }
 
   const { companyId, companyName } = resolved;
+  logger.info(`[submitSelfRegistration] Company resolved — id: "${companyId}", name: "${companyName}"`);
 
   // Check email not already a user in this company
+  logger.info(`[submitSelfRegistration] Checking for existing user: email="${normalizedEmail}", companyId="${companyId}"`);
   const userSnap = await firestore
     .collection("users")
     .where("email", "==", normalizedEmail)
@@ -888,17 +899,17 @@ exports.submitSelfRegistration = onCall(async (request) => {
     .limit(1)
     .get();
 
+  logger.info(`[submitSelfRegistration] Existing user check — found: ${!userSnap.empty}`);
   if (!userSnap.empty) {
-    throw new HttpsError(
-      "already-exists",
-      "An account with this email already exists.",
-    );
+    logger.warn(`[submitSelfRegistration] FAIL — email already registered: "${normalizedEmail}" in company "${companyId}"`);
+    throw new HttpsError("already-exists", "An account with this email already exists.");
   }
 
   // TODO(testing): OTP verification is temporarily disabled.
   // Directly create the user account without email OTP.
 
   // STEP A: Create Firebase Auth account
+  logger.info(`[submitSelfRegistration] STEP A — creating Firebase Auth user for "${normalizedEmail}"`);
   let firebaseUid;
   try {
     const authUser = await admin.auth().createUser({
@@ -908,24 +919,29 @@ exports.submitSelfRegistration = onCall(async (request) => {
       emailVerified: true,
     });
     firebaseUid = authUser.uid;
+    logger.info(`[submitSelfRegistration] STEP A — Auth user created, uid: "${firebaseUid}"`);
   } catch (authErr) {
+    logger.error(`[submitSelfRegistration] STEP A — createUser error: code="${authErr.code}", message="${authErr.message}"`);
     if (authErr.code === "auth/email-already-exists") {
       const existing = await admin.auth().getUserByEmail(normalizedEmail);
       firebaseUid = existing.uid;
+      logger.info(`[submitSelfRegistration] STEP A — existing auth user found, uid: "${firebaseUid}"`);
     } else {
-      logger.error("createUser error:", authErr);
       throw new HttpsError("internal", "Failed to create account. Please try again.");
     }
   }
 
   // STEP B: Set custom claims (approved: false — pending HR review)
+  logger.info(`[submitSelfRegistration] STEP B — setting custom claims for uid: "${firebaseUid}"`);
   await admin.auth().setCustomUserClaims(firebaseUid, {
     role: "employee",
     companyId,
     approved: false,
   });
+  logger.info(`[submitSelfRegistration] STEP B — custom claims set`);
 
   // STEP C: Write user doc to /users/{uid}
+  logger.info(`[submitSelfRegistration] STEP C — writing user doc at users/${firebaseUid}`);
   await firestore.collection("users").doc(firebaseUid).set({
     uid: firebaseUid,
     name: name.trim(),
@@ -942,8 +958,10 @@ exports.submitSelfRegistration = onCall(async (request) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+  logger.info(`[submitSelfRegistration] STEP C — user doc written`);
 
   // STEP D: Write audit log
+  logger.info(`[submitSelfRegistration] STEP D — writing audit log`);
   await writeAuditLog({
     companyId,
     action: "USER_SELF_REGISTERED",
@@ -954,13 +972,16 @@ exports.submitSelfRegistration = onCall(async (request) => {
     targetId: firebaseUid,
     after: { status: "pending_approval", registrationPath: "qr_self_register" },
   });
+  logger.info(`[submitSelfRegistration] STEP D — audit log written`);
 
   // STEP E: Notify all HR admins and super admins
+  logger.info(`[submitSelfRegistration] STEP E — fetching HR admins for companyId: "${companyId}"`);
   const hrAdmins = await firestore
     .collection("users")
     .where("companyId", "==", companyId)
     .where("role", "in", ["hr_admin", "super_admin"])
     .get();
+  logger.info(`[submitSelfRegistration] STEP E — found ${hrAdmins.size} HR admin(s) to notify`);
 
   const notifBatch = firestore.batch();
   hrAdmins.forEach((hrDoc) => {
@@ -983,12 +1004,18 @@ exports.submitSelfRegistration = onCall(async (request) => {
     });
   });
   await notifBatch.commit();
+  logger.info(`[submitSelfRegistration] STEP E — notifications sent`);
 
   // STEP F: Send approval-pending confirmation email
-  await sendApprovalPendingEmail(normalizedEmail, name.trim(), companyName);
+  logger.info(`[submitSelfRegistration] STEP F — sending approval pending email to "${normalizedEmail}"`);
+  try {
+    await sendApprovalPendingEmail(normalizedEmail, name.trim(), companyName);
+    logger.info(`[submitSelfRegistration] STEP F — email sent`);
+  } catch (emailErr) {
+    logger.error(`[submitSelfRegistration] STEP F — email failed (non-fatal):`, emailErr.message);
+  }
 
-  logger.info(`[DEV] User ${normalizedEmail} registered directly (OTP skipped) in ${companyId}`);
-
+  logger.info(`[submitSelfRegistration] COMPLETE — user "${normalizedEmail}" (uid: "${firebaseUid}") registered in company "${companyId}"`);
   return { success: true, message: "Registration submitted" };
 });
 

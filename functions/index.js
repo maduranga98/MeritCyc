@@ -522,43 +522,52 @@ function requireHrOrAdmin(request) {
 
 // ---------------------------------------------------------------------------
 // Helper: resolve companyId from a company code
-// Simple query on companies collection where companyCode is stored
+// Query in: companies/{companyId}/registration/{docID}/companyCode
 // Returns { companyId, companyName, qrEnabled } or null
 // ---------------------------------------------------------------------------
 
 async function resolveCompanyCode(companyCode) {
   try {
-    // Simple query: companies/{companyId}/companyCode
+    // Query in registration subcollections using collectionGroup
+    // Path: companies/{companyId}/registration/{docID}
     const snap = await firestore
-      .collection("companies")
+      .collectionGroup("registration")
       .where("companyCode", "==", companyCode)
       .limit(1)
       .get();
 
     if (snap.empty) {
-      logger.warn(`Company code not found: ${companyCode}`);
+      logger.warn(`Company code not found in registration: ${companyCode}`);
       return null;
     }
 
-    const companyDoc = snap.docs[0];
+    const registrationDoc = snap.docs[0];
+    const registrationData = registrationDoc.data();
+
+    // Extract companyId from the path: companies/{companyId}/registration/{docID}
+    const companyId = registrationDoc.ref.parent.parent.id;
+
+    logger.info(`Found registration for code ${companyCode}, companyId: ${companyId}`);
+
+    // Get company data for name
+    const companyDoc = await firestore.collection("companies").doc(companyId).get();
+
+    if (!companyDoc.exists) {
+      logger.warn(`Company document not found: ${companyId}`);
+      return null;
+    }
+
     const companyData = companyDoc.data();
 
-    logger.info(`Found company for code ${companyCode}:`, {
-      companyId: companyDoc.id,
-      companyName: companyData.name,
-      qrEnabled: companyData.qrEnabled,
-    });
-
     if (!companyData.name) {
-      logger.warn(`Company document missing name field: ${companyDoc.id}`);
+      logger.warn(`Company document missing name: ${companyId}`);
       return null;
     }
 
     const result = {
-      companyId: companyDoc.id,
+      companyId: companyId,
       companyName: companyData.name,
-      // Default to true for backward compatibility if qrEnabled is missing
-      qrEnabled: companyData.qrEnabled !== false,
+      qrEnabled: registrationData.qrEnabled !== false,
     };
 
     logger.info(`Resolved company code ${companyCode}:`, result);

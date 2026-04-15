@@ -114,11 +114,11 @@ const OTPVerification: React.FC = () => {
 
   if (!state?.email) return null;
 
-  return <OTPForm state={state} />;
+  return <OTPForm state={state} navigate={navigate} />;
 };
 
 // Inner component so we can safely call hooks after the guard
-const OTPForm: React.FC<{ state: LocationState }> = ({ state }) => {
+const OTPForm: React.FC<{ state: LocationState; navigate: ReturnType<typeof useNavigate> }> = ({ state, navigate }) => {
   // ── Digit state ────────────────────────────────────────────────────────
   const [digits, setDigits] = useState<string[]>(Array(OTP_LEN).fill(""));
   const inputRefs = useRef<(HTMLInputElement | null)[]>(

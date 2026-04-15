@@ -135,10 +135,9 @@ export function generateRecommendations(
   return scoreBreakdown
     .filter(
       (score) =>
-        // Include below-excellent performers
+        // Include below-excellent performers or excellent with lower scores
         score.performance !== 'excellent' ||
-        // Also include good performers with lower weighted scores
-        (score.performance === 'good' && score.normalizedScore < 80)
+        (score.performance === 'excellent' && score.normalizedScore < 80)
     )
     .map((score) => {
       const targetScore = calculateTargetScore(
@@ -181,6 +180,6 @@ export function hasRecommendations(scoreBreakdown: StoryScoreBreakdown[]): boole
   return scoreBreakdown.some(
     (score) =>
       score.performance !== 'excellent' ||
-      (score.performance === 'good' && score.normalizedScore < 80)
+      (score.performance === 'excellent' && score.normalizedScore < 80)
   );
 }

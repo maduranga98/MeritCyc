@@ -116,7 +116,6 @@ export default function ReportsGenerator() {
         const deptMap = new Map<string, { employees: number; totalScore: number }>();
         evaluations.forEach(eval_ => {
           const deptId = eval_.departmentId || 'unknown';
-          const deptName = eval_.departmentName || 'Unknown Department';
           if (!deptMap.has(deptId)) {
             deptMap.set(deptId, { employees: 0, totalScore: 0 });
           }
@@ -126,28 +125,32 @@ export default function ReportsGenerator() {
         });
 
         const departmentBreakdown = Array.from(deptMap.entries()).map(([deptId, data]) => ({
-          departmentName: evaluations.find(e => e.departmentId === deptId)?.departmentName || 'Unknown',
+          departmentName: deptId === 'unknown' ? 'Unknown Department' : deptId,
           averageScore: data.totalScore / data.employees,
           employeeCount: data.employees,
         }));
 
         // Calculate tier distribution
-        const tierCounts = new Map<number, number>();
+        const tierCounts = new Map<string, number>();
         evaluations.forEach(eval_ => {
-          const tierIndex = eval_.assignedTierIndex || 0;
-          tierCounts.set(tierIndex, (tierCounts.get(tierIndex) || 0) + 1);
+          const tierId = eval_.assignedTierId || 'unassigned';
+          tierCounts.set(tierId, (tierCounts.get(tierId) || 0) + 1);
         });
 
-        const tierDistribution = Array.from(tierCounts.entries()).map(([tierIndex, count]) => ({
-          tierName: cycle.tiers[tierIndex]?.name || `Tier ${tierIndex + 1}`,
-          count,
-          percentage: (count / evaluations.length) * 100,
-        }));
+        const tierDistribution = Array.from(tierCounts.entries()).map(([tierId, count]) => {
+          const tierConfig = cycle.tiers.find(t => t.id === tierId);
+          const eval_ = evaluations.find(e => e.assignedTierId === tierId);
+          return {
+            tierName: tierConfig?.name || eval_?.assignedTierName || 'Unassigned',
+            count,
+            percentage: (count / evaluations.length) * 100,
+          };
+        });
 
         // Calculate budget metrics
         const totalBudgetUtilized = evaluations.reduce((sum, e) => {
-          const baseSalary = 50000; // mock base salary
-          const increment = (e.recommendedIncrement || 0) / 100;
+          const baseSalary = e.currentSalary || 50000;
+          const increment = (e.incrementPercent || 0) / 100;
           return sum + (baseSalary * increment);
         }, 0);
 
@@ -156,7 +159,7 @@ export default function ReportsGenerator() {
         pdfGenerationService.generateCycleSummaryPDF({
           cycle,
           evaluations,
-          companyName: user?.companyName || 'Company',
+          companyName: 'Company',
           currency: cycle.budget.currency,
           departmentBreakdown,
           tierDistribution,

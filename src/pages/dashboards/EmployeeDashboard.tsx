@@ -7,11 +7,10 @@ import { useNotificationStore } from '../../stores/notificationStore';
 import { type IncrementStory, type CareerMap } from '../../types/incrementStory';
 import { type Evaluation } from '../../types/evaluation';
 import { type Cycle } from '../../types/cycle';
-import { Clock, TrendingUp, Award, DollarSign, Bell, Pulse } from 'lucide-react';
+import { Clock, TrendingUp, Award, DollarSign, Bell, Activity } from 'lucide-react';
 import { markNotificationRead } from '../../services/notificationService';
 import { db } from '../../config/firebase';
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
-import { cycleService } from '../../services/cycleService';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -75,13 +74,14 @@ const EmployeeDashboard: React.FC = () => {
               setActiveEvaluation(evalData);
 
               // Calculate weighted score from criteria
-              if (evalData.criteriaScores && Array.isArray(evalData.criteriaScores)) {
-                const totalWeighted = evalData.criteriaScores.reduce((sum, c: any) => {
+              if (evalData.scores && typeof evalData.scores === 'object') {
+                const criteriaArray = Object.values(evalData.scores);
+                const totalWeighted = criteriaArray.reduce((sum: number, c: any) => {
                   const weight = c.weight || 1;
-                  const score = c.score || 0;
+                  const score = c.normalizedScore || 0;
                   return sum + (score * weight);
                 }, 0);
-                const totalWeight = evalData.criteriaScores.reduce((sum, c: any) => sum + (c.weight || 1), 0);
+                const totalWeight = criteriaArray.reduce((sum: number, c: any) => sum + (c.weight || 1), 0);
                 const weighted = totalWeight > 0 ? totalWeighted / totalWeight : 0;
                 setCurrentWeightedScore(weighted);
 
@@ -142,7 +142,7 @@ const EmployeeDashboard: React.FC = () => {
               </span>
               <h2 className="text-xl font-bold text-merit-navy">{activeCycle.name}</h2>
               <p className="text-slate-500 text-sm mt-1">
-                {new Date(activeCycle.startDate).toLocaleDateString()} – {new Date(activeCycle.endDate).toLocaleDateString()}
+                {new Date(activeCycle.timeline.startDate.toDate?.() || activeCycle.timeline.startDate).toLocaleDateString()} – {new Date(activeCycle.timeline.endDate.toDate?.() || activeCycle.timeline.endDate).toLocaleDateString()}
               </p>
             </div>
             <div className="text-right">
@@ -159,7 +159,7 @@ const EmployeeDashboard: React.FC = () => {
             <div className="bg-slate-50 p-3 rounded-lg">
               <p className="text-xs text-slate-500 uppercase tracking-wider">Status</p>
               <p className="text-sm font-bold text-emerald-600 mt-1 flex items-center gap-1">
-                <Pulse className="w-4 h-4" /> In Progress
+                <Activity className="w-4 h-4" /> In Progress
               </p>
             </div>
           </div>

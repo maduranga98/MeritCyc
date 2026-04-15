@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../config/firebase';
-import { doc, getDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { type User } from '../../types/user';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { type UserProfile } from '../../types/user';
 import { type Evaluation } from '../../types/evaluation';
-import { type AuditLog } from '../../types/audit';
+import { type AuditLogEntry } from '../../types/audit';
 import { type Department } from '../../types/department';
 import { type SalaryBand } from '../../types/salaryBand';
 import { departmentService } from '../../services/departmentService';
@@ -21,9 +21,9 @@ export default function EmployeeDetail() {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
 
-  const [employee, setEmployee] = useState<User | null>(null);
+  const [employee, setEmployee] = useState<UserProfile | null>(null);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [salaryBands, setSalaryBands] = useState<SalaryBand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +50,7 @@ export default function EmployeeDetail() {
           return;
         }
 
-        const empData = empDoc.data() as User;
+        const empData = empDoc.data() as UserProfile;
         if (empData.companyId !== currentUser.companyId) {
           toast.error('Employee not found in your company');
           navigate('/people/directory');
@@ -85,9 +85,9 @@ export default function EmployeeDetail() {
           )
         );
         const allLogs = logsSnapshot.docs
-          .map((d) => ({ id: d.id, ...d.data() } as AuditLog))
+          .map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry))
           .filter((log) => log.targetId === uid || log.actorUid === uid)
-          .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+          .sort((a, b) => b.timestamp - a.timestamp)
           .slice(0, 50);
         setAuditLogs(allLogs);
 
@@ -270,7 +270,7 @@ export default function EmployeeDetail() {
                   <Calendar className="w-5 h-5 text-slate-400" />
                   <p className="text-slate-900 font-medium">
                     {employee.createdAt
-                      ? format(employee.createdAt.toDate(), 'MMM d, yyyy')
+                      ? format(new Date(employee.createdAt), 'MMM d, yyyy')
                       : '—'}
                   </p>
                 </div>
@@ -278,12 +278,12 @@ export default function EmployeeDetail() {
             </div>
 
             {/* Manager Card */}
-            {employee.managerId && (
+            {evaluations.length > 0 && evaluations[0].managerName && (
               <div className="bg-white rounded-xl border border-slate-200 p-6">
                 <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
                   Reports To
                 </h3>
-                <p className="text-slate-900 font-medium">{employee.managerName || employee.managerId}</p>
+                <p className="text-slate-900 font-medium">{evaluations[0].managerName}</p>
               </div>
             )}
           </div>
@@ -315,28 +315,28 @@ export default function EmployeeDetail() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {evaluations.map((eval) => (
-                      <tr key={eval.id} className="hover:bg-slate-50 transition-colors cursor-pointer">
-                        <td className="px-6 py-4 font-medium text-slate-900">{eval.cycleName}</td>
+                    {evaluations.map((evaluation) => (
+                      <tr key={evaluation.id} className="hover:bg-slate-50 transition-colors cursor-pointer">
+                        <td className="px-6 py-4 font-medium text-slate-900">{evaluation.cycleId}</td>
                         <td className="px-6 py-4 text-slate-600">
-                          {eval.createdAt && format(eval.createdAt.toDate(), 'MMM d, yyyy')}
+                          {evaluation.createdAt && format(evaluation.createdAt.toDate?.() || evaluation.createdAt, 'MMM d, yyyy')}
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-bold text-slate-900">{eval.weightedTotalScore?.toFixed(1) || '—'}</span>
+                          <span className="font-bold text-slate-900">{evaluation.weightedTotalScore?.toFixed(1) || '—'}</span>
                         </td>
                         <td className="px-6 py-4">
-                          {eval.assignedTierName && (
+                          {evaluation.assignedTierName && (
                             <span className="px-2 py-1 rounded text-white text-xs font-bold bg-slate-600">
-                              {eval.assignedTierName}
+                              {evaluation.assignedTierName}
                             </span>
                           )}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-900">
-                          {eval.incrementPercent ? `${eval.incrementPercent}%` : '—'}
+                          {evaluation.incrementPercent ? `${evaluation.incrementPercent}%` : '—'}
                         </td>
                         <td className="px-6 py-4">
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                            {eval.status}
+                            {evaluation.status}
                           </span>
                         </td>
                       </tr>
@@ -373,8 +373,8 @@ export default function EmployeeDetail() {
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-500">
-                    <span title={log.createdAt?.toDate().toLocaleString()}>
-                      {log.createdAt && formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true })}
+                    <span title={new Date(log.timestamp).toLocaleString()}>
+                      {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}
                     </span>
                     {log.metadata && Object.keys(log.metadata).length > 0 && (
                       <span className="text-slate-400">

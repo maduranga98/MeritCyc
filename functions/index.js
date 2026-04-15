@@ -397,6 +397,8 @@ exports.revokeInvite = invites.revokeInvite;
 
 const registrations = require("./src/https/registrations");
 
+exports.validateCompanyCode = registrations.validateCompanyCode;
+exports.submitSelfRegistration = registrations.submitSelfRegistration;
 exports.approveRegistration = registrations.approveRegistration;
 exports.rejectRegistration = registrations.rejectRegistration;
 exports.requestMoreInfo = registrations.requestMoreInfo;

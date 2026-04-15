@@ -28,6 +28,7 @@ import PendingApprovals from "./pages/people/PendingApprovals";
 import DepartmentManagement from "./pages/people/DepartmentManagement";
 import SalaryBandManagement from "./pages/people/SalaryBandManagement";
 import EmployeeDirectory from "./pages/people/EmployeeDirectory";
+import EmployeeDetail from "./pages/people/EmployeeDetail";
 import ProfilePage from "./pages/settings/Profile";
 import CyclesList from "./pages/cycles/CyclesList";
 import CycleDetail from "./pages/cycles/CycleDetail";
@@ -236,6 +237,16 @@ function App() {
             <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
               <AppLayout>
                 <EmployeeDirectory />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/people/employees/:uid"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <EmployeeDetail />
               </AppLayout>
             </ProtectedRoute>
           }

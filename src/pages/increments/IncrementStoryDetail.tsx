@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getIncrementStory, getIncrementStories } from '../../services/incrementStoryService';
 import { type IncrementStory } from '../../types/incrementStory';
+import { generateRecommendations } from '../../services/recommendationService';
 import { format } from 'date-fns';
 import { ArrowLeft, Download, Award, TrendingUp, AlertCircle, CheckCircle2, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -19,6 +20,16 @@ const IncrementStoryDetail: React.FC = () => {
   const [downloading, setDownloading] = useState(false);
   const pdfRef = useRef<HTMLDivElement>(null);
   const animatedRef = useRef(false);
+
+  // Compute recommendations if not present
+  const displayedStory = useMemo(() => {
+    if (!story) return null;
+    if (story.recommendations.length > 0) return story;
+
+    // Generate recommendations from score breakdown if empty
+    const generated = generateRecommendations(story.scoreBreakdown);
+    return { ...story, recommendations: generated };
+  }, [story]);
 
   useEffect(() => {
     if (!user?.uid || !cycleId) return;
@@ -50,7 +61,7 @@ const IncrementStoryDetail: React.FC = () => {
     );
   }
 
-  if (!story) {
+  if (!story || !displayedStory) {
     return (
       <div className="max-w-4xl mx-auto text-center py-20 font-brand">
         <h2 className="text-2xl font-bold text-slate-700">Story not found</h2>
@@ -303,7 +314,7 @@ const IncrementStoryDetail: React.FC = () => {
             <p className="text-slate-500 mt-1">Personalized suggestions based on your performance</p>
           </div>
 
-          {story.recommendations.length === 0 ? (
+          {displayedStory.recommendations.length === 0 ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex items-start gap-4">
               <CheckCircle2 className="w-8 h-8 text-emerald-500 flex-shrink-0 mt-1" />
               <div>
@@ -313,7 +324,7 @@ const IncrementStoryDetail: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {story.recommendations.sort((a, b) => {
+              {displayedStory.recommendations.sort((a, b) => {
                 const pMap: Record<string, number> = { high: 3, medium: 2, low: 1 };
                 return (pMap[b.priority] || 0) - (pMap[a.priority] || 0);
               }).map((rec) => (

@@ -6,7 +6,7 @@ import { type Cycle } from '../../types/cycle';
 import { type Evaluation } from '../../types/evaluation';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ClipboardList, Clock, CheckCircle2 } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { DeadlineReminder } from '../../components/evaluations/DeadlineReminder';
 
 export default function ManagerEvaluationsHub() {
   const { user } = useAuth();
@@ -57,16 +57,6 @@ export default function ManagerEvaluationsHub() {
     const completed = cycleEvals.filter(e => e.status === 'submitted' || e.status === 'finalized' || e.status === 'overridden').length;
     const progressPercent = total > 0 ? (completed / total) * 100 : 0;
 
-    const daysRemaining = cycle.timeline?.evaluationDeadline
-      ? differenceInDays(cycle.timeline.evaluationDeadline.toDate(), new Date())
-      : null;
-
-    let deadlineColor = "text-slate-500";
-    if (daysRemaining !== null) {
-        if (daysRemaining < 3) deadlineColor = "text-red-600 font-bold animate-pulse";
-        else if (daysRemaining < 7) deadlineColor = "text-amber-600 font-medium";
-    }
-
     return (
       <div key={cycle.id} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex justify-between items-start mb-4">
@@ -76,15 +66,12 @@ export default function ManagerEvaluationsHub() {
                   Active
                </span>
             </div>
-            {daysRemaining !== null && (
-                <div className="text-right">
-                    <p className="text-xs text-slate-500 mb-1 flex items-center gap-1 justify-end">
-                       <Clock className="w-3.5 h-3.5"/> Deadline
-                    </p>
-                    <p className={`text-sm ${deadlineColor}`}>
-                        {daysRemaining < 0 ? 'Overdue' : `${daysRemaining} days remaining`}
-                    </p>
-                </div>
+            {cycle.timeline?.evaluationDeadline && (
+                <DeadlineReminder
+                  deadlineDate={cycle.timeline.evaluationDeadline.toDate()}
+                  variant="header"
+                  showDate={true}
+                />
             )}
         </div>
 

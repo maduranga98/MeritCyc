@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { analyticsService } from "../../services/analyticsService";
-import { type CompanyKPIs, type IncrementTrendPoint } from "../../types/analytics";
+import { type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYTierData } from "../../types/analytics";
 import { Link } from "react-router-dom";
 import {
   Users,
@@ -41,8 +41,11 @@ export default function ExecutiveDashboard() {
   const { user } = useAuth();
   const [kpis, setKpis] = useState<CompanyKPIs | null>(null);
   const [trends, setTrends] = useState<IncrementTrendPoint[]>([]);
+  const [deptData, setDeptData] = useState<DepartmentPerformance[]>([]);
+  const [yoyData, setYoyData] = useState<YoYTierData[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState("12m");
+  const [selectedDept, setSelectedDept] = useState<DepartmentPerformance | null>(null);
 
   useEffect(() => {
     if (user?.companyId) {
@@ -59,6 +62,12 @@ export default function ExecutiveDashboard() {
 
       const trendData = await analyticsService.getIncrementTrends(user.companyId, dateRange);
       setTrends(trendData);
+
+      const deptData = await analyticsService.getDepartmentPerformance(user.companyId);
+      setDeptData(deptData);
+
+      const yoyData = await analyticsService.getYoYComparison(user.companyId);
+      setYoyData(yoyData);
     } catch (error) {
       console.error(error);
     } finally {
@@ -74,20 +83,6 @@ export default function ExecutiveDashboard() {
     );
   }
 
-  // Mock data for charts
-  const deptData = [
-    { departmentName: "Engineering", averageScore: 82, averageIncrement: 12 },
-    { departmentName: "Sales", averageScore: 75, averageIncrement: 10 },
-    { departmentName: "Marketing", averageScore: 78, averageIncrement: 11 },
-    { departmentName: "HR", averageScore: 80, averageIncrement: 9 },
-    { departmentName: "Finance", averageScore: 85, averageIncrement: 10 },
-  ];
-
-  const yoyData = [
-    { year: "2021", "Tier 1": 15, "Tier 2": 10, "Tier 3": 5 },
-    { year: "2022", "Tier 1": 16, "Tier 2": 11, "Tier 3": 6 },
-    { year: "2023", "Tier 1": 14, "Tier 2": 9, "Tier 3": 4 },
-  ];
 
   return (
     <div className="space-y-6 pb-12">
@@ -223,7 +218,8 @@ export default function ExecutiveDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* SECTION 3 - Department Radar */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-6">Department Performance</h2>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">Department Performance</h2>
+          <p className="text-sm text-slate-500 mb-6">Click on a department to view details</p>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={deptData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
@@ -236,6 +232,18 @@ export default function ExecutiveDashboard() {
                 <Tooltip />
               </RadarChart>
             </ResponsiveContainer>
+          </div>
+          <div className="mt-6 space-y-2">
+            {deptData.map((dept) => (
+              <button
+                key={dept.departmentId}
+                onClick={() => setSelectedDept(dept)}
+                className="w-full p-3 text-left rounded-lg border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+              >
+                <p className="font-medium text-slate-900">{dept.departmentName}</p>
+                <p className="text-xs text-slate-500">{dept.employeeCount} employees | Avg: {dept.averageScore}/100</p>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -314,6 +322,71 @@ export default function ExecutiveDashboard() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Department Drill-Down Modal */}
+      {selectedDept && (
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/60 z-40 transition-opacity"
+            onClick={() => setSelectedDept(null)}
+          />
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-lg max-w-2xl w-full">
+              <div className="p-6 border-b border-slate-200 flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">{selectedDept.departmentName}</h2>
+                  <p className="text-sm text-slate-500 mt-1">{selectedDept.employeeCount} employees</p>
+                </div>
+                <button
+                  onClick={() => setSelectedDept(null)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                    <p className="text-xs text-emerald-600 font-medium uppercase">Average Score</p>
+                    <p className="text-3xl font-bold text-emerald-700 mt-2">{selectedDept.averageScore}/100</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <p className="text-xs text-blue-600 font-medium uppercase">Average Increment</p>
+                    <p className="text-3xl font-bold text-blue-700 mt-2">{selectedDept.averageIncrement}%</p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-slate-900 mb-3">Performance Metrics</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Relative to Company Average</span>
+                      <span className="text-sm font-bold text-slate-900">
+                        {selectedDept.averageScore >= 75 ? '+' : ''}{selectedDept.averageScore - 75}
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div
+                        className="bg-emerald-500 h-2 rounded-full"
+                        style={{
+                          width: `${Math.min(100, (selectedDept.averageScore / 100) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+                <button
+                  onClick={() => setSelectedDept(null)}
+                  className="px-4 py-2 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
     </div>
   );

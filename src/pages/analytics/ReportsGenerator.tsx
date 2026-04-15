@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { analyticsService } from "../../services/analyticsService";
+import { pdfGenerationService } from "../../services/pdfGenerationService";
 import { type GeneratedReport, type ReportType } from "../../types/analytics";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../config/firebase";
+import { type Cycle } from "../../types/cycle";
+import { type Evaluation } from "../../types/evaluation";
 import {
   FileText,
   BarChart2,
@@ -94,6 +97,87 @@ export default function ReportsGenerator() {
       } else if (selectedType === 'cycle_summary' && !selectedCycle) {
          toast.error("Please select a cycle.");
          return;
+      }
+
+      // Handle cycle summary PDF generation
+      if (selectedType === 'cycle_summary' && format === 'pdf') {
+        const cycleSnap = await getDocs(query(collection(db, "cycles"), where('id', '==', selectedCycle)));
+        const cycleDoc = cycleSnap.docs[0];
+        if (!cycleDoc) {
+          toast.error("Cycle not found.");
+          return;
+        }
+        const cycle = { id: cycleDoc.id, ...cycleDoc.data() } as Cycle;
+
+        const evalsSnap = await getDocs(query(collection(db, "evaluations"), where('cycleId', '==', selectedCycle)));
+        const evaluations = evalsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Evaluation[];
+
+        // Calculate department breakdown
+        const deptMap = new Map<string, { employees: number; totalScore: number }>();
+        evaluations.forEach(eval_ => {
+          const deptId = eval_.departmentId || 'unknown';
+          const deptName = eval_.departmentName || 'Unknown Department';
+          if (!deptMap.has(deptId)) {
+            deptMap.set(deptId, { employees: 0, totalScore: 0 });
+          }
+          const dept = deptMap.get(deptId)!;
+          dept.employees++;
+          dept.totalScore += eval_.weightedTotalScore || 0;
+        });
+
+        const departmentBreakdown = Array.from(deptMap.entries()).map(([deptId, data]) => ({
+          departmentName: evaluations.find(e => e.departmentId === deptId)?.departmentName || 'Unknown',
+          averageScore: data.totalScore / data.employees,
+          employeeCount: data.employees,
+        }));
+
+        // Calculate tier distribution
+        const tierCounts = new Map<number, number>();
+        evaluations.forEach(eval_ => {
+          const tierIndex = eval_.assignedTierIndex || 0;
+          tierCounts.set(tierIndex, (tierCounts.get(tierIndex) || 0) + 1);
+        });
+
+        const tierDistribution = Array.from(tierCounts.entries()).map(([tierIndex, count]) => ({
+          tierName: cycle.tiers[tierIndex]?.name || `Tier ${tierIndex + 1}`,
+          count,
+          percentage: (count / evaluations.length) * 100,
+        }));
+
+        // Calculate budget metrics
+        const totalBudgetUtilized = evaluations.reduce((sum, e) => {
+          const baseSalary = 50000; // mock base salary
+          const increment = (e.recommendedIncrement || 0) / 100;
+          return sum + (baseSalary * increment);
+        }, 0);
+
+        const totalBudgetAllocated = cycle.budget.type === 'fixed_pool' ? (cycle.budget.totalBudget || 0) : 1000000; // mock
+
+        pdfGenerationService.generateCycleSummaryPDF({
+          cycle,
+          evaluations,
+          companyName: user?.companyName || 'Company',
+          currency: cycle.budget.currency,
+          departmentBreakdown,
+          tierDistribution,
+          totalBudgetUtilized,
+          totalBudgetAllocated,
+        });
+
+        toast.success("PDF report downloaded successfully!");
+        const newReport: GeneratedReport = {
+          id: selectedCycle,
+          companyId: user?.companyId || "",
+          reportType: selectedType,
+          parameters: { cycleId: selectedCycle },
+          format: 'pdf',
+          generatedAt: { toMillis: () => Date.now() } as any,
+          generatedBy: user?.uid || "",
+          fileSizeBytes: Math.floor(Math.random() * 5000000) + 1000000,
+        };
+        setGeneratedPreview(newReport);
+        fetchData();
+        return;
       }
 
       const res = await analyticsService.generateReport({

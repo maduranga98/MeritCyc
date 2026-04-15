@@ -28,6 +28,7 @@ import PendingApprovals from "./pages/people/PendingApprovals";
 import DepartmentManagement from "./pages/people/DepartmentManagement";
 import SalaryBandManagement from "./pages/people/SalaryBandManagement";
 import EmployeeDirectory from "./pages/people/EmployeeDirectory";
+import EmployeeDetail from "./pages/people/EmployeeDetail";
 import ProfilePage from "./pages/settings/Profile";
 import CyclesList from "./pages/cycles/CyclesList";
 import CycleDetail from "./pages/cycles/CycleDetail";
@@ -51,6 +52,7 @@ import { SettingsLayout } from "./components/layout/SettingsLayout";
 import FairnessDashboard from "./pages/analytics/FairnessDashboard";
 import ExecutiveDashboard from "./pages/analytics/ExecutiveDashboard";
 import ReportsGenerator from "./pages/analytics/ReportsGenerator";
+import AuditTrail from "./pages/analytics/AuditTrail";
 
 // Settings
 import GeneralSettings from "./pages/settings/GeneralSettings";
@@ -241,6 +243,16 @@ function App() {
           }
         />
         <Route
+          path="/people/employees/:uid"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <EmployeeDetail />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/people/departments"
           element={
             <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
@@ -388,6 +400,16 @@ function App() {
             <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
               <AppLayout>
                 <FairnessDashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/audit-trail"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <AuditTrail />
               </AppLayout>
             </ProtectedRoute>
           }

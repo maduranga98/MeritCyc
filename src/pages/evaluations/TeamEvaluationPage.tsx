@@ -8,8 +8,8 @@ import { type Cycle } from '../../types/cycle';
 import { type Evaluation } from '../../types/evaluation';
 import { type Department } from '../../types/department';
 import { Loader2, ArrowLeft, Clock, Users, Mail, CheckCircle2, AlertCircle } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
+import { DeadlineReminder } from '../../components/evaluations/DeadlineReminder';
 import { EvaluationForm } from '../../components/evaluations/EvaluationForm';
 import { toast } from 'sonner';
 
@@ -85,16 +85,6 @@ export default function TeamEvaluationPage() {
     );
   }
 
-  const daysRemaining = cycle.timeline?.evaluationDeadline
-      ? differenceInDays(cycle.timeline.evaluationDeadline.toDate(), new Date())
-      : null;
-
-  let deadlineColor = "text-slate-500";
-  if (daysRemaining !== null) {
-      if (daysRemaining < 3) deadlineColor = "text-red-600 font-bold animate-pulse";
-      else if (daysRemaining < 7) deadlineColor = "text-amber-600 font-medium";
-  }
-
   // Stats
   const total = evaluations.length;
   const notStarted = evaluations.filter(e => e.status === 'not_started').length;
@@ -148,15 +138,12 @@ export default function TeamEvaluationPage() {
               </div>
           </div>
           <div className="text-right flex items-center gap-6">
-              {daysRemaining !== null && (
-                  <div className="text-right">
-                      <p className="text-xs text-slate-500 mb-1 flex items-center gap-1 justify-end">
-                         <Clock className="w-3.5 h-3.5"/> Deadline
-                      </p>
-                      <p className={`text-lg ${deadlineColor}`}>
-                          {daysRemaining < 0 ? 'Overdue' : `${daysRemaining} days remaining`}
-                      </p>
-                  </div>
+              {cycle.timeline?.evaluationDeadline && (
+                  <DeadlineReminder
+                    deadlineDate={cycle.timeline.evaluationDeadline.toDate()}
+                    variant="header"
+                    showDate={true}
+                  />
               )}
               <button
                   onClick={handleSendReminder}

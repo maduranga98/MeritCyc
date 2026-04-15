@@ -97,9 +97,10 @@ export const analyticsService = {
       evals.forEach(evalDoc => {
         const eval_ = evalDoc.data();
         const tier = eval_.assignedTierIndex ?? 0;
-        const tierKey = `tier${tier + 1}` as keyof typeof yoyMap.get(cycleYear)!;
-        if (tierKey in yoyMap.get(cycleYear)!) {
-          yoyMap.get(cycleYear)![tierKey]++;
+        const tierKey = `tier${tier + 1}` as 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5';
+        const tierData = yoyMap.get(cycleYear);
+        if (tierData && tierKey in tierData) {
+          tierData[tierKey]++;
         }
       });
     }

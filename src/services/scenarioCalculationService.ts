@@ -87,7 +87,6 @@ function getIncrementForScore(
   }
 
   // Linear interpolation within tier
-  const tierMid = (tier.minScore + tier.maxScore) / 2;
   const position = (score - tier.minScore) / (tier.maxScore - tier.minScore);
   return tier.incrementMin + (tier.incrementMax - tier.incrementMin) * position;
 }
@@ -109,7 +108,7 @@ function getTierForScore(
  * Provides immediate feedback for what-if analysis
  */
 export function calculateScenario(input: ScenarioInput): SimulationResults {
-  const { evaluations, totalBudget, currency, tierThresholds, budgetCap, assumedDistribution } = input;
+  const { evaluations, totalBudget, tierThresholds, budgetCap, assumedDistribution } = input;
 
   // Get score distribution based on assumption
   const scores = getScoreDistribution(assumedDistribution, evaluations.length);
@@ -155,7 +154,7 @@ export function calculateScenario(input: ScenarioInput): SimulationResults {
     const tierScores = scores.filter(
       (s) => s >= tier.minScore && s <= tier.maxScore
     );
-    const tierAvgIncrement = tierScores.length > 0 ? employeeIncrements.filter((inc, i) => getTierForScore(scores[i], tierThresholds) === index).reduce((a, b) => a + b, 0) / tierScores.length : 0;
+    const tierAvgIncrement = tierScores.length > 0 ? employeeIncrements.filter((_, i) => getTierForScore(scores[i], tierThresholds) === index).reduce((a, b) => a + b, 0) / tierScores.length : 0;
     const tierCost = employeeCosts.filter((_, i) => getTierForScore(scores[i], tierThresholds) === index).reduce((a, b) => a + b, 0);
 
     return {

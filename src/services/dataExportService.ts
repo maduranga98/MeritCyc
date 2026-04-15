@@ -1,8 +1,6 @@
 import JSZip from 'jszip';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { type Cycle } from '../types/cycle';
-import { type Evaluation } from '../types/evaluation';
 import { auditService } from './auditService';
 
 export const dataExportService = {
@@ -22,7 +20,8 @@ export const dataExportService = {
       const bandsSnap = await getDocs(query(collection(db, 'companies', companyId, 'salaryBands')));
 
       // Fetch audit logs
-      const auditLogs = await auditService.fetchAuditLogs(companyId, {}, undefined, true);
+      const auditResult = await auditService.fetchAuditLogs(companyId, {}, undefined);
+      const auditLogs = auditResult.logs;
 
       // Create folders in ZIP
       const cyclesFolder = zip.folder('cycles');

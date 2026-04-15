@@ -74,13 +74,14 @@ const EmployeeDashboard: React.FC = () => {
               setActiveEvaluation(evalData);
 
               // Calculate weighted score from criteria
-              if (evalData.criteriaScores && Array.isArray(evalData.criteriaScores)) {
-                const totalWeighted = evalData.criteriaScores.reduce((sum, c: any) => {
+              if (evalData.scores && typeof evalData.scores === 'object') {
+                const criteriaArray = Object.values(evalData.scores);
+                const totalWeighted = criteriaArray.reduce((sum: number, c: any) => {
                   const weight = c.weight || 1;
-                  const score = c.score || 0;
+                  const score = c.normalizedScore || 0;
                   return sum + (score * weight);
                 }, 0);
-                const totalWeight = evalData.criteriaScores.reduce((sum, c: any) => sum + (c.weight || 1), 0);
+                const totalWeight = criteriaArray.reduce((sum: number, c: any) => sum + (c.weight || 1), 0);
                 const weighted = totalWeight > 0 ? totalWeighted / totalWeight : 0;
                 setCurrentWeightedScore(weighted);
 
@@ -141,7 +142,7 @@ const EmployeeDashboard: React.FC = () => {
               </span>
               <h2 className="text-xl font-bold text-merit-navy">{activeCycle.name}</h2>
               <p className="text-slate-500 text-sm mt-1">
-                {new Date(activeCycle.startDate).toLocaleDateString()} – {new Date(activeCycle.endDate).toLocaleDateString()}
+                {new Date(activeCycle.timeline.startDate.toDate?.() || activeCycle.timeline.startDate).toLocaleDateString()} – {new Date(activeCycle.timeline.endDate.toDate?.() || activeCycle.timeline.endDate).toLocaleDateString()}
               </p>
             </div>
             <div className="text-right">

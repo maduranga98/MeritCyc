@@ -87,7 +87,7 @@ export const pdfGenerationService = {
     pdf.text(`${budgetPercent}%`, margin + kpiBoxWidth + 8, yPosition + 22);
 
     // KPI 3: Average Increment
-    const avgIncrement = (data.evaluations.reduce((sum, e) => sum + (e.recommendedIncrement || 0), 0) / data.evaluations.length).toFixed(1);
+    const avgIncrement = (data.evaluations.reduce((sum, e) => sum + (e.incrementPercent || 0), 0) / data.evaluations.length).toFixed(1);
     pdf.setFillColor(255, 247, 237); // orange-50
     pdf.rect(margin + (kpiBoxWidth + 3) * 2, yPosition, kpiBoxWidth, kpiBoxHeight, 'F');
     pdf.setFontSize(9);
@@ -231,9 +231,9 @@ export const pdfGenerationService = {
       pdf.setTextColor(15, 23, 42);
       pdf.setFontSize(7);
       pdf.text(eval_.employeeName.substring(0, 20), margin + 2, yPosition + 4);
-      pdf.text((eval_.departmentName || 'N/A').substring(0, 15), margin + empColWidths[0] + 2, yPosition + 4);
+      pdf.text((eval_.departmentId || 'N/A').substring(0, 15), margin + empColWidths[0] + 2, yPosition + 4);
       pdf.text((eval_.weightedTotalScore || 0).toFixed(1), margin + empColWidths[0] + empColWidths[1] + 2, yPosition + 4);
-      pdf.text(`${(eval_.recommendedIncrement || 0).toFixed(1)}%`, margin + empColWidths[0] + empColWidths[1] + empColWidths[2] + 2, yPosition + 4);
+      pdf.text(`${(eval_.incrementPercent || 0).toFixed(1)}%`, margin + empColWidths[0] + empColWidths[1] + empColWidths[2] + 2, yPosition + 4);
 
       yPosition += rowHeight;
     });

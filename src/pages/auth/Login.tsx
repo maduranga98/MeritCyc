@@ -108,11 +108,9 @@ const LoginPage: React.FC = () => {
       const claims = tokenResult.claims;
 
       if (claims.approved === false) {
-        await signOut(auth);
-        toast.error(
-          "Your account is pending HR approval. You will be notified once access is granted."
-        );
-        return false;
+        // User is not yet approved - they should see the pending approval page
+        // Don't sign them out - let the auth flow handle it
+        return true; // Return true to allow the redirect in Login component
       }
 
       return true;

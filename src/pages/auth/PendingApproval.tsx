@@ -23,14 +23,20 @@ const PendingApproval: React.FC = () => {
 
   // Fetch company name from Firestore once we have a companyId
   useEffect(() => {
-    if (!user?.companyId) return;
+    if (!user?.companyId) {
+      setCompanyName(null);
+      return;
+    }
     getDoc(doc(db, "companies", user.companyId))
       .then((snap) => {
         if (snap.exists()) {
           setCompanyName((snap.data().name as string) ?? null);
         }
       })
-      .catch(() => {/* ignore — company name is display-only */});
+      .catch(() => {
+        console.warn("Could not fetch company name");
+        setCompanyName(null);
+      });
   }, [user?.companyId]);
 
   // Poll for claim changes — force-refresh the token every 10 s.
@@ -83,8 +89,11 @@ const PendingApproval: React.FC = () => {
           Your Account is Pending Approval
         </h1>
         <p className="text-slate-500 text-sm leading-relaxed mb-6">
-          You've successfully verified your email. Your HR team is reviewing
-          your registration.
+          {companyName ? (
+            <>You've successfully verified your email. Your HR team is reviewing your registration.</>
+          ) : (
+            <>Your account has been created and is awaiting approval. You'll receive an email once it's verified and approved.</>
+          )}
         </p>
 
         {/* Status info card */}
@@ -95,13 +104,18 @@ const PendingApproval: React.FC = () => {
           {companyName && (
             <InfoRow label="Company" value={companyName} />
           )}
-          <InfoRow label="Status" value="Awaiting HR Approval" valueClass="text-amber-600 font-semibold" />
+          {!companyName && user?.email && (
+            <InfoRow label="Status" value="Verifying email…" valueClass="text-blue-600 font-semibold" />
+          )}
+          {companyName && (
+            <InfoRow label="Status" value="Awaiting HR Approval" valueClass="text-amber-600 font-semibold" />
+          )}
         </div>
 
         <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-          You'll receive an email at{" "}
+          Check your email at{" "}
           <span className="font-medium text-slate-700">{user?.email ?? "your registered address"}</span>{" "}
-          once your account is approved.
+          for further instructions. It may take a few minutes to arrive.
         </p>
 
         <button

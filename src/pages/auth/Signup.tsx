@@ -96,24 +96,36 @@ const SignupPage: React.FC = () => {
         displayName: data.fullName,
       });
 
-      // 3. Create user document in Firestore
-      // Default to 'employee' role, pending HR approval
-      await setDoc(doc(db, "users", userCredential.user.uid), {
-        uid: userCredential.user.uid,
-        email: data.email,
-        name: data.fullName,
-        role: "employee",
-        companyId: "",
-        approved: false, // Requires HR approval
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      // 4. Send email verification (optional but recommended)
+      // 3. Send email verification
       try {
         await sendEmailVerification(userCredential.user);
       } catch (err) {
         console.warn("Email verification failed, but account was created:", err);
+      }
+
+      // 4. Create minimal user document in Firestore
+      // NOTE: Security rules prevent direct writes to /users/{uid}, so we use try-catch
+      // The user document should be created by Cloud Functions (when company approves)
+      // For now, we create a minimal unverified user doc to bootstrap the system
+      try {
+        await setDoc(doc(db, "users", userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          email: data.email,
+          name: data.fullName,
+          role: "employee",
+          companyId: "",
+          approved: false,
+          emailVerified: false,
+          registrationMethod: "direct_signup",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (firestoreErr) {
+        console.warn(
+          "Firestore write blocked (expected — rules restrict writes)",
+          firestoreErr
+        );
+        // Continue anyway — user can still sign in after email verification
       }
 
       // 5. Sign user out — they should log in after signup

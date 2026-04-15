@@ -523,44 +523,67 @@ function requireHrOrAdmin(request) {
 // ---------------------------------------------------------------------------
 // Helper: resolve companyId from a company code via registration subcollection
 // Returns { companyId, companyName, qrEnabled } or null
+// Path: companies/{companyId}/registration/{docId}/companyCode
 // ---------------------------------------------------------------------------
 
 async function resolveCompanyCode(companyCode) {
-  // Query company documents directly by companyCode
-  const snap = await firestore
-    .collection("companies")
-    .where("companyCode", "==", companyCode)
-    .limit(1)
-    .get();
+  try {
+    // Query registration documents across all companies using collectionGroup
+    // Path: companies/{companyId}/registration/{docId}
+    const snap = await firestore
+      .collectionGroup("registration")
+      .where("companyCode", "==", companyCode)
+      .limit(1)
+      .get();
 
-  if (snap.empty) {
-    logger.warn(`Company code not found: ${companyCode}`);
+    if (snap.empty) {
+      logger.warn(`Company code not found in registration subcollection: ${companyCode}`);
+      return null;
+    }
+
+    const registrationDoc = snap.docs[0];
+    const registrationData = registrationDoc.data();
+
+    // Extract companyId from the document path
+    // Path is: companies/{companyId}/registration/{docId}
+    const companyId = registrationDoc.ref.parent.parent.id;
+
+    logger.info(`Found registration for code ${companyCode}, companyId: ${companyId}`);
+
+    // Get company data to retrieve name and qrEnabled status
+    const companyDoc = await firestore.collection("companies").doc(companyId).get();
+
+    if (!companyDoc.exists) {
+      logger.warn(`Company document not found: ${companyId}`);
+      return null;
+    }
+
+    const companyData = companyDoc.data();
+
+    if (!companyData.name) {
+      logger.warn(`Company document missing name field: ${companyId}`);
+      return null;
+    }
+
+    logger.info(`Found company for code ${companyCode}:`, {
+      companyId: companyId,
+      companyName: companyData.name,
+      qrEnabled: registrationData.qrEnabled,
+    });
+
+    const result = {
+      companyId: companyId,
+      companyName: companyData.name,
+      // Use qrEnabled from registration document, default to true for backward compatibility
+      qrEnabled: registrationData.qrEnabled !== false,
+    };
+
+    logger.info(`Resolved company code ${companyCode}:`, result);
+    return result;
+  } catch (error) {
+    logger.error(`Error resolving company code ${companyCode}:`, error);
     return null;
   }
-
-  const companyDoc = snap.docs[0];
-  const companyData = companyDoc.data();
-
-  logger.info(`Found company for code ${companyCode}:`, {
-    companyId: companyDoc.id,
-    companyName: companyData.name,
-    qrEnabled: companyData.qrEnabled,
-  });
-
-  if (!companyData.name) {
-    logger.warn(`Company document missing name field: ${companyDoc.id}`);
-    return null;
-  }
-
-  const result = {
-    companyId: companyDoc.id,
-    companyName: companyData.name,
-    // Default to true for backward compatibility if qrEnabled is missing
-    qrEnabled: companyData.qrEnabled !== false,
-  };
-
-  logger.info(`Resolved company code ${companyCode}:`, result);
-  return result;
 }
 
 // ---------------------------------------------------------------------------

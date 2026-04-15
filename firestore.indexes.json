@@ -1,15 +1,4 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "registration",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "companyCode",
-          "order": "ASCENDING"
-        }
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }

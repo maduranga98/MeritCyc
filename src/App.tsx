@@ -52,6 +52,7 @@ import { SettingsLayout } from "./components/layout/SettingsLayout";
 import FairnessDashboard from "./pages/analytics/FairnessDashboard";
 import ExecutiveDashboard from "./pages/analytics/ExecutiveDashboard";
 import ReportsGenerator from "./pages/analytics/ReportsGenerator";
+import AuditTrail from "./pages/analytics/AuditTrail";
 
 // Settings
 import GeneralSettings from "./pages/settings/GeneralSettings";
@@ -399,6 +400,16 @@ function App() {
             <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
               <AppLayout>
                 <FairnessDashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/audit-trail"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <AuditTrail />
               </AppLayout>
             </ProtectedRoute>
           }

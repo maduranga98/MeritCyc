@@ -58,10 +58,11 @@ service cloud.firestore {
     // =========================================================================
 
     // QR config doc: /companies/{companyId}/registration/{companyId}
-    // HR and super_admin of the same company may read (to display QR manager).
+    // Public read access for company code validation during signup.
+    // HR and super_admin can also read to display QR manager.
     // Writes are Cloud Functions only.
     match /companies/{companyId}/registration/{docId} {
-      allow read: if isHrOrAdmin(companyId);
+      allow read: if true; // Public read for unauthenticated company code validation
       allow write: if false; // Cloud Functions only
     }
 

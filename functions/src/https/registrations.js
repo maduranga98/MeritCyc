@@ -60,6 +60,234 @@ async function requireHrOrSuperAdmin(request) {
   return token;
 }
 
+// =============================================================================
+// validateCompanyCode — Validate company code for self-registration
+// =============================================================================
+
+exports.validateCompanyCode = onCall(async (request) => {
+  const { companyCode } = request.data;
+
+  if (!companyCode) {
+    throw new HttpsError("invalid-argument", "Missing companyCode.");
+  }
+
+  try {
+    const regDocsSnapshot = await firestore
+      .collectionGroup("registration")
+      .where("companyCode", "==", companyCode.toUpperCase())
+      .limit(1)
+      .get();
+
+    if (regDocsSnapshot.empty) {
+      return {
+        success: false,
+        error: {
+          code: "INVALID_CODE",
+          message: "Company code not found.",
+        },
+      };
+    }
+
+    const regDoc = regDocsSnapshot.docs[0];
+    const companyId = regDoc.ref.parent.parent?.id;
+
+    if (!companyId) {
+      return {
+        success: false,
+        error: {
+          code: "INVALID_CODE",
+          message: "Could not determine company.",
+        },
+      };
+    }
+
+    const regData = regDoc.data();
+
+    if (!regData.qrEnabled) {
+      const companyDoc = await firestore.collection("companies").doc(companyId).get();
+      const companyName = companyDoc.exists ? companyDoc.data().name : "Your Company";
+
+      return {
+        success: false,
+        error: {
+          code: "REGISTRATION_DISABLED",
+          message: "Registration is disabled for this company.",
+        },
+        companyName,
+      };
+    }
+
+    const companyDoc = await firestore.collection("companies").doc(companyId).get();
+    const companyName = companyDoc.exists ? companyDoc.data().name : "Your Company";
+
+    return {
+      success: true,
+      companyId,
+      companyName,
+    };
+  } catch (error) {
+    logger.error("Error in validateCompanyCode:", error);
+    throw new HttpsError("internal", error.message || "An error occurred.");
+  }
+});
+
+// =============================================================================
+// submitSelfRegistration — Self-registration via QR code
+// =============================================================================
+
+exports.submitSelfRegistration = onCall(async (request) => {
+  const { companyCode, name, email, departmentId, jobTitle, password, phoneNumber, employeeId } = request.data;
+
+  if (!companyCode || !name || !email || !jobTitle || !password) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Missing required fields: companyCode, name, email, jobTitle, password."
+    );
+  }
+
+  try {
+    // 1. Validate company code
+    const regDocsSnapshot = await firestore
+      .collectionGroup("registration")
+      .where("companyCode", "==", companyCode.toUpperCase())
+      .where("qrEnabled", "==", true)
+      .limit(1)
+      .get();
+
+    if (regDocsSnapshot.empty) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Invalid or disabled company code."
+      );
+    }
+
+    const regDoc = regDocsSnapshot.docs[0];
+    const companyId = regDoc.ref.parent.parent?.id;
+
+    if (!companyId) {
+      throw new HttpsError("internal", "Could not determine company.");
+    }
+
+    // 2. Check if email already exists in this company's users
+    const userSnapshot = await firestore
+      .collection("users")
+      .where("email", "==", email.toLowerCase())
+      .where("companyId", "==", companyId)
+      .limit(1)
+      .get();
+
+    if (!userSnapshot.empty) {
+      throw new HttpsError(
+        "already-exists",
+        "An account with this email already exists in this company."
+      );
+    }
+
+    // 3. Check if there's already a pending registration for this email
+    const pendingSnapshot = await firestore
+      .collection("companies")
+      .doc(companyId)
+      .collection("pendingRegistrations")
+      .where("email", "==", email.toLowerCase())
+      .where("status", "in", ["pending_approval", "info_requested"])
+      .limit(1)
+      .get();
+
+    if (!pendingSnapshot.empty) {
+      throw new HttpsError(
+        "already-exists",
+        "A registration request with this email is already pending."
+      );
+    }
+
+    // 4. Create pending registration document
+    const pendingId = firestore
+      .collection("companies")
+      .doc(companyId)
+      .collection("pendingRegistrations")
+      .doc().id;
+
+    const pendingData = {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      companyId,
+      companyCode: companyCode.toUpperCase(),
+      departmentId: departmentId || "",
+      jobTitle: jobTitle.trim(),
+      status: "pending_approval",
+      phoneNumber: phoneNumber?.trim() || "",
+      employeeId: employeeId?.trim() || "",
+      registrationMethod: "self_registration",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await firestore
+      .collection("companies")
+      .doc(companyId)
+      .collection("pendingRegistrations")
+      .doc(pendingId)
+      .set(pendingData);
+
+    // 5. Notify HR admins
+    const companyDoc = await firestore.collection("companies").doc(companyId).get();
+    const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
+
+    const hrAdminsSnapshot = await firestore
+      .collection("users")
+      .where("companyId", "==", companyId)
+      .where("role", "==", "hr_admin")
+      .where("status", "==", "active")
+      .get();
+
+    if (!hrAdminsSnapshot.empty) {
+      const toEmails = hrAdminsSnapshot.docs.map(doc => ({
+        email: doc.data().email,
+        name: doc.data().name
+      }));
+
+      try {
+        await transactionalEmailsApi.sendTransacEmail({
+          subject: `New self-registration pending approval at ${companyName}`,
+          htmlContent: `
+        <html>
+          <body>
+            <h2>New Registration Request</h2>
+            <p>A new employee has registered via QR code and is waiting for approval.</p>
+            <p><strong>Name:</strong> ${name}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Job Title:</strong> ${jobTitle}</p>
+            <p>Please log in to MeritCyc to review and approve this registration.</p>
+          </body>
+        </html>
+      `,
+          sender: { name: companyName, email: "noreply@meritcyc.com" },
+          to: toEmails,
+        });
+      } catch (e) {
+        logger.error("Failed to send HR notification email", e);
+      }
+    }
+
+    // 6. Audit log
+    await writeAuditLog({
+      companyId,
+      action: "SELF_REGISTRATION_SUBMITTED",
+      actorUid: "system",
+      actorEmail: email,
+      actorRole: "employee",
+      targetType: "pendingRegistration",
+      targetId: pendingId,
+      after: pendingData,
+    });
+
+    return { success: true, message: "Registration submitted successfully." };
+  } catch (error) {
+    logger.error("Error in submitSelfRegistration:", error);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", error.message || "An error occurred.");
+  }
+});
+
 exports.approveRegistration = onCall(async (request) => {
   const token = await requireHrOrSuperAdmin(request);
   const companyId = token.companyId;

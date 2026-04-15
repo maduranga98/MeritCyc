@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { settingsService } from "../../services/settingsService";
+import { dataExportService } from "../../services/dataExportService";
 import { type CompanySettings } from "../../types/settings";
 import { toast } from "sonner";
-import { Loader2, AlertTriangle, Upload, Building2 } from "lucide-react";
+import { Loader2, AlertTriangle, Upload, Building2, Download } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../config/firebase";
 
@@ -19,6 +20,7 @@ export default function GeneralSettings() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const [scheduledDeletionDate, setScheduledDeletionDate] = useState<number | null>(null);
 
@@ -124,6 +126,25 @@ export default function GeneralSettings() {
       } catch(e: any) {
           toast.error(e.message || "Failed to cancel deletion");
       }
+  };
+
+  const handleExportData = async () => {
+    if (!user?.companyId) {
+      toast.error("Unable to export: Company not found");
+      return;
+    }
+
+    setExporting(true);
+    try {
+      toast.loading("Preparing your data export...");
+      await dataExportService.exportCompanyDataZIP(user.companyId);
+      toast.success("Your company data has been downloaded as a ZIP file");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to export data");
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (loading) {
@@ -285,7 +306,37 @@ export default function GeneralSettings() {
         </div>
       </div>
 
-      {/* SECTION 3 - Danger Zone */}
+      {/* SECTION 3 - Data Export */}
+      <div className="border-2 border-emerald-200 bg-emerald-50/30 rounded-xl p-6 space-y-4">
+        <h2 className="text-base font-bold text-emerald-700 mb-4">Data Export</h2>
+
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h3 className="font-bold text-slate-900">Download Company Data</h3>
+                <p className="text-emerald-600 text-sm max-w-md">Export all your company's data including cycles, evaluations, employees, and audit logs as a ZIP file.</p>
+            </div>
+
+            <button
+                onClick={handleExportData}
+                disabled={exporting}
+                className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            >
+                {exporting ? (
+                    <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Exporting...
+                    </>
+                ) : (
+                    <>
+                        <Download className="w-4 h-4" />
+                        Export Data
+                    </>
+                )}
+            </button>
+        </div>
+      </div>
+
+      {/* SECTION 4 - Danger Zone */}
       <div className="border-2 border-red-200 bg-red-50/30 rounded-xl p-6 space-y-4">
         <h2 className="text-base font-bold text-red-700 mb-4">Danger Zone</h2>
 

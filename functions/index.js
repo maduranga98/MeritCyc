@@ -895,43 +895,101 @@ exports.submitSelfRegistration = onCall(async (request) => {
     );
   }
 
-  // Generate and hash OTP
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
-  const hashedOtp = sha256(otp);
-  const otpExpiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+  // TODO(testing): OTP verification is temporarily disabled.
+  // Directly create the user account without email OTP.
 
-  // Write to pendingRegistrations using email as doc ID (idempotent upsert)
-  const pendingRef = firestore
-    .collection("companies")
-    .doc(companyId)
-    .collection("pendingRegistrations")
-    .doc(normalizedEmail);
+  // STEP A: Create Firebase Auth account
+  let firebaseUid;
+  try {
+    const authUser = await admin.auth().createUser({
+      email: normalizedEmail,
+      password: password,
+      displayName: name.trim(),
+      emailVerified: true,
+    });
+    firebaseUid = authUser.uid;
+  } catch (authErr) {
+    if (authErr.code === "auth/email-already-exists") {
+      const existing = await admin.auth().getUserByEmail(normalizedEmail);
+      firebaseUid = existing.uid;
+    } else {
+      logger.error("createUser error:", authErr);
+      throw new HttpsError("internal", "Failed to create account. Please try again.");
+    }
+  }
 
-  await pendingRef.set({
-    name: name.trim(),
-    email: normalizedEmail,
-    departmentId: departmentId || "",
-    jobTitle: jobTitle.trim(),
-    phoneNumber: phoneNumber || "",
-    employeeId: employeeId || "",
-    password: password, // plaintext — protected by Firestore rules, deleted after OTP verification
-    companyCode: normalized,
+  // STEP B: Set custom claims (approved: false — pending HR review)
+  await admin.auth().setCustomUserClaims(firebaseUid, {
+    role: "employee",
     companyId,
-    otp: hashedOtp,
-    otpAttempts: 0,
-    otpExpiresAt,
-    status: "otp_pending",
-    cooldownUntil: null,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    approved: false,
   });
 
-  await sendOtpEmail(normalizedEmail, name.trim(), otp, companyName);
+  // STEP C: Write user doc to /users/{uid}
+  await firestore.collection("users").doc(firebaseUid).set({
+    uid: firebaseUid,
+    name: name.trim(),
+    email: normalizedEmail,
+    phoneNumber: phoneNumber || "",
+    employeeId: employeeId || "",
+    companyId,
+    departmentId: departmentId || "",
+    jobTitle: jobTitle.trim(),
+    role: "employee",
+    status: "pending_approval",
+    registrationPath: "qr_self_register",
+    approved: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 
-  logger.info(
-    `[DEV] OTP for ${normalizedEmail} in ${companyId}: ${otp}`,
-  );
+  // STEP D: Write audit log
+  await writeAuditLog({
+    companyId,
+    action: "USER_SELF_REGISTERED",
+    actorUid: firebaseUid,
+    actorEmail: normalizedEmail,
+    actorRole: "employee",
+    targetType: "user",
+    targetId: firebaseUid,
+    after: { status: "pending_approval", registrationPath: "qr_self_register" },
+  });
 
-  return { success: true, message: "OTP sent" };
+  // STEP E: Notify all HR admins and super admins
+  const hrAdmins = await firestore
+    .collection("users")
+    .where("companyId", "==", companyId)
+    .where("role", "in", ["hr_admin", "super_admin"])
+    .get();
+
+  const notifBatch = firestore.batch();
+  hrAdmins.forEach((hrDoc) => {
+    const notifRef = firestore
+      .collection("users")
+      .doc(hrDoc.id)
+      .collection("notifications")
+      .doc();
+    notifBatch.set(notifRef, {
+      type: "new_registration",
+      title: "New Registration Request",
+      message: `${name.trim()} has requested to join via self-registration.`,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      metadata: {
+        applicantUid: firebaseUid,
+        applicantName: name.trim(),
+        applicantEmail: normalizedEmail,
+      },
+    });
+  });
+  await notifBatch.commit();
+
+  // STEP F: Send approval-pending confirmation email
+  await sendApprovalPendingEmail(normalizedEmail, name.trim(), companyName);
+
+  logger.info(`[DEV] User ${normalizedEmail} registered directly (OTP skipped) in ${companyId}`);
+
+  return { success: true, message: "Registration submitted" };
 });
 
 // =============================================================================

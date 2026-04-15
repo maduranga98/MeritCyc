@@ -90,7 +90,7 @@ const QRLanding: React.FC = () => {
   const locState = (location.state ?? {}) as LocationState;
 
   // ── Step 1: validation ─────────────────────────────────────────────────
-  type Step = "validating" | "invalid" | "form" | "disabled";
+  type Step = "validating" | "invalid" | "form" | "disabled" | "success";
   const [step, setStep] = useState<Step>(
     locState.preValidated ? "form" : companyCode ? "validating" : "invalid",
   );
@@ -237,14 +237,7 @@ const QRLanding: React.FC = () => {
         employeeId: employeeId.trim(),
       });
 
-      navigate("/join/verify", {
-        state: {
-          email: email.trim().toLowerCase(),
-          companyId,
-          companyName,
-          companyCode: (companyCode ?? "").toUpperCase(),
-        },
-      });
+      setStep("success");
     } catch (err: unknown) {
       const fnErr = err as { code?: string; message?: string };
       if (fnErr.code === "functions/resource-exhausted") {
@@ -350,6 +343,53 @@ const QRLanding: React.FC = () => {
               </svg>
               Back
             </Link>
+          </div>
+        )}
+
+        {/* ── Success / pending approval ── */}
+        {step === "success" && (
+          <div className="text-center">
+            <div className="mt-2 mb-5 mx-auto w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+                stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">You're Almost In!</h1>
+            <p className="text-slate-500 text-sm mb-6">
+              Registration submitted for{" "}
+              <span className="font-semibold text-slate-700">{companyName || "your company"}</span>.
+            </p>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left mb-6">
+              <p className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-3">
+                What happens next:
+              </p>
+              <ul className="space-y-2">
+                {[
+                  "Your HR team has been notified",
+                  "They will review and approve your account",
+                  `You'll receive an email at ${email} once approved`,
+                  "This usually takes 1–2 business days",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-slate-600">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                      stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                      className="mt-0.5 shrink-0">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/login")}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl transition-colors active:scale-[0.98]"
+            >
+              Back to Login
+            </button>
           </div>
         )}
 

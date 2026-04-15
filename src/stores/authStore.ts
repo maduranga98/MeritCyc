@@ -149,13 +149,29 @@ export const useAuthStore = create<AuthStore>((set) => ({
                 useNotificationStore.getState().setNotifications(notifs);
               });
             } else {
-              console.error(
-                "No user document found in Firestore for UID:",
-                firebaseUser.uid
+              // No document found. This can happen for:
+              // 1. Newly signed-up users (not yet approved by company)
+              // 2. Users created via direct signup (awaiting verification)
+              // In these cases, create a minimal user object from Firebase profile
+              console.warn(
+                "No custom claims and no Firestore doc for UID:",
+                firebaseUser.uid,
+                "— using Firebase profile as fallback"
               );
+
               set({
-                user: null,
-                firebaseUser: null,
+                user: {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email ?? "",
+                  name:
+                    firebaseUser.displayName ??
+                    firebaseUser.email?.split("@")[0] ??
+                    "User",
+                  role: "employee", // Default to employee for new signups
+                  companyId: "",
+                  approved: false, // New users must be approved
+                },
+                firebaseUser,
                 claims: null,
                 loading: false,
               });

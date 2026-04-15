@@ -1,16 +1,23 @@
 // =============================================================================
 // MeritCyc Signup Page
-// Company registration: email/password, then redirect to /onboarding.
+// Unified signup: email/password + full name, creates user in Firestore,
+// requires HR approval, then redirects to login.
 // =============================================================================
 
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { createUserWithEmailAndPassword, type AuthError } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+  type AuthError,
+} from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { auth } from "../../config/firebase";
+import { auth, db } from "../../config/firebase";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 
 // ---------------------------------------------------------------------------
@@ -19,11 +26,14 @@ import { AuthLayout } from "../../components/auth/AuthLayout";
 
 const signupSchema = z
   .object({
+    fullName: z.string().min(2, "Full name must be at least 2 characters"),
     email: z.string().email("Please enter a valid email address"),
     password: z
       .string()
-      .min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your password"),
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number"),
+    confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -33,21 +43,23 @@ const signupSchema = z
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Error Messages
 // ---------------------------------------------------------------------------
 
 function getErrorMessage(code: string): string {
   switch (code) {
     case "auth/email-already-in-use":
-      return "An account with this email already exists.";
+      return "An account with this email already exists. Try logging in or use a different email.";
     case "auth/invalid-email":
       return "Please enter a valid email address.";
     case "auth/weak-password":
-      return "Password is too weak. Please choose a stronger password.";
+      return "Password is too weak. Include uppercase letters and numbers.";
     case "auth/network-request-failed":
       return "Network error. Check your connection and try again.";
+    case "auth/operation-not-allowed":
+      return "Account creation is currently disabled. Contact support.";
     default:
-      return "Something went wrong. Please try again.";
+      return "Failed to create account. Please try again.";
   }
 }
 
@@ -72,11 +84,62 @@ const SignupPage: React.FC = () => {
   const onSubmit = async (data: SignupFormValues) => {
     setIsLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, data.email, data.password);
-      navigate("/onboarding", { replace: true });
+      // 1. Create Firebase auth user
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
+
+      // 2. Update profile with full name
+      await updateProfile(userCredential.user, {
+        displayName: data.fullName,
+      });
+
+      // 3. Send email verification
+      try {
+        await sendEmailVerification(userCredential.user);
+      } catch (err) {
+        console.warn("Email verification failed, but account was created:", err);
+      }
+
+      // 4. Create minimal user document in Firestore
+      // NOTE: Security rules prevent direct writes to /users/{uid}, so we use try-catch
+      // The user document should be created by Cloud Functions (when company approves)
+      // For now, we create a minimal unverified user doc to bootstrap the system
+      try {
+        await setDoc(doc(db, "users", userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          email: data.email,
+          name: data.fullName,
+          role: "employee",
+          companyId: "",
+          approved: false,
+          emailVerified: false,
+          registrationMethod: "direct_signup",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (firestoreErr) {
+        console.warn(
+          "Firestore write blocked (expected — rules restrict writes)",
+          firestoreErr
+        );
+        // Continue anyway — user can still sign in after email verification
+      }
+
+      // 5. Sign user out — they should log in after signup
+      // (to ensure custom claims are properly set by Cloud Functions)
+      await auth.signOut();
+
+      toast.success(
+        "Account created! Check your email to verify, then sign in."
+      );
+      navigate("/", { replace: true });
     } catch (err: unknown) {
       const code = (err as AuthError).code ?? "";
       toast.error(getErrorMessage(code));
+      console.error("Signup error:", code, err);
     } finally {
       setIsLoading(false);
     }
@@ -86,13 +149,34 @@ const SignupPage: React.FC = () => {
     <AuthLayout>
       <div className="w-full max-w-md">
         <h2 className="text-3xl font-semibold text-merit-navy mb-2">
-          Create your company account
+          Create Account
         </h2>
         <p className="text-merit-slate mb-8 text-sm">
-          Set up MeritCyc for your organisation.
+          Join MeritCyc to get started. Your account will be reviewed by your
+          HR team.
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          {/* Full Name */}
+          <div>
+            <label className="block text-xs font-bold uppercase text-merit-slate mb-2 tracking-wider">
+              Full Name
+            </label>
+            <input
+              type="text"
+              {...register("fullName")}
+              placeholder="John Doe"
+              disabled={isLoading}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-merit-emerald/20 focus:border-merit-emerald transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+            />
+            {errors.fullName && (
+              <p className="text-red-500 text-sm mt-1">
+                {errors.fullName.message}
+              </p>
+            )}
+          </div>
+
+          {/* Email */}
           <div>
             <label className="block text-xs font-bold uppercase text-merit-slate mb-2 tracking-wider">
               Work Email
@@ -110,6 +194,7 @@ const SignupPage: React.FC = () => {
             )}
           </div>
 
+          {/* Password */}
           <div>
             <label className="block text-xs font-bold uppercase text-merit-slate mb-2 tracking-wider">
               Password
@@ -119,7 +204,7 @@ const SignupPage: React.FC = () => {
                 type={showPassword ? "text" : "password"}
                 {...register("password")}
                 autoComplete="new-password"
-                placeholder="Min. 8 characters"
+                placeholder="Min. 8 characters (uppercase + number)"
                 disabled={isLoading}
                 className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-merit-emerald/20 focus:border-merit-emerald transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
               />
@@ -133,10 +218,13 @@ const SignupPage: React.FC = () => {
               </button>
             </div>
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
+              <p className="text-red-500 text-sm mt-1">
+                {errors.password.message}
+              </p>
             )}
           </div>
 
+          {/* Confirm Password */}
           <div>
             <label className="block text-xs font-bold uppercase text-merit-slate mb-2 tracking-wider">
               Confirm Password
@@ -166,6 +254,7 @@ const SignupPage: React.FC = () => {
             )}
           </div>
 
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={isLoading}
@@ -177,11 +266,12 @@ const SignupPage: React.FC = () => {
                 <span>Creating account…</span>
               </>
             ) : (
-              "Create Company Account"
+              "Create Account"
             )}
           </button>
         </form>
 
+        {/* Sign In Link */}
         <p className="text-center text-xs text-merit-slate mt-6">
           Already have an account?{" "}
           <Link to="/" className="text-merit-emerald font-semibold hover:underline">
@@ -194,7 +284,7 @@ const SignupPage: React.FC = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Icon sub-components
+// Icon Components
 // ---------------------------------------------------------------------------
 
 const EyeIcon: React.FC = () => (

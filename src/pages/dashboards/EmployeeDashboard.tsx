@@ -7,11 +7,10 @@ import { useNotificationStore } from '../../stores/notificationStore';
 import { type IncrementStory, type CareerMap } from '../../types/incrementStory';
 import { type Evaluation } from '../../types/evaluation';
 import { type Cycle } from '../../types/cycle';
-import { Clock, TrendingUp, Award, DollarSign, Bell, Pulse } from 'lucide-react';
+import { Clock, TrendingUp, Award, DollarSign, Bell, Activity } from 'lucide-react';
 import { markNotificationRead } from '../../services/notificationService';
 import { db } from '../../config/firebase';
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
-import { cycleService } from '../../services/cycleService';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -159,7 +158,7 @@ const EmployeeDashboard: React.FC = () => {
             <div className="bg-slate-50 p-3 rounded-lg">
               <p className="text-xs text-slate-500 uppercase tracking-wider">Status</p>
               <p className="text-sm font-bold text-emerald-600 mt-1 flex items-center gap-1">
-                <Pulse className="w-4 h-4" /> In Progress
+                <Activity className="w-4 h-4" /> In Progress
               </p>
             </div>
           </div>

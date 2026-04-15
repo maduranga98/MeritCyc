@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Clock, AlertCircle } from 'lucide-react';
 import {
   getDeadlineUrgency,
   getDeadlineUrgencyClasses,

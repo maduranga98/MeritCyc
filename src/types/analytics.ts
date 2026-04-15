@@ -41,3 +41,16 @@ export interface IncrementTrendPoint {
   totalCost: number;
   budgetUtilization: number;
 }
+
+export interface DepartmentPerformance {
+  departmentId: string;
+  departmentName: string;
+  averageScore: number;
+  averageIncrement: number;
+  employeeCount: number;
+}
+
+export interface YoYTierData {
+  year: string;
+  [tierKey: string]: string | number;
+}

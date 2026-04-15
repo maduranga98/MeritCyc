@@ -529,11 +529,11 @@ function requireHrOrAdmin(request) {
 async function resolveCompanyCode(companyCode) {
   logger.info(`[resolveCompanyCode] START — searching for code: "${companyCode}"`);
   try {
-    // Query in registration subcollections using collectionGroup
-    // Path: companies/{companyId}/registration/{docID}
-    logger.info(`[resolveCompanyCode] Running collectionGroup("registration").where("companyCode","==","${companyCode}")`);
+    // Query the companies collection directly — companyCode and qrEnabled are
+    // stored on the company doc itself, so no collectionGroup index is needed.
+    logger.info(`[resolveCompanyCode] Querying companies collection where companyCode == "${companyCode}"`);
     const snap = await firestore
-      .collectionGroup("registration")
+      .collection("companies")
       .where("companyCode", "==", companyCode)
       .limit(1)
       .get();
@@ -541,41 +541,25 @@ async function resolveCompanyCode(companyCode) {
     logger.info(`[resolveCompanyCode] Query complete — docs found: ${snap.size}, empty: ${snap.empty}`);
 
     if (snap.empty) {
-      logger.warn(`[resolveCompanyCode] No document matched companyCode="${companyCode}"`);
+      logger.warn(`[resolveCompanyCode] No company matched companyCode="${companyCode}"`);
       return null;
     }
 
-    const registrationDoc = snap.docs[0];
-    const registrationData = registrationDoc.data();
-
-    logger.info(`[resolveCompanyCode] Found doc path: ${registrationDoc.ref.path}`);
-    logger.info(`[resolveCompanyCode] Registration doc data:`, JSON.stringify(registrationData));
-
-    // Extract companyId from the path: companies/{companyId}/registration/{docID}
-    const companyId = registrationDoc.ref.parent.parent.id;
-    logger.info(`[resolveCompanyCode] Extracted companyId: "${companyId}"`);
-
-    // Get company data for name
-    const companyDoc = await firestore.collection("companies").doc(companyId).get();
-    logger.info(`[resolveCompanyCode] Company doc exists: ${companyDoc.exists}`);
-
-    if (!companyDoc.exists) {
-      logger.warn(`[resolveCompanyCode] Company document not found: "${companyId}"`);
-      return null;
-    }
-
+    const companyDoc = snap.docs[0];
     const companyData = companyDoc.data();
-    logger.info(`[resolveCompanyCode] Company name: "${companyData.name}", status: "${companyData.status}"`);
+    const companyId = companyDoc.id;
+
+    logger.info(`[resolveCompanyCode] Found company — id: "${companyId}", name: "${companyData.name}", status: "${companyData.status}", qrEnabled: ${companyData.qrEnabled}`);
 
     if (!companyData.name) {
-      logger.warn(`[resolveCompanyCode] Company document missing name: "${companyId}"`);
+      logger.warn(`[resolveCompanyCode] Company doc missing name, companyId: "${companyId}"`);
       return null;
     }
 
     const result = {
       companyId,
       companyName: companyData.name,
-      qrEnabled: registrationData.qrEnabled !== false,
+      qrEnabled: companyData.qrEnabled !== false,
     };
 
     logger.info(`[resolveCompanyCode] SUCCESS — result:`, JSON.stringify(result));

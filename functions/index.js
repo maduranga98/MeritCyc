@@ -337,6 +337,12 @@ exports.completeOnboarding = onCall(async (request) => {
     }
     const companyCode = `MC-${suffix}`;
 
+    // Store company code in both the company document and registration doc
+    await companyRef.update({
+      companyCode,
+      qrEnabled: true,
+    });
+
     const regRef = companyRef.collection("registration").doc(companyId);
     await regRef.set({
       companyCode,
@@ -520,8 +526,9 @@ function requireHrOrAdmin(request) {
 // ---------------------------------------------------------------------------
 
 async function resolveCompanyCode(companyCode) {
+  // Query company documents directly by companyCode
   const snap = await firestore
-    .collectionGroup("registration")
+    .collection("companies")
     .where("companyCode", "==", companyCode)
     .limit(1)
     .get();
@@ -531,28 +538,25 @@ async function resolveCompanyCode(companyCode) {
     return null;
   }
 
-  const regDoc = snap.docs[0];
-  logger.info(`Found registration doc for code ${companyCode}:`, {
-    docId: regDoc.id,
-    qrEnabled: regDoc.data().qrEnabled,
+  const companyDoc = snap.docs[0];
+  const companyData = companyDoc.data();
+
+  logger.info(`Found company for code ${companyCode}:`, {
+    companyId: companyDoc.id,
+    companyName: companyData.name,
+    qrEnabled: companyData.qrEnabled,
   });
 
-  // The registration doc lives at companies/{companyId}/registration/{companyId}
-  // regDoc.ref.parent.parent gives the company DocumentReference
-  const companyRef = regDoc.ref.parent.parent;
-  const companyDoc = await companyRef.get();
-
-  if (!companyDoc.exists) {
-    logger.warn(`Company document not found for registration: ${companyRef.id}`);
+  if (!companyData.name) {
+    logger.warn(`Company document missing name field: ${companyDoc.id}`);
     return null;
   }
 
-  const regData = regDoc.data();
   const result = {
     companyId: companyDoc.id,
-    companyName: companyDoc.data().name,
+    companyName: companyData.name,
     // Default to true for backward compatibility if qrEnabled is missing
-    qrEnabled: regData.qrEnabled !== false,
+    qrEnabled: companyData.qrEnabled !== false,
   };
 
   logger.info(`Resolved company code ${companyCode}:`, result);
@@ -636,6 +640,12 @@ exports.generateCompanyQRCode = onCall(async (request) => {
   }
   const companyCode = `MC-${suffix}`;
 
+  // Update company document with the new code
+  await firestore.collection("companies").doc(companyId).update({
+    companyCode,
+    qrEnabled: true,
+  });
+
   const regRef = firestore
     .collection("companies")
     .doc(companyId)
@@ -687,6 +697,11 @@ exports.toggleQRRegistration = onCall(async (request) => {
   if (typeof enabled !== "boolean") {
     throw new HttpsError("invalid-argument", "enabled must be a boolean.");
   }
+
+  // Update both company document and registration doc
+  await firestore.collection("companies").doc(companyId).update({
+    qrEnabled: enabled,
+  });
 
   const regRef = firestore
     .collection("companies")

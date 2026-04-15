@@ -1,8 +1,8 @@
 {
   "indexes": [
     {
-      "collectionGroup": "registration",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionId": "companies",
+      "queryScope": "COLLECTION",
       "fields": [
         {
           "fieldPath": "companyCode",

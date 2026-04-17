@@ -6,9 +6,9 @@ import { type GeneratedReport, type CompanyKPIs, type IncrementTrendPoint, type 
 export const analyticsService = {
   // Aggregate from Firestore reads
   getCompanyKPIs: async (companyId: string, _dateRange: string): Promise<CompanyKPIs> => {
-    // In a real app this would query specific dates. For now returning mock/aggregated data
     const usersSnap = await getDocs(query(collection(db, "users"), where("companyId", "==", companyId), where("status", "==", "active")));
     const cyclesSnap = await getDocs(query(collection(db, "cycles"), where("companyId", "==", companyId)));
+    const evals = await getDocs(query(collection(db, "evaluations"), where("companyId", "==", companyId)));
 
     const totalEmployees = usersSnap.size;
 
@@ -19,24 +19,88 @@ export const analyticsService = {
        if (c.data().status === 'completed') completedCycles++;
     });
 
+    let totalSalaryIncrementsAwarded = 0;
+    const incrementsList: number[] = [];
+    let fairnessScores: number[] = [];
+
+    evals.forEach(evalDoc => {
+      const eval_ = evalDoc.data();
+      if (eval_.status === 'submitted' || eval_.status === 'finalized' || eval_.status === 'overridden') {
+        const increment = eval_.recommendedIncrement || 0;
+        const baseSalary = eval_.baseSalary || 0;
+        const incrementAmount = baseSalary * (increment / 100);
+        totalSalaryIncrementsAwarded += incrementAmount;
+        if (increment > 0) incrementsList.push(increment);
+        if (eval_.fairnessScore !== undefined) fairnessScores.push(eval_.fairnessScore);
+      }
+    });
+
+    const averageIncrementPercent = incrementsList.length > 0
+      ? Math.round((incrementsList.reduce((a, b) => a + b, 0) / incrementsList.length) * 10) / 10
+      : 0;
+
+    const fairnessScore = fairnessScores.length > 0
+      ? Math.round((fairnessScores.reduce((a, b) => a + b, 0) / fairnessScores.length))
+      : 75;
+
     return {
       totalEmployees,
       activeCycles,
       completedCycles,
-      totalSalaryIncrementsAwarded: 500000, // mock
-      averageIncrementPercent: 12.5, // mock
-      fairnessScore: 85, // mock
+      totalSalaryIncrementsAwarded: Math.round(totalSalaryIncrementsAwarded),
+      averageIncrementPercent,
+      fairnessScore,
       currency: 'USD'
     };
   },
 
-  getIncrementTrends: async (_companyId: string, _dateRange: string): Promise<IncrementTrendPoint[]> => {
-    // Mock trends
-    return [
-       { cycleId: "1", cycleName: "2022 H1", date: "2022-06", averageIncrement: 8, totalEmployees: 100, totalCost: 400000, budgetUtilization: 95 },
-       { cycleId: "2", cycleName: "2022 H2", date: "2022-12", averageIncrement: 9, totalEmployees: 110, totalCost: 450000, budgetUtilization: 98 },
-       { cycleId: "3", cycleName: "2023 H1", date: "2023-06", averageIncrement: 11, totalEmployees: 120, totalCost: 500000, budgetUtilization: 92 },
-    ];
+  getIncrementTrends: async (companyId: string, _dateRange: string): Promise<IncrementTrendPoint[]> => {
+    const cyclesSnap = await getDocs(query(collection(db, "cycles"), where("companyId", "==", companyId), where("status", "==", "completed")));
+    const trends: IncrementTrendPoint[] = [];
+
+    for (const cycleDoc of cyclesSnap.docs) {
+      const cycle = cycleDoc.data();
+      const cycleName = cycle.name || `Cycle ${cycleDoc.id.slice(0, 8)}`;
+      const date = cycle.createdAt?.toDate().toISOString().split('T')[0] || '';
+      const budget = cycle.budget || 0;
+
+      const evals = await getDocs(
+        query(collection(db, "evaluations"), where("cycleId", "==", cycleDoc.id))
+      );
+
+      let totalCost = 0;
+      const increments: number[] = [];
+      const employees = new Set<string>();
+
+      evals.forEach(evalDoc => {
+        const eval_ = evalDoc.data();
+        if (eval_.status === 'submitted' || eval_.status === 'finalized' || eval_.status === 'overridden') {
+          const increment = eval_.recommendedIncrement || 0;
+          const baseSalary = eval_.baseSalary || 0;
+          totalCost += baseSalary * (increment / 100);
+          increments.push(increment);
+          employees.add(eval_.employeeId);
+        }
+      });
+
+      const averageIncrement = increments.length > 0
+        ? Math.round((increments.reduce((a, b) => a + b, 0) / increments.length) * 10) / 10
+        : 0;
+
+      const budgetUtilization = budget > 0 ? Math.round((totalCost / budget) * 100) : 0;
+
+      trends.push({
+        cycleId: cycleDoc.id,
+        cycleName,
+        date,
+        averageIncrement,
+        totalEmployees: employees.size,
+        totalCost: Math.round(totalCost),
+        budgetUtilization: Math.min(budgetUtilization, 100),
+      });
+    }
+
+    return trends.sort((a, b) => a.date.localeCompare(b.date));
   },
 
   getDepartmentPerformance: async (companyId: string): Promise<DepartmentPerformance[]> => {

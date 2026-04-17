@@ -46,6 +46,8 @@ export default function ExecutiveDashboard() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState("12m");
   const [selectedDept, setSelectedDept] = useState<DepartmentPerformance | null>(null);
+  const [employeeGrowth, setEmployeeGrowth] = useState(0);
+  const [cycleGrowth, setCycleGrowth] = useState(0);
 
   useEffect(() => {
     if (user?.companyId) {
@@ -63,8 +65,23 @@ export default function ExecutiveDashboard() {
       const trendData = await analyticsService.getIncrementTrends(user.companyId, dateRange);
       setTrends(trendData);
 
+      // Calculate employee growth from trends
+      if (trendData.length > 1) {
+        const lastTrend = trendData[trendData.length - 1];
+        const prevTrend = trendData[trendData.length - 2];
+        const empGrowth = prevTrend.totalEmployees > 0
+          ? Math.round(((lastTrend.totalEmployees - prevTrend.totalEmployees) / prevTrend.totalEmployees) * 100)
+          : 0;
+        setEmployeeGrowth(empGrowth);
+      }
+
       const deptData = await analyticsService.getDepartmentPerformance(user.companyId);
       setDeptData(deptData);
+
+      // Calculate completed cycle growth
+      if (kpiData.completedCycles > 0) {
+        setCycleGrowth(1); // At least 1 new completed cycle
+      }
 
       const yoyData = await analyticsService.getYoYComparison(user.companyId);
       setYoyData(yoyData);
@@ -114,9 +131,12 @@ export default function ExecutiveDashboard() {
               <div className="p-2 bg-slate-50 rounded-lg">
                 <Users className="w-5 h-5 text-slate-500" />
               </div>
-              <span className="flex items-center text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                <ArrowUp className="w-3 h-3 mr-1" /> 5%
-              </span>
+              {employeeGrowth !== 0 && (
+                <span className={`flex items-center text-xs font-bold ${employeeGrowth >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'} px-2 py-1 rounded-full`}>
+                  {employeeGrowth >= 0 ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(employeeGrowth)}%
+                </span>
+              )}
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 mb-1">Total Employees</p>
@@ -141,9 +161,11 @@ export default function ExecutiveDashboard() {
               <div className="p-2 bg-slate-50 rounded-lg">
                 <CheckCircle className="w-5 h-5 text-slate-500" />
               </div>
-              <span className="flex items-center text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                <ArrowUp className="w-3 h-3 mr-1" /> 1
-              </span>
+              {cycleGrowth > 0 && (
+                <span className="flex items-center text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                  <ArrowUp className="w-3 h-3 mr-1" /> {cycleGrowth}
+                </span>
+              )}
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 mb-1">Completed Cycles</p>
@@ -249,18 +271,20 @@ export default function ExecutiveDashboard() {
 
         {/* SECTION 4 - YoY Comparison */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-6">Year-over-Year Increment Analysis</h2>
+          <h2 className="text-lg font-bold text-slate-900 mb-6">Year-over-Year Tier Distribution</h2>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={yoyData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="year" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                <YAxis axisLine={false} tickLine={false} label={{ value: 'Employees', angle: -90, position: 'insideLeft' }} />
                 <Tooltip cursor={{ fill: '#f8fafc' }} />
                 <Legend />
                 <Bar dataKey="Tier 1" fill="#10B981" radius={[2, 2, 0, 0]} />
                 <Bar dataKey="Tier 2" fill="#3B82F6" radius={[2, 2, 0, 0]} />
                 <Bar dataKey="Tier 3" fill="#F59E0B" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Tier 4" fill="#EF4444" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Tier 5" fill="#8B5CF6" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -272,30 +296,31 @@ export default function ExecutiveDashboard() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Top Performance Departments</h2>
               <div className="space-y-3">
-                  {[deptData[4], deptData[0], deptData[3]].filter(Boolean).map((dept, idx) => (
+                  {deptData.slice(0, 3).map((dept, idx) => (
                       <div key={idx} className="flex justify-between items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
-                          <span className="font-medium text-slate-900">{dept?.departmentName}</span>
+                          <span className="font-medium text-slate-900">{dept.departmentName}</span>
                           <div className="flex items-center gap-3">
-                              <span className="text-sm font-bold text-slate-700">{dept?.averageScore}</span>
+                              <span className="text-sm font-bold text-slate-700">{dept.averageScore}</span>
                               <ArrowUp className="w-4 h-4 text-emerald-500" />
                           </div>
                       </div>
                   ))}
+                  {deptData.length === 0 && <p className="text-sm text-slate-500">No department data available</p>}
               </div>
           </div>
           {/* Bottom Performers */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Areas for Improvement</h2>
               <div className="space-y-3">
-                  {[deptData[1], deptData[2]].filter(Boolean).map((dept, idx) => (
+                  {deptData.length > 3 ? deptData.slice(-2).reverse().map((dept, idx) => (
                       <div key={idx} className="flex justify-between items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
-                          <span className="font-medium text-slate-900">{dept?.departmentName}</span>
+                          <span className="font-medium text-slate-900">{dept.departmentName}</span>
                           <div className="flex items-center gap-3">
-                              <span className="text-sm font-bold text-slate-700">{dept?.averageScore}</span>
+                              <span className="text-sm font-bold text-slate-700">{dept.averageScore}</span>
                               <ArrowDown className="w-4 h-4 text-red-500" />
                           </div>
                       </div>
-                  ))}
+                  )) : <p className="text-sm text-slate-500">Insufficient data for comparison</p>}
               </div>
           </div>
       </div>
@@ -361,7 +386,12 @@ export default function ExecutiveDashboard() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-slate-600">Relative to Company Average</span>
                       <span className="text-sm font-bold text-slate-900">
-                        {selectedDept.averageScore >= 75 ? '+' : ''}{selectedDept.averageScore - 75}
+                        {(() => {
+                          const companyAvg = deptData.length > 0
+                            ? Math.round(deptData.reduce((sum, d) => sum + d.averageScore, 0) / deptData.length)
+                            : 75;
+                          return `${selectedDept.averageScore >= companyAvg ? '+' : ''}${selectedDept.averageScore - companyAvg}`;
+                        })()}
                       </span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-2">

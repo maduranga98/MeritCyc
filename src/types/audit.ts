@@ -24,6 +24,7 @@ export type AuditAction =
   | "evaluation_draft_saved"
   | "score_overridden"
   | "qr_code_regenerated"
+  | "registration_toggled"
   | "data_exported";
 
 export interface AuditLogEntry {

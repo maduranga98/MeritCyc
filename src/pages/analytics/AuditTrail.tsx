@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { auditService, type AuditFilters } from '../../services/auditService';
-import type { AuditLogEntry, AuditAction } from '../../types/audit';
+import type { AuditLogEntry } from '../../types/audit';
 import { Download, Filter, X, Copy, FileText } from 'lucide-react';
 
 const AuditTrail: React.FC = () => {
@@ -10,7 +10,6 @@ const AuditTrail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<AuditFilters>({});
   const [showFilters, setShowFilters] = useState(false);
-  const [actionTypes, setActionTypes] = useState<AuditAction[]>([]);
   const [actorEmails, setActorEmails] = useState<string[]>([]);
   const [pageParam, setPageParam] = useState<any>(null);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -23,11 +22,7 @@ const AuditTrail: React.FC = () => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
-        const [actionsRes, emailsRes] = await Promise.all([
-          auditService.getActionTypes(user.companyId!),
-          auditService.getActorEmails(user.companyId!),
-        ]);
-        setActionTypes(actionsRes);
+        const emailsRes = await auditService.getActorEmails(user.companyId!);
         setActorEmails(emailsRes);
       } catch (err) {
         console.error('Error loading filter options:', err);

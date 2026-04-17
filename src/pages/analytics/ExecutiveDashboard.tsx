@@ -272,11 +272,11 @@ export default function ExecutiveDashboard() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Top Performance Departments</h2>
               <div className="space-y-3">
-                  {[deptData[4], deptData[0], deptData[3]].map((dept, idx) => (
+                  {[deptData[4], deptData[0], deptData[3]].filter(Boolean).map((dept, idx) => (
                       <div key={idx} className="flex justify-between items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
-                          <span className="font-medium text-slate-900">{dept.departmentName}</span>
+                          <span className="font-medium text-slate-900">{dept?.departmentName}</span>
                           <div className="flex items-center gap-3">
-                              <span className="text-sm font-bold text-slate-700">{dept.averageScore}</span>
+                              <span className="text-sm font-bold text-slate-700">{dept?.averageScore}</span>
                               <ArrowUp className="w-4 h-4 text-emerald-500" />
                           </div>
                       </div>
@@ -287,11 +287,11 @@ export default function ExecutiveDashboard() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Areas for Improvement</h2>
               <div className="space-y-3">
-                  {[deptData[1], deptData[2]].map((dept, idx) => (
+                  {[deptData[1], deptData[2]].filter(Boolean).map((dept, idx) => (
                       <div key={idx} className="flex justify-between items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
-                          <span className="font-medium text-slate-900">{dept.departmentName}</span>
+                          <span className="font-medium text-slate-900">{dept?.departmentName}</span>
                           <div className="flex items-center gap-3">
-                              <span className="text-sm font-bold text-slate-700">{dept.averageScore}</span>
+                              <span className="text-sm font-bold text-slate-700">{dept?.averageScore}</span>
                               <ArrowDown className="w-4 h-4 text-red-500" />
                           </div>
                       </div>

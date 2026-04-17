@@ -354,7 +354,7 @@ const AuditTrail: React.FC = () => {
                 <tbody className="divide-y divide-slate-200">
                   {logs.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-3 text-sm text-slate-600 whitespace-nowrap" title={new Date(log.timestamp).toISOString()}>
+                      <td className="px-6 py-3 text-sm text-slate-600 whitespace-nowrap" title={typeof log.timestamp === 'number' && !isNaN(log.timestamp) ? new Date(log.timestamp).toISOString() : ''}>
                         {formatTimestamp(log.timestamp)}
                       </td>
                       <td className="px-6 py-3 text-sm">

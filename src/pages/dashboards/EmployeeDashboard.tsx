@@ -49,11 +49,20 @@ const EmployeeDashboard: React.FC = () => {
   useEffect(() => {
     if (!user?.uid || !user?.companyId) return;
 
-    const loadActiveCycle = async () => {
+    let evalUnsubscribe: (() => void) | null = null;
+    let isMounted = true;
+
+    const init = async () => {
       try {
         const cyclesSnapshot = await getDocs(
-          query(collection(db, 'cycles'), where('companyId', '==', user.companyId), where('status', 'in', ['active', 'locked']))
+          query(
+            collection(db, 'cycles'),
+            where('companyId', '==', user.companyId),
+            where('status', 'in', ['active', 'locked'])
+          )
         );
+
+        if (!isMounted) return;
 
         if (cyclesSnapshot.empty) {
           setActiveCycle(null);
@@ -63,17 +72,24 @@ const EmployeeDashboard: React.FC = () => {
 
         const cycleDoc = cyclesSnapshot.docs[0];
         const cycleData = cycleDoc.data() as Cycle;
+
+        if (!isMounted) return;
+
         setActiveCycle({ ...cycleData, isLocked: cycleData.status === 'locked' });
 
-        // Subscribe to real-time evaluation updates for this employee in this cycle
-        const evalUnsubscribe = onSnapshot(
-          query(collection(db, 'evaluations'), where('cycleId', '==', cycleDoc.id), where('employeeId', '==', user.uid)),
+        evalUnsubscribe = onSnapshot(
+          query(
+            collection(db, 'evaluations'),
+            where('cycleId', '==', cycleDoc.id),
+            where('employeeId', '==', user.uid)
+          ),
           (snapshot) => {
+            if (!isMounted) return;
+
             if (!snapshot.empty) {
               const evalData = snapshot.docs[0].data() as Evaluation;
               setActiveEvaluation(evalData);
 
-              // Calculate weighted score from criteria
               if (evalData.scores && typeof evalData.scores === 'object') {
                 const criteriaArray = Object.values(evalData.scores) as CriteriaScore[];
                 const totalWeighted = criteriaArray.reduce((sum: number, c: CriteriaScore) => {
@@ -85,23 +101,27 @@ const EmployeeDashboard: React.FC = () => {
                 const weighted = totalWeight > 0 ? totalWeighted / totalWeight : 0;
                 setCurrentWeightedScore(weighted);
 
-                // Estimate tier based on weighted score
                 if (weighted >= 90) setEstimatedTier('Exceptional');
                 else if (weighted >= 75) setEstimatedTier('Exceeds');
                 else if (weighted >= 60) setEstimatedTier('Meets');
                 else setEstimatedTier('Developing');
               }
+            } else {
+              setActiveEvaluation(null);
             }
           }
         );
-
-        return evalUnsubscribe;
       } catch (err) {
         console.error('Error loading active cycle:', err);
       }
     };
 
-    loadActiveCycle().then(unsub => () => unsub?.());
+    init();
+
+    return () => {
+      isMounted = false;
+      evalUnsubscribe?.();
+    };
   }, [user?.uid, user?.companyId]);
 
   const bestScore = stories.length > 0 ? Math.max(...stories.map(s => s.score)) : 0;

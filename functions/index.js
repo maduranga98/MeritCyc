@@ -1675,6 +1675,10 @@ exports.updateEmployeeProfile = onCall(async (request) => {
     await firestore.runTransaction(async (transaction) => {
         const currentDoc = await transaction.get(userRef);
 
+        if (!currentDoc.exists) {
+          throw new HttpsError("not-found", "User document no longer exists.");
+        }
+
         // If department changed, update counts
         const oldDeptId = currentDoc.data().departmentId;
         const newDeptId = departmentId;
@@ -1682,11 +1686,17 @@ exports.updateEmployeeProfile = onCall(async (request) => {
         if (departmentId !== undefined && oldDeptId !== newDeptId) {
             if (oldDeptId) {
                 const oldDeptRef = firestore.collection("companies").doc(companyId).collection("departments").doc(oldDeptId);
-                transaction.update(oldDeptRef, { employeeCount: admin.firestore.FieldValue.increment(-1) });
+                const oldDeptDoc = await transaction.get(oldDeptRef);
+                if (oldDeptDoc.exists) {
+                    transaction.update(oldDeptRef, { employeeCount: admin.firestore.FieldValue.increment(-1) });
+                }
             }
             if (newDeptId) {
                  const newDeptRef = firestore.collection("companies").doc(companyId).collection("departments").doc(newDeptId);
-                 transaction.update(newDeptRef, { employeeCount: admin.firestore.FieldValue.increment(1) });
+                 const newDeptDoc = await transaction.get(newDeptRef);
+                 if (newDeptDoc.exists) {
+                     transaction.update(newDeptRef, { employeeCount: admin.firestore.FieldValue.increment(1) });
+                 }
             }
         }
 
@@ -1696,11 +1706,17 @@ exports.updateEmployeeProfile = onCall(async (request) => {
         if (salaryBandId !== undefined && oldBandId !== newBandId) {
             if (oldBandId) {
                 const oldBandRef = firestore.collection("companies").doc(companyId).collection("salaryBands").doc(oldBandId);
-                transaction.update(oldBandRef, { employeeCount: admin.firestore.FieldValue.increment(-1) });
+                const oldBandDoc = await transaction.get(oldBandRef);
+                if (oldBandDoc.exists) {
+                    transaction.update(oldBandRef, { employeeCount: admin.firestore.FieldValue.increment(-1) });
+                }
             }
             if (newBandId) {
                 const newBandRef = firestore.collection("companies").doc(companyId).collection("salaryBands").doc(newBandId);
-                transaction.update(newBandRef, { employeeCount: admin.firestore.FieldValue.increment(1) });
+                const newBandDoc = await transaction.get(newBandRef);
+                if (newBandDoc.exists) {
+                    transaction.update(newBandRef, { employeeCount: admin.firestore.FieldValue.increment(1) });
+                }
             }
         }
 

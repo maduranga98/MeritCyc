@@ -64,7 +64,7 @@ function getErrorMessage(code: string): string {
 // ---------------------------------------------------------------------------
 
 const LoginPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isEmailLoading, setIsEmailLoading] = useState(false);
@@ -89,12 +89,12 @@ const LoginPage: React.FC = () => {
     }
   }, [searchParams]);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated and fully resolved
   useEffect(() => {
-    if (user) {
+    if (user && !loading) {
       navigate(getDashboardPath(user.role), { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
 
   // ---------------------------------------------------------------------------
   // Post-login: check approval, then redirect

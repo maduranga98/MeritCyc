@@ -82,8 +82,16 @@ export const useAuthStore = create<AuthStore>((set) => ({
           // ------------------------------------------------------------------
           // 1. Try custom claims first (set by Cloud Functions)
           // ------------------------------------------------------------------
-          const tokenResult = await firebaseUser.getIdTokenResult(true);
-          const raw = tokenResult.claims;
+          let tokenResult = await firebaseUser.getIdTokenResult(true);
+          let raw = tokenResult.claims;
+
+          // If no role in claims, wait 1s and retry once — handles post-approval
+          // race condition where Cloud Function just set claims
+          if (!raw.role) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            tokenResult = await firebaseUser.getIdTokenResult(true);
+            raw = tokenResult.claims;
+          }
 
           if (raw.role) {
             const claims: CustomClaims = {
@@ -136,7 +144,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
                     "User",
                   role,
                   companyId: (data.companyId as string) ?? "",
-                  approved: (data.approved as boolean) ?? true,
+                  approved: (data.approved as boolean) ?? false,
                 },
                 firebaseUser,
                 claims: null,
@@ -194,17 +202,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
 // ---------------------------------------------------------------------------
 
 function mapLegacyRole(role: string): RoleCode {
+  if (!role) return 'employee';
+  const normalized = role.toLowerCase().trim().replace(/[\s-]/g, '_');
   const map: Record<string, RoleCode> = {
-    "Super Admin": "platform_admin",
-    Admin: "super_admin",
-    "HR Admin": "hr_admin",
-    Manager: "manager",
-    Employee: "employee",
-    platform_admin: "platform_admin",
-    super_admin: "super_admin",
-    hr_admin: "hr_admin",
-    manager: "manager",
-    employee: "employee",
+    'platform_admin': 'platform_admin',
+    'super_admin': 'super_admin',
+    'admin': 'super_admin',
+    'hr_admin': 'hr_admin',
+    'hr admin': 'hr_admin',
+    'hradmin': 'hr_admin',
+    'manager': 'manager',
+    'employee': 'employee',
   };
-  return map[role] ?? "employee";
+  return map[normalized] ?? map[role.toLowerCase().trim()] ?? 'employee';
 }

@@ -18,6 +18,7 @@ import {
   X,
   Bell,
   CheckSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { type RoleCode } from "../../types/roles";
 import { useNotificationStore } from "../../stores/notificationStore";
@@ -89,6 +90,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
             { name: "Executive Dashboard", href: "/analytics", icon: BarChart2, exact: true },
             { name: "Reports", href: "/analytics/reports", icon: BarChart2 },
             { name: "Fairness", href: "/fairness", icon: Scale, isFairnessBadge: true },
+            { name: "Audit Trail", href: "/audit-trail", icon: ShieldCheck },
           ],
         },
         { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
@@ -126,6 +128,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
             { name: "Executive Dashboard", href: "/analytics", icon: BarChart2, exact: true },
             { name: "Reports", href: "/analytics/reports", icon: BarChart2 },
             { name: "Fairness", href: "/fairness", icon: Scale, isFairnessBadge: true },
+            { name: "Audit Trail", href: "/audit-trail", icon: ShieldCheck },
           ],
         },
         { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },

@@ -159,31 +159,30 @@ export const auditService = {
   },
 
   /**
-   * Get action color for UI
+   * Get color classes for action badge
    */
-  getActionColor(
-    action: AuditAction
-  ): 'red' | 'green' | 'blue' | 'amber' | 'slate' {
-    if (
-      action.includes('deleted') ||
-      action.includes('rejected') ||
-      action.includes('deactivated')
-    ) {
-      return 'red';
+  getActionColor(action: AuditAction): string {
+    switch (action) {
+      case 'user_approved':
+      case 'user_reactivated':
+        return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+      case 'user_rejected':
+      case 'user_deactivated':
+        return 'bg-red-50 text-red-700 border border-red-200';
+      case 'role_changed':
+      case 'score_overridden':
+        return 'bg-amber-50 text-amber-700 border border-amber-200';
+      case 'cycle_created':
+      case 'cycle_published':
+      case 'cycle_finalized':
+      case 'cycle_cancelled':
+        return 'bg-blue-50 text-blue-700 border border-blue-200';
+      case 'company_settings_updated':
+      case 'qr_code_regenerated':
+      case 'registration_toggled':
+        return 'bg-slate-50 text-slate-600 border border-slate-200';
+      default:
+        return 'bg-slate-100 text-slate-500 border border-slate-200';
     }
-    if (
-      action.includes('approved') ||
-      action.includes('reactivated') ||
-      action.includes('created')
-    ) {
-      return 'green';
-    }
-    if (action.includes('submitted') || action.includes('finalized')) {
-      return 'blue';
-    }
-    if (action.includes('override')) {
-      return 'amber';
-    }
-    return 'slate';
   },
 };

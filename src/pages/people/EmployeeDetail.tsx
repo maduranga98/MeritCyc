@@ -10,7 +10,8 @@ import { type Department } from '../../types/department';
 import { type SalaryBand } from '../../types/salaryBand';
 import { departmentService } from '../../services/departmentService';
 import { salaryBandService } from '../../services/salaryBandService';
-import { Loader2, ArrowLeft, Mail, Building, Badge, Calendar, Shield, LogIn, AlertCircle } from 'lucide-react';
+import { employeeService } from '../../services/employeeService';
+import { Loader2, ArrowLeft, Mail, Building, Badge, Calendar, Shield, LogIn, AlertCircle, Edit2, UserX, UserCheck, Trophy } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -28,79 +29,87 @@ export default function EmployeeDetail() {
   const [salaryBands, setSalaryBands] = useState<SalaryBand[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [actionModal, setActionModal] = useState<'deactivate' | 'reactivate' | null>(null);
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
-  // Load employee data
-  useEffect(() => {
+  const loadData = async () => {
     if (!uid || !currentUser?.companyId) return;
 
-    const loadData = async () => {
-      try {
-        // Check if user has access (must be hr_admin or super_admin)
-        if (!['hr_admin', 'super_admin'].includes(currentUser.role || '')) {
-          toast.error('Access denied');
-          navigate('/people/directory');
-          return;
-        }
+    try {
+      if (!['hr_admin', 'super_admin'].includes(currentUser.role || '')) {
+        toast.error('Access denied');
+        navigate('/people/directory');
+        return;
+      }
 
-        // Load employee
-        const empDoc = await getDoc(doc(db, 'users', uid));
-        if (!empDoc.exists()) {
-          toast.error('Employee not found');
-          navigate('/people/directory');
-          return;
-        }
+      const empDoc = await getDoc(doc(db, 'users', uid));
+      if (!empDoc.exists()) {
+        toast.error('Employee not found.');
+        navigate('/people/directory');
+        return;
+      }
 
-        const empData = empDoc.data() as UserProfile;
-        if (empData.companyId !== currentUser.companyId) {
-          toast.error('Employee not found in your company');
-          navigate('/people/directory');
-          return;
-        }
+      const empData = empDoc.data() as UserProfile;
+      if (empData.companyId !== currentUser.companyId) {
+        toast.error('Employee not found.');
+        navigate('/people/directory');
+        return;
+      }
 
-        setEmployee(empData);
+      setEmployee(empData);
 
-        // Load departments and salary bands
-        const depts = await departmentService.getDepartments(currentUser.companyId);
-        setDepartments(depts);
-
-        const bands = await salaryBandService.getSalaryBands(currentUser.companyId);
-        setSalaryBands(bands);
-
-        // Load evaluations
-        const evalsSnapshot = await getDocs(
+      const [depts, bands, evalsSnapshot, logsSnapshot1, logsSnapshot2] = await Promise.all([
+        departmentService.getDepartments(currentUser.companyId),
+        salaryBandService.getSalaryBands(currentUser.companyId),
+        getDocs(
           query(
             collection(db, 'evaluations'),
-            where('employeeId', '==', uid),
+            where('employeeUid', '==', uid),
             where('status', 'in', ['submitted', 'overridden', 'finalized'])
           )
-        );
-        const evals = evalsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Evaluation));
-        setEvaluations(evals.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
-
-        // Load audit logs
-        const logsSnapshot = await getDocs(
+        ),
+        getDocs(
           query(
             collection(db, 'auditLogs'),
-            where('companyId', '==', currentUser.companyId)
+            where('companyId', '==', currentUser.companyId),
+            where('targetId', '==', uid)
           )
-        );
-        const allLogs = logsSnapshot.docs
-          .map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry))
-          .filter((log) => log.targetId === uid || log.actorUid === uid)
-          .sort((a, b) => b.timestamp - a.timestamp)
-          .slice(0, 50);
-        setAuditLogs(allLogs);
+        ),
+        getDocs(
+          query(
+            collection(db, 'auditLogs'),
+            where('companyId', '==', currentUser.companyId),
+            where('actorUid', '==', uid)
+          )
+        ),
+      ]);
 
-        setLoading(false);
-      } catch (error) {
-        console.error('Error loading employee:', error);
-        toast.error('Failed to load employee data');
-        setLoading(false);
-      }
-    };
+      setDepartments(depts);
+      setSalaryBands(bands);
 
+      const evals = evalsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Evaluation));
+      setEvaluations(evals.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
+
+      const logs1 = logsSnapshot1.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry));
+      const logs2 = logsSnapshot2.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry));
+      const allLogs = [...logs1, ...logs2]
+        .filter((log, i, arr) => arr.findIndex((l) => l.id === log.id) === i)
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 50);
+      setAuditLogs(allLogs);
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading employee:', error);
+      toast.error('Failed to load employee data');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
-  }, [uid, currentUser, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, currentUser?.companyId]);
 
   if (loading) {
     return (
@@ -133,12 +142,72 @@ export default function EmployeeDetail() {
     return salaryBands.find((b) => b.id === bandId)?.name || bandId || '—';
   };
 
+  const getBandDetails = (bandId?: string) => {
+    return salaryBands.find((b) => b.id === bandId);
+  };
+
+  const getRoleBadgeColor = (role?: string) => {
+    switch (role) {
+      case 'super_admin':
+        return 'bg-purple-100 text-purple-700';
+      case 'hr_admin':
+        return 'bg-blue-100 text-blue-700';
+      case 'manager':
+        return 'bg-amber-100 text-amber-700';
+      case 'employee':
+      default:
+        return 'bg-slate-100 text-slate-600';
+    }
+  };
+
+  const getStatusBadgeColor = (status?: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-emerald-100 text-emerald-700';
+      case 'inactive':
+        return 'bg-red-100 text-red-700';
+      case 'pending':
+        return 'bg-amber-100 text-amber-700';
+      default:
+        return 'bg-slate-100 text-slate-600';
+    }
+  };
+
   const getActionColor = (action: string) => {
-    if (action.includes('APPROVED')) return 'bg-emerald-100 text-emerald-700';
-    if (action.includes('OVERRIDDEN')) return 'bg-amber-100 text-amber-700';
-    if (action.includes('CHANGED') || action.includes('UPDATED')) return 'bg-blue-100 text-blue-700';
-    if (action.includes('DEACTIVATED') || action.includes('REJECTED')) return 'bg-red-100 text-red-700';
-    return 'bg-slate-100 text-slate-700';
+    if (['USER_APPROVED', 'USER_REACTIVATED'].some(a => action.includes(a))) {
+      return 'bg-emerald-50 text-emerald-700';
+    }
+    if (['SCORE_OVERRIDDEN', 'ROLE_CHANGED'].some(a => action.includes(a))) {
+      return 'bg-amber-50 text-amber-700';
+    }
+    if (['USER_DEACTIVATED', 'USER_REJECTED'].some(a => action.includes(a))) {
+      return 'bg-red-50 text-red-700';
+    }
+    if (action.includes('CYCLE')) {
+      return 'bg-blue-50 text-blue-700';
+    }
+    return 'bg-slate-50 text-slate-600';
+  };
+
+  const handleStatusChange = async (action: 'deactivate' | 'reactivate') => {
+    if (!employee) return;
+    setIsSubmittingAction(true);
+    try {
+      if (action === 'deactivate') {
+        await employeeService.deactivateEmployee(employee.uid);
+        toast.success('Employee deactivated');
+      } else {
+        await employeeService.reactivateEmployee(employee.uid);
+        toast.success('Employee reactivated');
+      }
+      setActionModal(null);
+      await loadData();
+    } catch (err) {
+      const e = err as Error;
+      toast.error(e.message || 'An error occurred');
+    } finally {
+      setIsSubmittingAction(false);
+    }
   };
 
   return (
@@ -156,32 +225,63 @@ export default function EmployeeDetail() {
 
           <div className="flex items-start justify-between gap-6">
             <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white text-2xl font-bold">
-                {employee.name?.charAt(0).toUpperCase()}
-              </div>
+              {employee.photoURL ? (
+                <img
+                  src={employee.photoURL}
+                  alt={employee.name}
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xl font-bold">
+                  {employee.name?.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">{employee.name}</h1>
-                <p className="text-slate-500">{getDeptName(employee.departmentId)}</p>
+                <p className="text-sm text-slate-500">
+                  {employee.jobTitle && <span>{employee.jobTitle}</span>}
+                  {employee.jobTitle && employee.departmentId && <span> • </span>}
+                  {employee.departmentId && <span>{getDeptName(employee.departmentId)}</span>}
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(employee.role)}`}>
+                    {employee.role.replace('_', ' ').toUpperCase()}
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(employee.status)}`}>
+                    {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {employee.status === 'active' && (
-                <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
-                  Active
-                </span>
-              )}
-              {employee.status === 'inactive' && (
-                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium">
-                  Inactive
-                </span>
-              )}
-              {employee.role === 'manager' && (
-                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                  Manager
-                </span>
-              )}
-            </div>
+            {currentUser?.role && ['hr_admin', 'super_admin'].includes(currentUser.role) && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => toast.info('Edit profile feature coming soon')}
+                  className="flex items-center gap-2 border border-slate-300 rounded-md px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Edit Profile
+                </button>
+                {employee.status === 'active' ? (
+                  <button
+                    onClick={() => setActionModal('deactivate')}
+                    className="flex items-center gap-2 bg-red-500 text-white rounded-md px-4 py-2 text-sm font-medium hover:bg-red-600 transition-colors"
+                  >
+                    <UserX className="w-4 h-4" />
+                    Deactivate
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setActionModal('reactivate')}
+                    className="flex items-center gap-2 bg-emerald-500 text-white rounded-md px-4 py-2 text-sm font-medium hover:bg-emerald-600 transition-colors"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    Reactivate
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -219,9 +319,7 @@ export default function EmployeeDetail() {
             {/* Info Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                  Email
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Email</h3>
                 <div className="flex items-center gap-3">
                   <Mail className="w-5 h-5 text-slate-400" />
                   <p className="text-slate-900 font-medium">{employee.email}</p>
@@ -229,9 +327,7 @@ export default function EmployeeDetail() {
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                  Department
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Department</h3>
                 <div className="flex items-center gap-3">
                   <Building className="w-5 h-5 text-slate-400" />
                   <p className="text-slate-900 font-medium">{getDeptName(employee.departmentId)}</p>
@@ -239,50 +335,88 @@ export default function EmployeeDetail() {
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                  Salary Band
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Salary Band</h3>
                 <p className="text-slate-900 font-medium">{getBandName(employee.salaryBandId)}</p>
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                  Role
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Role</h3>
                 <div className="flex items-center gap-3">
                   <Badge className="w-5 h-5 text-slate-400" />
-                  <p className="text-slate-900 font-medium capitalize">{employee.role}</p>
+                  <p className="text-slate-900 font-medium capitalize">{employee.role.replace('_', ' ')}</p>
                 </div>
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                  Status
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Status</h3>
                 <p className="text-slate-900 font-medium capitalize">{employee.status}</p>
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                  Member Since
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Registration Method</h3>
+                <p className="text-slate-900 font-medium">{employee.registrationMethod || '—'}</p>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Member Since</h3>
                 <div className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-slate-400" />
                   <p className="text-slate-900 font-medium">
-                    {employee.createdAt
-                      ? format(new Date(employee.createdAt), 'MMM d, yyyy')
-                      : '—'}
+                    {employee.createdAt ? format(new Date(employee.createdAt), 'MMM d, yyyy') : '—'}
                   </p>
                 </div>
               </div>
+
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Last Active</h3>
+                <p className="text-slate-900 font-medium">
+                  {employee.lastActiveAt ? formatDistanceToNow(new Date(employee.lastActiveAt), { addSuffix: true }) : '—'}
+                </p>
+              </div>
             </div>
+
+            {/* Salary Band Detail Card */}
+            {getBandDetails(employee.salaryBandId) && (
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Salary Band Details</h3>
+                {(() => {
+                  const band = getBandDetails(employee.salaryBandId);
+                  if (!band) return null;
+                  const currency = band.currency || 'USD';
+                  const minSalary = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency,
+                    minimumFractionDigits: 0,
+                  }).format(band.minSalary);
+                  const maxSalary = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency,
+                    minimumFractionDigits: 0,
+                  }).format(band.maxSalary);
+                  return (
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Band Name</p>
+                        <p className="text-slate-900 font-medium">{band.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Level</p>
+                        <p className="text-slate-900 font-medium">{band.level}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Salary Range</p>
+                        <p className="text-slate-900 font-medium">{minSalary} – {maxSalary}</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Manager Card */}
             {evaluations.length > 0 && evaluations[0].managerName && (
               <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                  Reports To
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Reports To</h3>
                 <p className="text-slate-900 font-medium">{evaluations[0].managerName}</p>
               </div>
             )}
@@ -296,8 +430,8 @@ export default function EmployeeDetail() {
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             {evaluations.length === 0 ? (
               <div className="p-12 text-center">
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-6 h-6 text-slate-400" />
+                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                  <Trophy className="w-6 h-6 text-slate-200" />
                 </div>
                 <p className="text-slate-500">No increment cycles yet.</p>
               </div>
@@ -311,12 +445,17 @@ export default function EmployeeDetail() {
                       <th className="px-6 py-4 text-left font-semibold text-slate-600">Score</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-600">Tier</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-600">Increment %</th>
+                      <th className="px-6 py-4 text-left font-semibold text-slate-600">Increment Amount</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-600">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {evaluations.map((evaluation) => (
-                      <tr key={evaluation.id} className="hover:bg-slate-50 transition-colors cursor-pointer">
+                      <tr
+                        key={evaluation.id}
+                        onClick={() => navigate(`/increments/${evaluation.cycleId}`)}
+                        className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      >
                         <td className="px-6 py-4 font-medium text-slate-900">{evaluation.cycleId}</td>
                         <td className="px-6 py-4 text-slate-600">
                           {evaluation.createdAt && format(evaluation.createdAt.toDate?.() || evaluation.createdAt, 'MMM d, yyyy')}
@@ -325,14 +464,27 @@ export default function EmployeeDetail() {
                           <span className="font-bold text-slate-900">{evaluation.weightedTotalScore?.toFixed(1) || '—'}</span>
                         </td>
                         <td className="px-6 py-4">
-                          {evaluation.assignedTierName && (
+                          {evaluation.assignedTierName ? (
                             <span className="px-2 py-1 rounded text-white text-xs font-bold bg-slate-600">
                               {evaluation.assignedTierName}
                             </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
                           )}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-900">
                           {evaluation.incrementPercent ? `${evaluation.incrementPercent}%` : '—'}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-slate-900">
+                          {evaluation.incrementAmount ? (
+                            new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: 'USD',
+                              minimumFractionDigits: 0,
+                            }).format(evaluation.incrementAmount)
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
@@ -352,20 +504,23 @@ export default function EmployeeDetail() {
         {/* TAB 3: Activity */}
         {/* ================================================================= */}
         {activeTab === 'activity' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {auditLogs.length === 0 ? (
               <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
                 <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
                   <LogIn className="w-6 h-6 text-slate-400" />
                 </div>
-                <p className="text-slate-500">No activity recorded</p>
+                <p className="text-slate-500">No activity recorded.</p>
               </div>
             ) : (
               auditLogs.map((log) => (
-                <div key={log.id} className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between gap-4 mb-3">
+                <div
+                  key={log.id}
+                  className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex-1">
-                      <p className="font-semibold text-slate-900">{log.action}</p>
+                      <p className="font-semibold text-slate-900">{log.action.replace(/_/g, ' ')}</p>
                       <p className="text-sm text-slate-500">{log.actorEmail}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${getActionColor(log.action)}`}>
@@ -390,6 +545,43 @@ export default function EmployeeDetail() {
           </div>
         )}
       </div>
+
+      {/* Deactivate/Reactivate Confirmation Modal */}
+      {actionModal && employee && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setActionModal(null)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6 border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-3">
+              {actionModal === 'deactivate' ? 'Deactivate Employee' : 'Reactivate Employee'}
+            </h3>
+            <p className="text-slate-600 mb-6 text-sm">
+              Are you sure you want to {actionModal} <strong>{employee.name}</strong>?
+              {actionModal === 'deactivate'
+                ? ' They will immediately lose access to the platform.'
+                : ' They will be able to log in again.'}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setActionModal(null)}
+                disabled={isSubmittingAction}
+                className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleStatusChange(actionModal)}
+                disabled={isSubmittingAction}
+                className={`px-4 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2 ${
+                  actionModal === 'deactivate' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600'
+                }`}
+              >
+                {isSubmittingAction && <Loader2 className="w-4 h-4 animate-spin" />}
+                Confirm {actionModal}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -523,6 +523,27 @@ function requireHrOrAdmin(request) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: allow hr_admin, super_admin, or manager
+// ---------------------------------------------------------------------------
+
+function requireHrOrAdminOrManager(request) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const { role, companyId } = request.auth.token;
+  if (role !== "hr_admin" && role !== "super_admin" && role !== "manager") {
+    throw new HttpsError(
+      "permission-denied",
+      "Only HR admins, super admins, and managers can perform this action.",
+    );
+  }
+  if (!companyId) {
+    throw new HttpsError("failed-precondition", "No companyId in token.");
+  }
+  return { uid: request.auth.uid, role, companyId };
+}
+
+// ---------------------------------------------------------------------------
 // Helper: resolve companyId from a company code
 // Query in: companies/{companyId}/registration/{docID}/companyCode
 // Returns { companyId, companyName, qrEnabled } or null
@@ -1587,7 +1608,7 @@ exports.deleteSalaryBand = onCall(async (request) => {
 // ---------------------------------------------------------------------------
 
 exports.updateEmployeeProfile = onCall(async (request) => {
-  const { uid, companyId, role } = requireHrOrAdmin(request);
+  const { uid, companyId, role } = requireHrOrAdminOrManager(request);
   const { targetUid, departmentId, salaryBandId, jobTitle, status } = request.data;
 
   if (!targetUid) {
@@ -1599,6 +1620,21 @@ exports.updateEmployeeProfile = onCall(async (request) => {
 
   if (!userDoc.exists || userDoc.data().companyId !== companyId) {
     throw new HttpsError("not-found", "User not found in your company.");
+  }
+
+  // If manager, ensure they can only update employees in their department
+  if (role === "manager") {
+    const managerRef = firestore.collection("users").doc(uid);
+    const managerDoc = await managerRef.get();
+    const managerDepartmentId = managerDoc.data().departmentId;
+    const targetDepartmentId = userDoc.data().departmentId;
+
+    if (!managerDepartmentId || managerDepartmentId !== targetDepartmentId) {
+      throw new HttpsError(
+        "permission-denied",
+        "Managers can only update employees in their department.",
+      );
+    }
   }
 
   const updates = {};

@@ -11,7 +11,7 @@ import { type SalaryBand } from '../../types/salaryBand';
 import { departmentService } from '../../services/departmentService';
 import { salaryBandService } from '../../services/salaryBandService';
 import { employeeService } from '../../services/employeeService';
-import { Loader2, ArrowLeft, Mail, Building, Badge, Calendar, Shield, LogIn, AlertCircle, Edit2, UserX, UserCheck, Trophy } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, Building, Badge, Calendar, LogIn, AlertCircle, Edit2, UserX, UserCheck, Trophy } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
 

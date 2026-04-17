@@ -20,9 +20,13 @@ export interface UserProfile {
   approved: boolean;
   departmentId?: string;
   salaryBandId?: string;
+  jobTitle?: string;
+  photoURL?: string;
   status: "active" | "inactive" | "pending";
   createdAt: number;
   updatedAt?: number;
+  registrationMethod?: string;
+  lastActiveAt?: number;
 }
 
 /**

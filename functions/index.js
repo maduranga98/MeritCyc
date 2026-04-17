@@ -1626,6 +1626,11 @@ exports.updateEmployeeProfile = onCall(async (request) => {
   if (role === "manager") {
     const managerRef = firestore.collection("users").doc(uid);
     const managerDoc = await managerRef.get();
+
+    if (!managerDoc.exists) {
+      throw new HttpsError("not-found", "Manager profile not found.");
+    }
+
     const managerDepartmentId = managerDoc.data().departmentId;
     const targetDepartmentId = userDoc.data().departmentId;
 

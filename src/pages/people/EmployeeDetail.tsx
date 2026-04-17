@@ -189,6 +189,19 @@ export default function EmployeeDetail() {
     return 'bg-slate-50 text-slate-600';
   };
 
+  const getTierBadgeStyle = (tierName: string): { bg: string; text: string } => {
+    const name = tierName.toLowerCase();
+    if (name.includes('exceptional') || name.includes('outstanding'))
+      return { bg: '#059669', text: '#ffffff' };
+    if (name.includes('exceed') || name.includes('above'))
+      return { bg: '#0284c7', text: '#ffffff' };
+    if (name.includes('meet') || name.includes('standard') || name.includes('good'))
+      return { bg: '#7c3aed', text: '#ffffff' };
+    if (name.includes('develop') || name.includes('below') || name.includes('needs'))
+      return { bg: '#d97706', text: '#ffffff' };
+    return { bg: '#64748b', text: '#ffffff' };
+  };
+
   const handleStatusChange = async (action: 'deactivate' | 'reactivate') => {
     if (!employee) return;
     setIsSubmittingAction(true);
@@ -464,11 +477,17 @@ export default function EmployeeDetail() {
                           <span className="font-bold text-slate-900">{evaluation.weightedTotalScore?.toFixed(1) || '—'}</span>
                         </td>
                         <td className="px-6 py-4">
-                          {evaluation.assignedTierName ? (
-                            <span className="px-2 py-1 rounded text-white text-xs font-bold bg-slate-600">
-                              {evaluation.assignedTierName}
-                            </span>
-                          ) : (
+                          {evaluation.assignedTierName ? (() => {
+                            const style = getTierBadgeStyle(evaluation.assignedTierName);
+                            return (
+                              <span
+                                className="px-2 py-1 rounded text-xs font-bold"
+                                style={{ backgroundColor: style.bg, color: style.text }}
+                              >
+                                {evaluation.assignedTierName}
+                              </span>
+                            );
+                          })() : (
                             <span className="text-slate-400">—</span>
                           )}
                         </td>

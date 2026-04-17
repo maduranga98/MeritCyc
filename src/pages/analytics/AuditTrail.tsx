@@ -46,7 +46,7 @@ const AuditTrail: React.FC = () => {
         const result = await auditService.fetchAuditLogs(user.companyId!, filters);
         setLogs(result.logs);
         setAllLogs(result.logs); // Keep track of all loaded logs for export
-        setPageParam(null);
+        setPageParam(result.nextPage || null);
         setHasNextPage(!!result.nextPage);
       } catch (err) {
         console.error('Error loading audit logs:', err);

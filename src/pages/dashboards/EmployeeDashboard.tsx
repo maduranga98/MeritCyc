@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { getIncrementStories, getCareerMap } from '../../services/incrementStoryService';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type IncrementStory, type CareerMap } from '../../types/incrementStory';
-import { type Evaluation } from '../../types/evaluation';
+import { type Evaluation, type CriteriaScore } from '../../types/evaluation';
 import { type Cycle } from '../../types/cycle';
 import { Clock, TrendingUp, Award, DollarSign, Bell, Activity } from 'lucide-react';
 import { markNotificationRead } from '../../services/notificationService';
@@ -75,13 +75,13 @@ const EmployeeDashboard: React.FC = () => {
 
               // Calculate weighted score from criteria
               if (evalData.scores && typeof evalData.scores === 'object') {
-                const criteriaArray = Object.values(evalData.scores);
-                const totalWeighted = criteriaArray.reduce((sum: number, c: any) => {
+                const criteriaArray = Object.values(evalData.scores) as CriteriaScore[];
+                const totalWeighted = criteriaArray.reduce((sum: number, c: CriteriaScore) => {
                   const weight = c.weight || 1;
                   const score = c.normalizedScore || 0;
                   return sum + (score * weight);
                 }, 0);
-                const totalWeight = criteriaArray.reduce((sum: number, c: any) => sum + (c.weight || 1), 0);
+                const totalWeight = criteriaArray.reduce((sum: number, c: CriteriaScore) => sum + (c.weight || 1), 0);
                 const weighted = totalWeight > 0 ? totalWeighted / totalWeight : 0;
                 setCurrentWeightedScore(weighted);
 
@@ -182,6 +182,111 @@ const EmployeeDashboard: React.FC = () => {
           <p>No active increment cycle at the moment. Check back when HR launches a new cycle.</p>
         </div>
       )}
+
+      {/* SECTION 2.5 — Your Progress This Cycle */}
+      {activeCycle && activeCycle.status === 'completed' ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+          <h3 className="font-semibold text-emerald-800">Your increment story is ready</h3>
+          <Link
+            to={`/increments/${activeCycle.id}`}
+            className="text-sm font-bold text-emerald-600 hover:text-emerald-700 mt-2 inline-block"
+          >
+            View My Increment Story →
+          </Link>
+        </div>
+      ) : activeCycle ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Your Progress This Cycle</h2>
+              <p className="text-sm text-slate-500 mt-1">{activeCycle.name}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-xs text-emerald-600 font-medium">Live</span>
+            </div>
+          </div>
+
+          {activeEvaluation ? (
+            <>
+              <div className="space-y-3 divide-y divide-slate-50">
+                {activeCycle.criteria.map((criterion) => {
+                  const score = activeEvaluation.scores[criterion.id];
+                  const scoreValue = score?.normalizedScore ?? null;
+                  const sourceLabel =
+                    criterion.dataSource === 'manager'
+                      ? 'Manager'
+                      : criterion.dataSource === 'system'
+                        ? 'System'
+                        : 'You';
+
+                  return (
+                    <div key={criterion.id} className="py-3 flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-slate-800">{criterion.name}</span>
+                          <span className="text-xs bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">
+                            {Math.round(criterion.weight * 100)}%
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400">Scored by: {sourceLabel}</p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {scoreValue !== null ? (
+                          <>
+                            <div className="font-bold text-slate-900 text-right w-12">
+                              {Math.round(scoreValue)}
+                            </div>
+                            <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-emerald-500 h-1.5 rounded-full"
+                                style={{ width: `${scoreValue}%` }}
+                              ></div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-xs text-slate-400 text-right w-12">Pending</div>
+                            <div className="w-24 bg-slate-200 rounded-full h-1.5"></div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 mt-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Current Weighted Score</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900">
+                      {currentWeightedScore.toFixed(1)}%
+                    </span>
+                    {activeEvaluation.scores &&
+                      Object.values(activeEvaluation.scores as Record<string, CriteriaScore>).length <
+                        activeCycle.criteria.length * 0.5 && (
+                        <span className="text-xs text-amber-500">(partial)</span>
+                      )}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Estimated Tier</span>
+                  <span className="font-bold text-slate-900">
+                    {estimatedTier || 'Pending — more scores needed'}
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <Clock className="w-6 h-6 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">Your manager hasn't started your evaluation yet.</p>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* SECTION 3 — Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

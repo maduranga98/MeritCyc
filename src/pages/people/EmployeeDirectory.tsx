@@ -124,6 +124,13 @@ export default function EmployeeDirectory() {
     });
   }, [employees, globalFilter, deptFilter, roleFilter, statusFilter]);
 
+  const salaryBandNameById = useMemo(() => {
+    return salaryBands.reduce<Record<string, string>>((acc, band) => {
+      acc[band.id] = band.name;
+      return acc;
+    }, {});
+  }, [salaryBands]);
+
   const columnHelper = createColumnHelper<Employee>();
 
   const columns = [
@@ -161,7 +168,11 @@ export default function EmployeeDirectory() {
     }),
     columnHelper.accessor("salaryBandName", {
       header: "Band",
-      cell: (info) => info.getValue() || <span className="text-slate-400 italic">-</span>,
+      cell: (info) => {
+        const emp = info.row.original;
+        const bandName = info.getValue() || (emp.salaryBandId ? salaryBandNameById[emp.salaryBandId] : "");
+        return bandName || <span className="text-slate-400 italic">-</span>;
+      },
     }),
     columnHelper.accessor("status", {
       header: "Status",

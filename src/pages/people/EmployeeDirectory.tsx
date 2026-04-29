@@ -127,24 +127,9 @@ export default function EmployeeDirectory() {
   const salaryBandNameById = useMemo(() => {
     return salaryBands.reduce<Record<string, string>>((acc, band) => {
       acc[band.id] = band.name;
-      acc[band.id.trim().toLowerCase()] = band.name;
       return acc;
     }, {});
   }, [salaryBands]);
-
-  const getDisplaySalaryBand = (emp: Employee) => {
-    if (emp.salaryBandName?.trim()) return emp.salaryBandName.trim();
-
-    const rawBandId =
-      emp.salaryBandId ??
-      ((emp as unknown as Record<string, unknown>).bandId as string | undefined) ??
-      ((emp as unknown as Record<string, unknown>).salaryBand as string | undefined);
-
-    const normalizedBandId = typeof rawBandId === "string" ? rawBandId.trim() : "";
-    if (!normalizedBandId) return "";
-
-    return salaryBandNameById[normalizedBandId] || salaryBandNameById[normalizedBandId.toLowerCase()] || normalizedBandId;
-  };
 
   const columnHelper = createColumnHelper<Employee>();
 
@@ -185,7 +170,7 @@ export default function EmployeeDirectory() {
       header: "Band",
       cell: (info) => {
         const emp = info.row.original;
-        const bandName = getDisplaySalaryBand(emp);
+        const bandName = info.getValue() || (emp.salaryBandId ? salaryBandNameById[emp.salaryBandId] : "");
         return bandName || <span className="text-slate-400 italic">-</span>;
       },
     }),

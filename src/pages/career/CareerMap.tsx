@@ -8,6 +8,10 @@ import { db } from '../../config/firebase';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Star, TrendingUp, Award, Lock } from 'lucide-react';
 import { format } from 'date-fns';
+import { watchCareerProgress } from '../../services/careerPathService';
+import { CareerProgressCard } from '../../components/career/CareerProgressCard';
+import { CriterionProgressBar } from '../../components/career/CriterionProgressBar';
+import { type CareerProgressResult } from '../../types/careerPath';
 
 const MilestoneIcon = ({ type, isAchieved }: { type: string, isAchieved: boolean }) => {
   let Icon = Award;
@@ -37,6 +41,7 @@ const CareerMapPage: React.FC = () => {
   const [careerMap, setCareerMap] = useState<CareerMap | null>(null);
   const [history, setHistory] = useState<IncrementStory[]>([]);
   const [salaryBands, setSalaryBands] = useState<SalaryBand[]>([]);
+  const [progress, setProgress] = useState<CareerProgressResult | null>(null);
 
   useEffect(() => {
     if (!user?.uid || !user?.companyId) return;
@@ -56,9 +61,12 @@ const CareerMapPage: React.FC = () => {
     };
     fetchBands();
 
+    const unsubscribeProgress = watchCareerProgress(user.uid, setProgress);
+
     return () => {
       unsubscribeMap();
       unsubscribeHistory();
+      unsubscribeProgress();
     };
   }, [user]);
 
@@ -96,6 +104,15 @@ const CareerMapPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {progress && <CareerProgressCard progress={progress} />}
+
+      {progress && (
+        <div className='bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-3'>
+          <h3 className='text-lg font-bold text-merit-navy'>Criteria Progress</h3>
+          {progress.criteriaProgress.map((item) => <CriterionProgressBar key={item.name} item={item} />)}
+        </div>
+      )}
 
       {/* SECTION 2 — Progress Toward Next Level */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">

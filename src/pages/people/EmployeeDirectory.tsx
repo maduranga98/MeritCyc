@@ -124,6 +124,28 @@ export default function EmployeeDirectory() {
     });
   }, [employees, globalFilter, deptFilter, roleFilter, statusFilter]);
 
+  const salaryBandNameById = useMemo(() => {
+    return salaryBands.reduce<Record<string, string>>((acc, band) => {
+      acc[band.id] = band.name;
+      acc[band.id.trim().toLowerCase()] = band.name;
+      return acc;
+    }, {});
+  }, [salaryBands]);
+
+  const getDisplaySalaryBand = (emp: Employee) => {
+    if (emp.salaryBandName?.trim()) return emp.salaryBandName.trim();
+
+    const rawBandId =
+      emp.salaryBandId ??
+      ((emp as unknown as Record<string, unknown>).bandId as string | undefined) ??
+      ((emp as unknown as Record<string, unknown>).salaryBand as string | undefined);
+
+    const normalizedBandId = typeof rawBandId === "string" ? rawBandId.trim() : "";
+    if (!normalizedBandId) return "";
+
+    return salaryBandNameById[normalizedBandId] || salaryBandNameById[normalizedBandId.toLowerCase()] || normalizedBandId;
+  };
+
   const columnHelper = createColumnHelper<Employee>();
 
   const columns = [
@@ -161,7 +183,11 @@ export default function EmployeeDirectory() {
     }),
     columnHelper.accessor("salaryBandName", {
       header: "Band",
-      cell: (info) => info.getValue() || <span className="text-slate-400 italic">-</span>,
+      cell: (info) => {
+        const emp = info.row.original;
+        const bandName = getDisplaySalaryBand(emp);
+        return bandName || <span className="text-slate-400 italic">-</span>;
+      },
     }),
     columnHelper.accessor("status", {
       header: "Status",

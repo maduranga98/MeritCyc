@@ -3821,3 +3821,75 @@ exports.updateBudgetTracking = onCall(async (request) => {
     throw new HttpsError("internal", error.message || "Failed to update budget tracking.");
   }
 });
+
+// =============================================================================
+// Career Path Functions (MVP)
+// =============================================================================
+
+exports.getCareerPath = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+  const { userId } = request.data;
+  if (!userId) throw new HttpsError('invalid-argument', 'userId is required.');
+
+  const userSnap = await firestore.collection('users').doc(userId).get();
+  if (!userSnap.exists) throw new HttpsError('not-found', 'User not found.');
+  const user = userSnap.data();
+
+  if (!user.careerPathId) return { careerPath: null };
+  const pathSnap = await firestore.collection('careerPaths').doc(user.careerPathId).get();
+  return { careerPath: pathSnap.exists ? { id: pathSnap.id, ...pathSnap.data() } : null };
+});
+
+exports.calculateProgress = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+  const { userId, cycleId } = request.data;
+  if (!userId || !cycleId) throw new HttpsError('invalid-argument', 'userId and cycleId are required.');
+
+  const userSnap = await firestore.collection('users').doc(userId).get();
+  if (!userSnap.exists) throw new HttpsError('not-found', 'User not found.');
+  const user = userSnap.data();
+  if (!user.careerPathId || !user.currentLevel) throw new HttpsError('failed-precondition', 'User careerPathId/currentLevel missing.');
+
+  const pathSnap = await firestore.collection('careerPaths').doc(user.careerPathId).get();
+  if (!pathSnap.exists) throw new HttpsError('not-found', 'Career path not found.');
+  const path = pathSnap.data();
+  const level = (path.levels || []).find((l) => l.level === user.currentLevel);
+  if (!level) throw new HttpsError('not-found', 'Current level missing in career path.');
+
+  const evalQ = await firestore.collection('evaluations').where('employeeUid', '==', userId).where('cycleId', '==', cycleId).limit(1).get();
+  if (evalQ.empty) throw new HttpsError('not-found', 'Evaluation not found.');
+  const evaluation = evalQ.docs[0].data();
+
+  let sum = 0;
+  let wSum = 0;
+  const criteriaProgress = level.criteria.map((c) => {
+    const score = evaluation.scores?.[c.name]?.normalizedScore || 0;
+    sum += score * c.weight;
+    wSum += c.weight;
+    return { ...c, score, met: score >= c.threshold };
+  });
+
+  const weightedProgress = wSum > 0 ? sum / wSum : 0;
+  const result = {
+    userId,
+    cycleId,
+    careerPathId: user.careerPathId,
+    currentLevel: user.currentLevel,
+    nextLevel: level.nextLevel,
+    weightedProgress,
+    eligibleForPromotion: criteriaProgress.every((c) => c.met),
+    criteriaProgress,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  await firestore.collection('users').doc(userId).collection('careerProgress').doc('current').set(result, { merge: true });
+  return result;
+});
+
+exports.updateProgressRealtime = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+  const { userId, cycleId } = request.data;
+  if (!userId || !cycleId) throw new HttpsError('invalid-argument', 'userId and cycleId are required.');
+  await firestore.collection('users').doc(userId).collection('careerProgress').doc('current').set({ realtimeRefreshRequestedAt: admin.firestore.FieldValue.serverTimestamp(), cycleId }, { merge: true });
+  return { success: true };
+});

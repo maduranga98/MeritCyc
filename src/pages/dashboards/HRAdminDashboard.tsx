@@ -3,6 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { db } from '../../config/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { CareerPathBuilder } from '../../components/career/CareerPathBuilder';
+import { saveCareerPath } from '../../services/careerPathService';
 
 const HRAdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -66,6 +68,13 @@ const HRAdminDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {user?.companyId && (
+            <div className='bg-white border border-slate-200 rounded-xl p-6 shadow-sm'>
+              <h2 className='text-lg font-bold text-slate-900 mb-3'>Career Path Builder</h2>
+              <p className='text-sm text-slate-500 mb-4'>Create role progression levels and criteria for employees.</p>
+              <CareerPathBuilder companyId={user.companyId} onSave={saveCareerPath} />
+            </div>
+          )}
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h2>
               <div className="flex flex-col gap-3">

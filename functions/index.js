@@ -3840,7 +3840,11 @@ exports.getCareerPath = onCall(async (request) => {
   return { careerPath: pathSnap.exists ? { id: pathSnap.id, ...pathSnap.data() } : null };
 });
 
-async function computeAndPersistCareerProgress(userId, cycleId) {
+exports.calculateProgress = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+  const { userId, cycleId } = request.data;
+  if (!userId || !cycleId) throw new HttpsError('invalid-argument', 'userId and cycleId are required.');
+
   const userSnap = await firestore.collection('users').doc(userId).get();
   if (!userSnap.exists) throw new HttpsError('not-found', 'User not found.');
   const user = userSnap.data();
@@ -3855,15 +3859,11 @@ async function computeAndPersistCareerProgress(userId, cycleId) {
   const evalQ = await firestore.collection('evaluations').where('employeeUid', '==', userId).where('cycleId', '==', cycleId).limit(1).get();
   if (evalQ.empty) throw new HttpsError('not-found', 'Evaluation not found.');
   const evaluation = evalQ.docs[0].data();
-  const scoreEntries = Object.values(evaluation.scores || {});
 
   let sum = 0;
   let wSum = 0;
   const criteriaProgress = level.criteria.map((c) => {
-    const matched = scoreEntries.find((entry) => (
-      entry.criteriaName === c.name || entry.criteriaId === c.name
-    ));
-    const score = matched?.normalizedScore || 0;
+    const score = evaluation.scores?.[c.name]?.normalizedScore || 0;
     sum += score * c.weight;
     wSum += c.weight;
     return { ...c, score, met: score >= c.threshold };
@@ -3884,18 +3884,12 @@ async function computeAndPersistCareerProgress(userId, cycleId) {
 
   await firestore.collection('users').doc(userId).collection('careerProgress').doc('current').set(result, { merge: true });
   return result;
-}
-
-exports.calculateProgress = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
-  const { userId, cycleId } = request.data;
-  if (!userId || !cycleId) throw new HttpsError('invalid-argument', 'userId and cycleId are required.');
-  return await computeAndPersistCareerProgress(userId, cycleId);
 });
 
 exports.updateProgressRealtime = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
   const { userId, cycleId } = request.data;
   if (!userId || !cycleId) throw new HttpsError('invalid-argument', 'userId and cycleId are required.');
-  return await computeAndPersistCareerProgress(userId, cycleId);
+  await firestore.collection('users').doc(userId).collection('careerProgress').doc('current').set({ realtimeRefreshRequestedAt: admin.firestore.FieldValue.serverTimestamp(), cycleId }, { merge: true });
+  return { success: true };
 });

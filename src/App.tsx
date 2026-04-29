@@ -16,6 +16,7 @@ import VerifyEmailPage from "./pages/auth/VerifyEmail";
 // Protected pages
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
 import CareerMap from "./pages/career/CareerMap";
+import CareerPathManagement from "./pages/career/CareerPathManagement";
 import IncrementStories from "./pages/increments/IncrementStories";
 import IncrementStoryDetail from "./pages/increments/IncrementStoryDetail";
 import NotificationsPage from "./pages/notifications/NotificationsPage";
@@ -462,6 +463,16 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <AppLayout>
                 <CareerMap />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/career-paths"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <AppLayout>
+                <CareerPathManagement />
               </AppLayout>
             </ProtectedRoute>
           }

@@ -20,6 +20,8 @@ export interface UserProfile {
   approved: boolean;
   departmentId?: string;
   salaryBandId?: string;
+  careerPathId?: string;
+  currentLevel?: string;
   jobTitle?: string;
   photoURL?: string;
   status: "active" | "inactive" | "pending";

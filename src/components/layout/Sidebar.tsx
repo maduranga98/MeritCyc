@@ -82,6 +82,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
             { name: "Score Review", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
           ]
         },
+        { name: "Career Paths", href: "/career-paths", icon: TrendingUp },
         {
           name: "Analytics",
           href: "/analytics",
@@ -120,6 +121,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
             { name: "Score Review", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
           ]
         },
+        { name: "Career Paths", href: "/career-paths", icon: TrendingUp },
         {
           name: "Analytics",
           href: "/analytics",

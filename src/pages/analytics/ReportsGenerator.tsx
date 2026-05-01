@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { analyticsService } from "../../services/analyticsService";
 import { pdfGenerationService } from "../../services/pdfGenerationService";
+import { companyService } from "../../services/companyService";
 import { type GeneratedReport, type ReportType } from "../../types/analytics";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../config/firebase";
@@ -156,10 +157,26 @@ export default function ReportsGenerator() {
 
         const totalBudgetAllocated = cycle.budget.type === 'fixed_pool' ? (cycle.budget.totalBudget || 0) : 1000000; // mock
 
-        pdfGenerationService.generateCycleSummaryPDF({
+        // Fetch company branding info
+        let companyName = 'Company';
+        let companyLogo: string | undefined;
+        try {
+          if (user?.companyId) {
+            const company = await companyService.getCompany(user.companyId);
+            if (company) {
+              companyName = company.name;
+              companyLogo = company.logoUrl;
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to fetch company branding', e);
+        }
+
+        await pdfGenerationService.generateCycleSummaryPDF({
           cycle,
           evaluations,
-          companyName: 'Company',
+          companyName,
+          companyLogo,
           currency: cycle.budget.currency,
           departmentBreakdown,
           tierDistribution,

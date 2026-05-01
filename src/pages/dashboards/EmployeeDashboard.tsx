@@ -7,10 +7,14 @@ import { useNotificationStore } from '../../stores/notificationStore';
 import { type IncrementStory, type CareerMap } from '../../types/incrementStory';
 import { type Evaluation, type CriteriaScore } from '../../types/evaluation';
 import { type Cycle } from '../../types/cycle';
+import { type SalaryBand } from '../../types/salaryBand';
+import { type Department } from '../../types/department';
 import { Clock, TrendingUp, Award, DollarSign, Bell, Activity } from 'lucide-react';
 import { markNotificationRead } from '../../services/notificationService';
+import { salaryBandService } from '../../services/salaryBandService';
+import { departmentService } from '../../services/departmentService';
 import { db } from '../../config/firebase';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -28,6 +32,10 @@ const EmployeeDashboard: React.FC = () => {
   const [activeEvaluation, setActiveEvaluation] = useState<Evaluation | null>(null);
   const [currentWeightedScore, setCurrentWeightedScore] = useState<number>(0);
   const [estimatedTier, setEstimatedTier] = useState<string | null>(null);
+  const [salaryBands, setSalaryBands] = useState<SalaryBand[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [userSalaryBandId, setUserSalaryBandId] = useState<string | undefined>();
+  const [userDepartmentId, setUserDepartmentId] = useState<string | undefined>();
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -45,6 +53,38 @@ const EmployeeDashboard: React.FC = () => {
       unsubscribeCareerMap();
     };
   }, [user]);
+
+  // Fetch salary bands, departments, and user profile fields
+  useEffect(() => {
+    if (!user?.uid || !user?.companyId) return;
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        const [bands, depts, userSnap] = await Promise.all([
+          salaryBandService.getSalaryBands(user.companyId),
+          departmentService.getDepartments(user.companyId),
+          getDoc(doc(db, 'users', user.uid)),
+        ]);
+
+        if (!isMounted) return;
+
+        setSalaryBands(bands);
+        setDepartments(depts);
+
+        if (userSnap.exists()) {
+          const d = userSnap.data();
+          setUserSalaryBandId(d.salaryBandId as string | undefined);
+          setUserDepartmentId(d.departmentId as string | undefined);
+        }
+      } catch {
+        // Non-critical
+      }
+    };
+
+    fetchData();
+    return () => { isMounted = false; };
+  }, [user?.uid, user?.companyId]);
 
   useEffect(() => {
     if (!user?.uid || !user?.companyId) return;
@@ -129,6 +169,10 @@ const EmployeeDashboard: React.FC = () => {
   const totalIncrements = stories.reduce((sum, s) => sum + s.incrementPercent, 0);
   const latestStory = stories[0];
 
+  const resolvedBand = salaryBands.find(b => b.id === (userSalaryBandId || careerMap?.currentBandId));
+  const resolvedBandName = resolvedBand?.name || careerMap?.currentBandName || 'Band Not Set';
+  const resolvedDeptName = departments.find(d => d.id === userDepartmentId)?.name || 'Department';
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 font-brand pb-12">
       {/* SECTION 1 — Welcome Hero Card */}
@@ -142,8 +186,13 @@ const EmployeeDashboard: React.FC = () => {
               Employee
             </span>
             <span className="text-slate-300 text-sm">
-              {careerMap?.currentBandName || 'Band Not Set'} • Department
+              {resolvedBandName} • {resolvedDeptName}
             </span>
+            {resolvedBand && (
+              <span className="text-emerald-400/80 text-sm">
+                {resolvedBand.currency} {resolvedBand.minSalary.toLocaleString()} – {resolvedBand.maxSalary.toLocaleString()}
+              </span>
+            )}
           </div>
         </div>
         <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center text-3xl font-bold border-4 border-slate-700 shadow-xl">
@@ -335,9 +384,14 @@ const EmployeeDashboard: React.FC = () => {
           <div className="text-slate-500 text-sm mb-1 flex items-center gap-2">
             <TrendingUp className="w-4 h-4" /> Current Band
           </div>
-          <div className="text-lg font-bold text-merit-navy truncate" title={careerMap?.currentBandName || 'Not Set'}>
-            {careerMap?.currentBandName || 'Not Set'}
+          <div className="text-lg font-bold text-merit-navy truncate" title={resolvedBandName}>
+            {resolvedBandName}
           </div>
+          {resolvedBand && (
+            <div className="text-xs text-slate-500 mt-1">
+              {resolvedBand.currency} {resolvedBand.minSalary.toLocaleString()} – {resolvedBand.maxSalary.toLocaleString()}
+            </div>
+          )}
         </div>
       </div>
 

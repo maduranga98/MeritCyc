@@ -14,3 +14,4 @@ export * from './incrementStory';
 export * from './fairness';
 export * from './analytics';
 export * from './settings';
+export * from './careerPath';

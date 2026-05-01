@@ -22,6 +22,10 @@ import { auth, db, storage } from "../../config/firebase";
 import { useAuthStore } from "../../stores/authStore";
 import { useAuth } from "../../context/AuthContext";
 import { ROLES } from "../../types/roles";
+import { type SalaryBand } from "../../types/salaryBand";
+import { type Department } from "../../types/department";
+import { salaryBandService } from "../../services/salaryBandService";
+import { departmentService } from "../../services/departmentService";
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -92,6 +96,8 @@ const ProfilePage: React.FC = () => {
   const setUser = useAuthStore((s) => s.setUser);
 
   const [profileData, setProfileData] = useState<UserProfileData>({});
+  const [salaryBands, setSalaryBands] = useState<SalaryBand[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string>(
     firebaseUser?.photoURL ?? ""
   );
@@ -130,9 +136,10 @@ const ProfilePage: React.FC = () => {
     }
   }, [user?.name, resetName]);
 
-  // Load extra Firestore profile fields
+  // Load extra Firestore profile fields + salary bands & departments
   useEffect(() => {
     if (!user?.uid) return;
+
     getDoc(doc(db, "users", user.uid))
       .then((snap) => {
         if (snap.exists()) {
@@ -146,7 +153,21 @@ const ProfilePage: React.FC = () => {
       .catch(() => {
         // Non-critical
       });
-  }, [user?.uid]);
+
+    if (user.companyId) {
+      Promise.all([
+        salaryBandService.getSalaryBands(user.companyId),
+        departmentService.getDepartments(user.companyId),
+      ])
+        .then(([bands, depts]) => {
+          setSalaryBands(bands);
+          setDepartments(depts);
+        })
+        .catch(() => {
+          // Non-critical
+        });
+    }
+  }, [user?.uid, user?.companyId]);
 
   // ---------------------------------------------------------------------------
   // Update display name
@@ -330,11 +351,18 @@ const ProfilePage: React.FC = () => {
           {(profileData.departmentId || profileData.salaryBandId) && (
             <div className="grid grid-cols-2 gap-4 mt-5 pt-5 border-t border-gray-100">
               {profileData.departmentId && (
-                <InfoField label="Department" value={profileData.departmentId} />
+                <InfoField label="Department" value={departments.find(d => d.id === profileData.departmentId)?.name || profileData.departmentId} />
               )}
-              {profileData.salaryBandId && (
-                <InfoField label="Salary Band" value={profileData.salaryBandId} />
-              )}
+              {profileData.salaryBandId && (() => {
+                const band = salaryBands.find(b => b.id === profileData.salaryBandId);
+                return (
+                  <InfoField
+                    label="Salary Band"
+                    value={band?.name || profileData.salaryBandId}
+                    subtitle={band ? `${band.currency} ${band.minSalary.toLocaleString()} – ${band.maxSalary.toLocaleString()}` : undefined}
+                  />
+                );
+              })()}
             </div>
           )}
         </div>
@@ -511,15 +539,19 @@ const SectionCard: React.FC<{
   </div>
 );
 
-const InfoField: React.FC<{ label: string; value: string }> = ({
+const InfoField: React.FC<{ label: string; value: string; subtitle?: string }> = ({
   label,
   value,
+  subtitle,
 }) => (
   <div>
     <p className="text-xs font-bold uppercase text-merit-slate tracking-wider mb-1">
       {label}
     </p>
     <p className="text-sm text-merit-navy font-medium">{value}</p>
+    {subtitle && (
+      <p className="text-xs text-merit-slate mt-0.5">{subtitle}</p>
+    )}
   </div>
 );
 

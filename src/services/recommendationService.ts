@@ -3,6 +3,7 @@ import type { StoryScoreBreakdown, StoryRecommendation, RecommendationPriority }
 /**
  * Gap Analysis Utility
  * Calculates improvement recommendations based on performance scores
+ * with personalization from gap size, criteria weight, and historical trends.
  */
 
 const GENERIC_SUGGESTIONS: Record<string, Record<string, string>> = {
@@ -57,6 +58,42 @@ const CRITERIA_SUGGESTIONS: Record<string, Record<string, string>> = {
     average: 'Room for improvement in prioritization. Use productivity tools and frameworks.',
     needs_improvement: 'Implement time management systems. Work with your manager on planning.',
   },
+  'Creativity': {
+    excellent: 'Highly creative thinker. Drive innovation initiatives within your team.',
+    good: 'Good creative output. Explore design thinking workshops.',
+    average: 'Practice brainstorming techniques. Seek diverse perspectives for inspiration.',
+    needs_improvement: 'Engage in creative exercises. Collaborate with peers on ideation sessions.',
+  },
+  'Adaptability': {
+    excellent: 'Extremely adaptable. Mentor others through change and uncertainty.',
+    good: 'Handles change well. Seek opportunities outside your comfort zone.',
+    average: 'Practice flexibility in approach. Reflect on past changes you navigated successfully.',
+    needs_improvement: 'Focus on resilience building. Start with small changes to build confidence.',
+  },
+  'Quality of Work': {
+    excellent: 'Exceptional quality standards. Establish best practices for your team.',
+    good: 'Good quality output. Implement peer reviews to catch edge cases.',
+    average: 'Review your work more thoroughly. Create personal checklists for deliverables.',
+    needs_improvement: 'Focus on attention to detail. Ask for feedback on completed work.',
+  },
+  'Productivity': {
+    excellent: 'Outstanding productivity. Share your workflow optimizations with the team.',
+    good: 'Solid output. Identify bottlenecks and streamline repetitive tasks.',
+    average: 'Track your time on tasks. Use the Eisenhower matrix to prioritize work.',
+    needs_improvement: 'Break large tasks into smaller chunks. Eliminate distractions during focus time.',
+  },
+  'Initiative': {
+    excellent: 'Highly proactive. Identify and drive improvements without being asked.',
+    good: 'Shows initiative. Look for gaps in processes you can fill.',
+    average: 'Volunteer for new assignments. Propose solutions when you spot problems.',
+    needs_improvement: 'Start by asking "what can I improve here?" in your daily work.',
+  },
+  'Customer Focus': {
+    excellent: 'Exceptional customer advocacy. Lead customer experience improvements.',
+    good: 'Customer-oriented. Gather more direct feedback from end users.',
+    average: 'Put yourself in the customer\'s shoes. Map your work to customer outcomes.',
+    needs_improvement: 'Study customer pain points. Align your priorities with customer needs.',
+  },
 };
 
 /**
@@ -75,6 +112,40 @@ export function getSuggestion(criteriaName: string, performance: string): string
 
   // Fall back to generic suggestions
   return GENERIC_SUGGESTIONS[performance]?.default || GENERIC_SUGGESTIONS.average.default;
+}
+
+/**
+ * Build a personalized message based on gap size and weight
+ */
+function buildPersonalizedMessage(
+  baseSuggestion: string,
+  gap: number,
+  weight: number,
+  performance: string,
+  trend: 'improving' | 'declining' | 'stable' | 'new'
+): string {
+  const parts: string[] = [baseSuggestion];
+
+  // Add gap context
+  if (gap > 0) {
+    parts.push(`You need ${gap.toFixed(1)} more points to reach the target.`);
+  }
+
+  // Add weight context for high-weight criteria
+  if (weight >= 0.25 && performance !== 'excellent') {
+    parts.push(`This is a high-impact area (${(weight * 100).toFixed(0)}% weight) — improving here will significantly boost your overall score.`);
+  }
+
+  // Add trend context
+  if (trend === 'improving') {
+    parts.push('Great news: you are improving in this area compared to your previous cycle. Keep the momentum going!');
+  } else if (trend === 'declining') {
+    parts.push('Note: your score in this area has declined from last cycle. This is a key area to focus on.');
+  } else if (trend === 'stable' && performance !== 'excellent') {
+    parts.push('Your score has held steady — now is the time to push for a breakthrough.');
+  }
+
+  return parts.join(' ');
 }
 
 /**
@@ -126,12 +197,35 @@ export function calculateTargetScore(
 }
 
 /**
+ * Determine trend by comparing current score with previous cycle
+ */
+function determineTrend(
+  currentNormalizedScore: number,
+  previousNormalizedScore?: number
+): 'improving' | 'declining' | 'stable' | 'new' {
+  if (previousNormalizedScore === undefined) return 'new';
+  const diff = currentNormalizedScore - previousNormalizedScore;
+  if (diff > 3) return 'improving';
+  if (diff < -3) return 'declining';
+  return 'stable';
+}
+
+/**
  * Generate recommendations from score breakdown
- * Filters low performers and provides actionable suggestions
+ * Filters low performers and provides actionable, personalized suggestions
  */
 export function generateRecommendations(
-  scoreBreakdown: StoryScoreBreakdown[]
+  scoreBreakdown: StoryScoreBreakdown[],
+  previousBreakdown?: StoryScoreBreakdown[]
 ): StoryRecommendation[] {
+  // Build a map of previous scores for trend analysis
+  const previousScoreMap = new Map<string, number>();
+  if (previousBreakdown) {
+    previousBreakdown.forEach((pb) => {
+      previousScoreMap.set(pb.criteriaId, pb.normalizedScore);
+    });
+  }
+
   return scoreBreakdown
     .filter(
       (score) =>
@@ -150,7 +244,19 @@ export function generateRecommendations(
         targetScore,
         score.performance
       );
-      const suggestion = getSuggestion(score.criteriaName, score.performance);
+      const baseSuggestion = getSuggestion(score.criteriaName, score.performance);
+      const trend = determineTrend(
+        score.normalizedScore,
+        previousScoreMap.get(score.criteriaId)
+      );
+      const gap = targetScore - score.normalizedScore;
+      const suggestion = buildPersonalizedMessage(
+        baseSuggestion,
+        gap,
+        score.weight,
+        score.performance,
+        trend
+      );
 
       return {
         criteriaId: score.criteriaId,

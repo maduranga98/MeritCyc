@@ -26,10 +26,17 @@ const IncrementStoryDetail: React.FC = () => {
     if (!story) return null;
     if (story.recommendations.length > 0) return story;
 
-    // Generate recommendations from score breakdown if empty
-    const generated = generateRecommendations(story.scoreBreakdown);
+    // Find previous cycle's score breakdown for trend-aware recommendations
+    const currentIndex = allStories.findIndex((s) => s.cycleId === story.cycleId);
+    const previousStory = currentIndex > 0 ? allStories[currentIndex - 1] : undefined;
+
+    // Generate personalized recommendations from score breakdown
+    const generated = generateRecommendations(
+      story.scoreBreakdown,
+      previousStory?.scoreBreakdown
+    );
     return { ...story, recommendations: generated };
-  }, [story]);
+  }, [story, allStories]);
 
   useEffect(() => {
     if (!user?.uid || !cycleId) return;

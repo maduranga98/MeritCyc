@@ -11,7 +11,9 @@ import { type SalaryBand } from '../../types/salaryBand';
 import { departmentService } from '../../services/departmentService';
 import { salaryBandService } from '../../services/salaryBandService';
 import { employeeService } from '../../services/employeeService';
-import { Loader2, ArrowLeft, Mail, Building, Badge, Calendar, LogIn, AlertCircle, Edit2, UserX, UserCheck, Trophy } from 'lucide-react';
+import { getIncrementStories } from '../../services/incrementStoryService';
+import { type IncrementStory } from '../../types/incrementStory';
+import { Loader2, ArrowLeft, Mail, Building, Badge, Calendar, LogIn, AlertCircle, Edit2, UserX, UserCheck, Trophy, FileText, TrendingUp, Award } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -24,6 +26,7 @@ export default function EmployeeDetail() {
 
   const [employee, setEmployee] = useState<UserProfile | null>(null);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [incrementStories, setIncrementStories] = useState<IncrementStory[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [salaryBands, setSalaryBands] = useState<SalaryBand[]>([]);
@@ -89,6 +92,19 @@ export default function EmployeeDetail() {
 
       const evals = evalsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Evaluation));
       setEvaluations(evals.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
+
+      // Fetch increment stories for richer history display
+      try {
+        const stories = await new Promise<IncrementStory[]>((resolve) => {
+          const unsub = getIncrementStories(uid, (data) => {
+            unsub();
+            resolve(data);
+          });
+        });
+        setIncrementStories(stories);
+      } catch {
+        setIncrementStories([]);
+      }
 
       const logs1 = logsSnapshot1.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry));
       const logs2 = logsSnapshot2.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry));
@@ -441,24 +457,89 @@ export default function EmployeeDetail() {
         {/* ================================================================= */}
         {activeTab === 'history' && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            {evaluations.length === 0 ? (
+            {incrementStories.length === 0 && evaluations.length === 0 ? (
               <div className="p-12 text-center">
-                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                  <Trophy className="w-6 h-6 text-slate-200" />
+                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                  <Trophy className="w-8 h-8 text-slate-300" />
                 </div>
-                <p className="text-slate-500">No increment cycles yet.</p>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">No increment history yet</h3>
+                <p className="text-slate-500 max-w-sm mx-auto mb-4">
+                  This employee hasn't participated in any completed increment cycles. Their history will appear here once cycles are finalized.
+                </p>
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-400 bg-slate-50 px-4 py-2 rounded-lg inline-flex">
+                  <FileText className="w-4 h-4" />
+                  <span>Stories are generated from finalized evaluations</span>
+                </div>
+              </div>
+            ) : incrementStories.length > 0 ? (
+              /* Rich increment stories view */
+              <div className="divide-y divide-slate-100">
+                {incrementStories.map((story) => (
+                  <div
+                    key={story.cycleId}
+                    onClick={() => navigate(`/increments/${story.cycleId}`)}
+                    className="p-6 hover:bg-slate-50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-1.5 h-12 rounded-full"
+                        style={{ backgroundColor: story.tierColor }}
+                      />
+                      <div>
+                        <p className="font-bold text-slate-900">{story.cycleName}</p>
+                        <p className="text-xs text-slate-500">
+                          {format(story.cycleStartDate.toDate(), 'MMM d')} – {format(story.cycleEndDate.toDate(), 'MMM d, yyyy')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="text-center">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Score</p>
+                        <p className="font-bold text-slate-900">{story.score.toFixed(1)}</p>
+                      </div>
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-bold"
+                        style={{ backgroundColor: `${story.tierColor}20`, color: story.tierColor }}
+                      >
+                        {story.tierName}
+                      </span>
+                      <div className="text-center">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Increment</p>
+                        <p className="font-bold text-emerald-600">+{story.incrementPercent.toFixed(1)}%</p>
+                      </div>
+                      {story.incrementAmount && (
+                        <div className="text-center">
+                          <p className="text-xs text-slate-500 uppercase tracking-wider">Amount</p>
+                          <p className="font-bold text-slate-900">
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: story.currency || 'USD',
+                              minimumFractionDigits: 0,
+                            }).format(story.incrementAmount)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
+              /* Fallback: raw evaluations table when stories aren't populated yet */
               <div className="overflow-x-auto">
+                <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <p className="text-xs text-amber-700">
+                    Increment stories are still being generated. Showing raw evaluation data as fallback.
+                  </p>
+                </div>
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-6 py-4 text-left font-semibold text-slate-600">Cycle Name</th>
-                      <th className="px-6 py-4 text-left font-semibold text-slate-600">Period</th>
+                      <th className="px-6 py-4 text-left font-semibold text-slate-600">Cycle</th>
+                      <th className="px-6 py-4 text-left font-semibold text-slate-600">Date</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-600">Score</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-600">Tier</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-600">Increment %</th>
-                      <th className="px-6 py-4 text-left font-semibold text-slate-600">Increment Amount</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-600">Status</th>
                     </tr>
                   </thead>
@@ -493,17 +574,6 @@ export default function EmployeeDetail() {
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-900">
                           {evaluation.incrementPercent ? `${evaluation.incrementPercent}%` : '—'}
-                        </td>
-                        <td className="px-6 py-4 font-medium text-slate-900">
-                          {evaluation.incrementAmount ? (
-                            new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: 'USD',
-                              minimumFractionDigits: 0,
-                            }).format(evaluation.incrementAmount)
-                          ) : (
-                            '—'
-                          )}
                         </td>
                         <td className="px-6 py-4">
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">

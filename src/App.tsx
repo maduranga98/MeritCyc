@@ -55,6 +55,7 @@ import FairnessDashboard from "./pages/analytics/FairnessDashboard";
 import ExecutiveDashboard from "./pages/analytics/ExecutiveDashboard";
 import ReportsGenerator from "./pages/analytics/ReportsGenerator";
 import AuditTrail from "./pages/analytics/AuditTrail";
+import DepartmentAnalyticsDetail from "./pages/analytics/DepartmentAnalyticsDetail";
 
 // Settings
 import GeneralSettings from "./pages/settings/GeneralSettings";
@@ -393,6 +394,16 @@ function App() {
             <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
               <AppLayout>
                 <ReportsGenerator />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/departments/:deptId"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <DepartmentAnalyticsDetail />
               </AppLayout>
             </ProtectedRoute>
           }

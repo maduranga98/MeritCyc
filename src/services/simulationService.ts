@@ -97,5 +97,15 @@ export const simulationService = {
     );
     const result = await fn(data);
     return result.data;
-  }
+  },
+
+  /** Trigger a budget tracking recalculation for a cycle */
+  triggerBudgetTrackingUpdate: async (cycleId: string): Promise<{ success: boolean }> => {
+    const fn = httpsCallable<{ cycleId: string }, { success: boolean }>(
+      functions,
+      'updateBudgetTracking'
+    );
+    const result = await fn({ cycleId });
+    return result.data;
+  },
 };

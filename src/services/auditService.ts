@@ -9,7 +9,7 @@ export interface AuditFilters {
   endDate?: Date;
   actionType?: AuditAction;
   actorEmail?: string;
-  targetType?: 'user' | 'company' | 'cycle' | 'evaluation' | 'settings';
+  targetType?: 'user' | 'company' | 'cycle' | 'evaluation' | 'settings' | 'report' | 'careerPath' | 'pendingRegistration' | 'registration';
 }
 
 export const auditService = {
@@ -163,24 +163,66 @@ export const auditService = {
    */
   getActionColor(action: AuditAction): string {
     switch (action) {
+      // Positive / approval actions
       case 'user_approved':
+      case 'REGISTRATION_APPROVED':
       case 'user_reactivated':
+      case 'EMPLOYEE_REACTIVATED':
+      case 'PROMOTION_APPROVED':
         return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+
+      // Negative / rejection / deactivation actions
       case 'user_rejected':
+      case 'REGISTRATION_REJECTED':
       case 'user_deactivated':
+      case 'EMPLOYEE_DEACTIVATED':
+      case 'COMPANY_DELETION_SCHEDULED':
         return 'bg-red-50 text-red-700 border border-red-200';
+
+      // Warning / change actions
       case 'role_changed':
+      case 'EMPLOYEE_ROLE_CHANGED':
       case 'score_overridden':
+      case 'SCORE_OVERRIDDEN':
+      case 'EMPLOYEE_PROFILE_UPDATED':
+      case 'CAREER_PATH_ASSIGNED':
         return 'bg-amber-50 text-amber-700 border border-amber-200';
+
+      // Info / cycle actions
       case 'cycle_created':
       case 'cycle_published':
       case 'cycle_finalized':
       case 'cycle_cancelled':
         return 'bg-blue-50 text-blue-700 border border-blue-200';
+
+      // Neutral / settings / data actions
       case 'company_settings_updated':
+      case 'COMPANY_SETTINGS_UPDATED':
+      case 'NOTIFICATION_SETTINGS_UPDATED':
+      case 'SECURITY_SETTINGS_UPDATED':
       case 'qr_code_regenerated':
+      case 'QR_CODE_GENERATED':
       case 'registration_toggled':
+      case 'QR_REGISTRATION_TOGGLED':
+      case 'data_exported':
+      case 'COMPANY_DATA_EXPORTED':
+      case 'company_created':
+      case 'COMPANY_CREATED':
+      case 'company_status_changed':
+      case 'company_deleted':
+      case 'COMPANY_DELETION_CANCELLED':
+      case 'FAIRNESS_REPORT_GENERATED':
+      case 'CAREER_PATH_CREATED':
+      case 'CAREER_PATH_UPDATED':
+      case 'REGISTRATION_INFO_REQUESTED':
+      case 'SELF_REGISTRATION_SUBMITTED':
+      case 'user_registered':
+      case 'user_invited':
+      case 'evaluation_submitted':
+      case 'EVALUATION_SUBMITTED':
+      case 'evaluation_draft_saved':
         return 'bg-slate-50 text-slate-600 border border-slate-200';
+
       default:
         return 'bg-slate-100 text-slate-500 border border-slate-200';
     }

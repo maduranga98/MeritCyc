@@ -8,6 +8,7 @@ import { type Evaluation } from '../../types/evaluation';
 import { type AuditLogEntry } from '../../types/audit';
 import { type Department } from '../../types/department';
 import { type SalaryBand } from '../../types/salaryBand';
+import ActivityLogItem from '../../components/people/ActivityLogItem';
 import { departmentService } from '../../services/departmentService';
 import { salaryBandService } from '../../services/salaryBandService';
 import { employeeService } from '../../services/employeeService';
@@ -187,22 +188,6 @@ export default function EmployeeDetail() {
       default:
         return 'bg-slate-100 text-slate-600';
     }
-  };
-
-  const getActionColor = (action: string) => {
-    if (['USER_APPROVED', 'USER_REACTIVATED'].some(a => action.includes(a))) {
-      return 'bg-emerald-50 text-emerald-700';
-    }
-    if (['SCORE_OVERRIDDEN', 'ROLE_CHANGED'].some(a => action.includes(a))) {
-      return 'bg-amber-50 text-amber-700';
-    }
-    if (['USER_DEACTIVATED', 'USER_REJECTED'].some(a => action.includes(a))) {
-      return 'bg-red-50 text-red-700';
-    }
-    if (action.includes('CYCLE')) {
-      return 'bg-blue-50 text-blue-700';
-    }
-    return 'bg-slate-50 text-slate-600';
   };
 
   const getTierBadgeStyle = (tierName: string): { bg: string; text: string } => {
@@ -599,36 +584,19 @@ export default function EmployeeDetail() {
                 <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
                   <LogIn className="w-6 h-6 text-slate-400" />
                 </div>
-                <p className="text-slate-500">No activity recorded.</p>
+                <p className="text-slate-500 font-medium">No activity recorded yet.</p>
+                <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+                  Activity such as profile updates, role changes, department transfers, and evaluation submissions will appear here.
+                </p>
               </div>
             ) : (
               auditLogs.map((log) => (
-                <div
+                <ActivityLogItem
                   key={log.id}
-                  className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex-1">
-                      <p className="font-semibold text-slate-900">{log.action.replace(/_/g, ' ')}</p>
-                      <p className="text-sm text-slate-500">{log.actorEmail}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getActionColor(log.action)}`}>
-                      {log.action.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-500">
-                    <span title={new Date(log.timestamp).toLocaleString()}>
-                      {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}
-                    </span>
-                    {log.metadata && Object.keys(log.metadata).length > 0 && (
-                      <span className="text-slate-400">
-                        {Object.entries(log.metadata)
-                          .map(([k, v]) => `${k}: ${v}`)
-                          .join(' • ')}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                  log={log}
+                  departments={departments}
+                  salaryBands={salaryBands}
+                />
               ))
             )}
           </div>

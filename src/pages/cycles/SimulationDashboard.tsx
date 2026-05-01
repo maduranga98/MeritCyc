@@ -26,7 +26,12 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
 } from 'recharts';
 import RunSimulationModal from '../../components/cycles/RunSimulationModal';
 
@@ -335,8 +340,76 @@ export default function SimulationDashboard() {
 
               {/* Comparison Table (if multiple simulations) */}
               {simulations.length > 1 && (
-                <div className="mt-8">
+                <div className="mt-8 space-y-8">
                   <h3 className="text-base font-bold text-slate-900 mb-4">Scenario Comparison</h3>
+
+                  {/* Visual Side-by-Side Chart */}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <div className="min-h-[350px]">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-3">Key Metrics by Scenario</h4>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer>
+                          <BarChart
+                            data={simulations.map(sim => ({
+                              name: sim.name,
+                              'Total Cost (k)': Math.round(sim.results.totalProjectedCost / 1000),
+                              'Qualifying Employees': sim.results.qualifyingEmployees,
+                              'Avg Increment %': Math.round(sim.results.averageIncrement * 10) / 10,
+                              isApplied: sim.isApplied,
+                            }))}
+                            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <XAxis dataKey="name" tick={{ fill: '#64748B', fontSize: 11 }} axisLine={false} tickLine={false} />
+                            <YAxis yAxisId="left" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
+                            <YAxis yAxisId="right" orientation="right" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
+                            <Tooltip
+                              cursor={{fill: '#f8fafc'}}
+                              contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                            />
+                            <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
+                            <Bar yAxisId="left" dataKey="Total Cost (k)" fill="#3B82F6" radius={[4,4,0,0]} maxBarSize={40} />
+                            <Bar yAxisId="right" dataKey="Qualifying Employees" fill="#10B981" radius={[4,4,0,0]} maxBarSize={40} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="min-h-[350px]">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-3">Scenario Profile Radar</h4>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer>
+                          <RadarChart
+                            data={[
+                              { metric: 'Budget Utilization', ...Object.fromEntries(simulations.map(s => [s.name, s.results.budgetUtilization])) },
+                              { metric: 'Avg Increment', ...Object.fromEntries(simulations.map(s => [s.name, s.results.averageIncrement * 10])) },
+                              { metric: 'Qualifying %', ...Object.fromEntries(simulations.map(s => [s.name, (s.results.qualifyingEmployees / (cycle.employeeCount || 1)) * 100])) },
+                              { metric: 'Cost Efficiency', ...Object.fromEntries(simulations.map(s => [s.name, 100 - s.results.budgetUtilization])) },
+                            ]}
+                          >
+                            <PolarGrid stroke="#E2E8F0" />
+                            <PolarAngleAxis dataKey="metric" tick={{ fill: '#64748B', fontSize: 11 }} />
+                            <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                            {simulations.map((sim, idx) => (
+                              <Radar
+                                key={sim.id}
+                                name={sim.name}
+                                dataKey={sim.name}
+                                stroke={sim.isApplied ? '#10B981' : ['#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][idx % 4]}
+                                fill={sim.isApplied ? '#10B981' : ['#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][idx % 4]}
+                                fillOpacity={0.1}
+                              />
+                            ))}
+                            <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
+                            <Tooltip
+                              contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                            />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="overflow-x-auto rounded-xl border border-slate-200">
                     <table className="w-full text-sm text-left">
                       <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-semibold">

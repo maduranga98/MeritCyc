@@ -117,6 +117,25 @@ service cloud.firestore {
     }
 
     // =========================================================================
+    // Career Paths — company-scoped, HR/SA write (Cloud Functions only), all company members read
+    // =========================================================================
+
+    match /companies/{companyId}/careerPaths/{pathId} {
+      allow read: if isSignedIn() && isSameCompany(companyId);
+      allow write: if false; // Cloud Functions only
+    }
+
+    // =========================================================================
+    // Employee Career Map — employee reads own only, HR reads all in company
+    // =========================================================================
+
+    match /users/{userId}/careerMap/{mapId} {
+      allow read: if request.auth.uid == userId ||
+                     (isHrOrAdmin(resource.data.companyId));
+      allow write: if false; // Cloud Functions only
+    }
+
+    // =========================================================================
     // Catch-all: deny everything not explicitly matched above
     // =========================================================================
 

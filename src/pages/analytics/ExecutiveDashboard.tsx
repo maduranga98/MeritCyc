@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { analyticsService } from "../../services/analyticsService";
 import { type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYTierData } from "../../types/analytics";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Users,
   RefreshCw,
@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Download,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import {
   ComposedChart,
@@ -39,6 +40,7 @@ import {
 
 export default function ExecutiveDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [kpis, setKpis] = useState<CompanyKPIs | null>(null);
   const [trends, setTrends] = useState<IncrementTrendPoint[]>([]);
   const [deptData, setDeptData] = useState<DepartmentPerformance[]>([]);
@@ -411,6 +413,19 @@ export default function ExecutiveDashboard() {
                   className="px-4 py-2 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   Close
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedDept) {
+                      navigate(`/analytics/departments/${selectedDept.departmentId}`, {
+                        state: { deptInfo: selectedDept },
+                      });
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View Full Report
                 </button>
               </div>
             </div>

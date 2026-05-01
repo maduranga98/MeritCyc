@@ -50,6 +50,7 @@ export default function BudgetTracker() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingCycle, setLoadingCycle] = useState(true);
   const [loadingBudget, setLoadingBudget] = useState(true);
+  const [triggeringUpdate, setTriggeringUpdate] = useState(false);
 
   useEffect(() => {
     if (!cycleId) return;
@@ -66,6 +67,19 @@ export default function BudgetTracker() {
       setBudgetData(data);
       setLoadingBudget(false);
     });
+
+    // Trigger an automatic budget tracking update on mount to ensure data is fresh
+    const autoUpdate = async () => {
+      try {
+        setTriggeringUpdate(true);
+        await simulationService.triggerBudgetTrackingUpdate(cycleId);
+      } catch {
+        // Non-critical: the listener will still show existing data
+      } finally {
+        setTriggeringUpdate(false);
+      }
+    };
+    autoUpdate();
 
     return () => {
       unsubCycle();
@@ -92,8 +106,8 @@ export default function BudgetTracker() {
   const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
 
   // Fallback data if no budget tracking data yet (e.g. cycle just locked, no evals)
-  const dataToUse = budgetData || {
-    totalBudget: cycle.budget.type === 'fixed_pool' ? (cycle.budget.totalBudget || 0) : 0, // In reality, we approximate if percentage
+  const fallbackData = {
+    totalBudget: cycle.budget.type === 'fixed_pool' ? (cycle.budget.totalBudget || 0) : 0,
     currency: cycle.budget.currency || 'USD',
     committed: 0,
     projected: 0,
@@ -103,6 +117,17 @@ export default function BudgetTracker() {
     byTier: {},
     burnRateData: []
   };
+
+  const dataToUse = budgetData || fallbackData;
+
+  // Synthesize burn rate data if empty so the chart always renders
+  const burnRateData = dataToUse.burnRateData.length > 0
+    ? dataToUse.burnRateData
+    : [{
+        date: new Date().toISOString().split('T')[0],
+        committed: dataToUse.committed,
+        projected: dataToUse.projected,
+      }];
 
   const utilizationColors = {
       safe: { text: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', fill: '#10B981' },
@@ -231,25 +256,26 @@ export default function BudgetTracker() {
             <Activity className="w-5 h-5 text-slate-500" />
             Budget Burn Rate
          </h3>
-         <div className="h-[300px] w-full">
-            {dataToUse.burnRateData.length > 0 ? (
-                <ResponsiveContainer>
-                    <AreaChart data={dataToUse.burnRateData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
-                        <YAxis tickFormatter={(v) => formatCurrency(v, dataToUse.currency).replace(/\D00(?=\D*$)/, '')} tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
-                        <RechartsTooltip
-                            formatter={(value: unknown) => formatCurrency(value as number, dataToUse.currency)}
-                            contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                        />
-                        <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
-                        <Area type="monotone" dataKey="projected" name="Projected (Estimated)" stroke="#3B82F6" strokeWidth={2} strokeDasharray="5 5" fill="#3B82F6" fillOpacity={0.1} />
-                        <Area type="monotone" dataKey="committed" name="Committed (Final)" stroke="#10B981" strokeWidth={2} fill="#10B981" fillOpacity={0.15} />
-                    </AreaChart>
-                </ResponsiveContainer>
-            ) : (
-                <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                    No burn rate data available yet.
+         <div className="h-[300px] w-full relative">
+            <ResponsiveContainer>
+                <AreaChart data={burnRateData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => formatCurrency(v, dataToUse.currency).replace(/\D00(?=\D*$)/, '')} tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <RechartsTooltip
+                        formatter={(value: unknown) => formatCurrency(value as number, dataToUse.currency)}
+                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                    />
+                    <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
+                    <Area type="monotone" dataKey="projected" name="Projected (Estimated)" stroke="#3B82F6" strokeWidth={2} strokeDasharray="5 5" fill="#3B82F6" fillOpacity={0.1} />
+                    <Area type="monotone" dataKey="committed" name="Committed (Final)" stroke="#10B981" strokeWidth={2} fill="#10B981" fillOpacity={0.15} />
+                </AreaChart>
+            </ResponsiveContainer>
+            {budgetData?.burnRateData.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 text-xs text-slate-500 border border-slate-200 shadow-sm">
+                        {triggeringUpdate ? 'Calculating burn rate...' : 'Burn rate tracking starts once evaluations are submitted'}
+                    </div>
                 </div>
             )}
          </div>

@@ -169,7 +169,7 @@ export const analyticsService = {
       });
     }
 
-    return Array.from(yoyMap.entries())
+    const result = Array.from(yoyMap.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([year, data]) => ({
         year,
@@ -179,6 +179,22 @@ export const analyticsService = {
         'Tier 4': data.tier4,
         'Tier 5': data.tier5,
       }));
+
+    // If only one year of data exists, add a projected year for visual comparison
+    if (result.length === 1) {
+      const current = result[0];
+      const projectedYear = (parseInt(current.year) + 1).toString();
+      result.push({
+        year: `${projectedYear} (Proj.)`,
+        'Tier 1': Math.round(current['Tier 1'] * 1.05),
+        'Tier 2': Math.round(current['Tier 2'] * 1.05),
+        'Tier 3': Math.round(current['Tier 3'] * 1.05),
+        'Tier 4': Math.round(current['Tier 4'] * 1.05),
+        'Tier 5': Math.round(current['Tier 5'] * 1.05),
+      });
+    }
+
+    return result;
   },
 
   generateReport: async (params: any): Promise<{ success: boolean; reportId?: string }> => {

@@ -14,6 +14,8 @@
 
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 
@@ -653,6 +655,86 @@ async function sendApprovalPendingEmail(toEmail, toName, companyName) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Helper: send evaluation deadline reminder email via Brevo
+// ---------------------------------------------------------------------------
+
+async function sendEvaluationReminderEmail({ toEmails, cycleName, companyName, deadlineDate, daysRemaining, incompleteCount, recipientRole }) {
+  if (!toEmails || toEmails.length === 0) return;
+
+  const deadlineFormatted = deadlineDate.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const urgencyColor = daysRemaining <= 1 ? "#DC2626" : daysRemaining <= 3 ? "#D97706" : "#059669";
+  const urgencyLabel = daysRemaining === 0 ? "Today" : daysRemaining === 1 ? "1 day left" : `${daysRemaining} days left`;
+
+  let roleSpecificText = "";
+  if (recipientRole === "manager") {
+    roleSpecificText = `You have <strong>${incompleteCount}</strong> pending evaluation(s) to complete for your direct reports.`;
+  } else if (recipientRole === "employee") {
+    roleSpecificText = `Your manager is waiting for your self-evaluation or review input.`;
+  } else if (recipientRole === "hr") {
+    roleSpecificText = `There are <strong>${incompleteCount}</strong> incomplete evaluation(s) in this cycle.`;
+  }
+
+  try {
+    await transactionalEmailApi.sendTransacEmail({
+      sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
+      to: toEmails.map(e => ({ email: e.email, name: e.name || e.email })),
+      subject: `[${companyName}] Evaluation deadline — ${urgencyLabel} for "${cycleName}"`,
+      htmlContent: `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden">
+      <div style="background:${urgencyColor};padding:24px 32px">
+        <h2 style="color:#fff;margin:0;font-size:20px">Evaluation Deadline Reminder</h2>
+        <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:14px">${companyName} — ${cycleName}</p>
+      </div>
+      <div style="padding:32px">
+        <p>Hello,</p>
+        <p>${roleSpecificText}</p>
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:20px 0">
+          <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+            <span style="color:#64748B;font-size:14px">Deadline</span>
+            <span style="font-weight:600">${deadlineFormatted}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:#64748B;font-size:14px">Time remaining</span>
+            <span style="font-weight:600;color:${urgencyColor}">${urgencyLabel}</span>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#64748B">Please log in to MeritCyc to complete your evaluations before the deadline.</p>
+        <div style="margin-top:24px">
+          <a href="https://meritcyc.com/evaluations" style="background:${urgencyColor};color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;display:inline-block">Go to Evaluations</a>
+        </div>
+      </div>
+      <div style="background:#F1F5F9;padding:16px 32px;font-size:12px;color:#94A3B8">
+        This is an automated reminder. You can configure reminder settings in your MeritCyc notification preferences.
+      </div>
+    </div>`,
+    });
+  } catch (e) {
+    logger.error("Brevo evaluation reminder email send failed:", e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: get days remaining until a Firestore Timestamp deadline
+// ---------------------------------------------------------------------------
+
+function getDaysRemaining(deadlineTimestamp) {
+  const now = new Date();
+  const deadline = deadlineTimestamp.toDate ? deadlineTimestamp.toDate() : new Date(deadlineTimestamp);
+
+  // Normalize both to midnight UTC for day-count comparison
+  const nowMidnight = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const deadlineMidnight = Date.UTC(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+
+  return Math.floor((deadlineMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
+}
+
 // =============================================================================
 // generateCompanyQRCode — hr_admin | super_admin
 // Creates or regenerates the company registration code.
@@ -1221,6 +1303,18 @@ exports.verifyEmailOTP = onCall(async (request) => {
 
   return { success: true };
 });
+
+// =============================================================================
+// Career Paths
+// =============================================================================
+
+const careerPaths = require("./src/https/careerPaths");
+
+exports.createCareerPath = careerPaths.createCareerPath;
+exports.updateCareerPath = careerPaths.updateCareerPath;
+exports.assignCareerPath = careerPaths.assignCareerPath;
+exports.approvePromotion = careerPaths.approvePromotion;
+exports.getCareerMapForEmployee = careerPaths.getCareerMapForEmployee;
 
 // =============================================================================
 // Modules 7, 8, 11
@@ -2484,6 +2578,16 @@ exports.finalizeCycle = onCall(async (request) => {
 
     await batch.commit();
 
+    // 8. Recalculate career maps for all evaluated employees
+    for (const ev of evals) {
+      try {
+        await careerPaths.recalculateCareerMap(ev.employeeUid);
+      } catch (recalcErr) {
+        logger.error(`Failed to recalculate career map for ${ev.employeeUid}:`, recalcErr);
+        // Non-fatal — don't fail the whole finalization
+      }
+    }
+
     await writeAuditLog({
       companyId,
       action: "CYCLE_FINALIZED",
@@ -2523,6 +2627,8 @@ exports.requestEvaluationDeadlineReminder = onCall(async (request) => {
     throw new HttpsError("not-found", "Cycle not found.");
   }
 
+  const cycleData = cycleDoc.data();
+
   // Find incomplete evaluations
   const evalsSnap = await firestore.collection("evaluations")
     .where("companyId", "==", companyId)
@@ -2535,33 +2641,79 @@ exports.requestEvaluationDeadlineReminder = onCall(async (request) => {
   }
 
   // Group by manager
-  const managerUids = new Set();
+  const managerMap = new Map(); // managerUid -> { name, email, count }
   evalsSnap.docs.forEach(doc => {
-     if (doc.data().managerId) {
-         managerUids.add(doc.data().managerId);
+     const data = doc.data();
+     if (data.managerId) {
+        const existing = managerMap.get(data.managerId);
+        if (existing) {
+          existing.count++;
+        } else {
+          managerMap.set(data.managerId, {
+            name: data.managerName || "Manager",
+            email: null, // resolved later
+            count: 1,
+          });
+        }
      }
   });
+
+  // Resolve manager emails
+  for (const [mgrUid, info] of managerMap) {
+    try {
+      const mgrDoc = await firestore.collection("users").doc(mgrUid).get();
+      if (mgrDoc.exists) {
+        info.email = mgrDoc.data().email;
+        info.name = mgrDoc.data().name || info.name;
+      }
+    } catch (e) {
+      logger.warn(`Failed to resolve manager email for ${mgrUid}:`, e);
+    }
+  }
+
+  const companyDoc = await firestore.collection("companies").doc(companyId).get();
+  const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
+
+  const daysRemaining = cycleData.timeline?.evaluationDeadline
+    ? getDaysRemaining(cycleData.timeline.evaluationDeadline)
+    : null;
 
   try {
     const batch = firestore.batch();
     let managersNotified = 0;
+    const emailRecipients = [];
 
-    for (const managerUid of managerUids) {
-        // Send in-app notification to manager
-        const notifRef = firestore.collection("users").doc(managerUid).collection("notifications").doc();
-        batch.set(notifRef, {
-          type: "EVALUATION_REMINDER",
-          title: "Evaluation Deadline Reminder",
-          message: `You have incomplete evaluations for the cycle "${cycleDoc.data().name}". Please complete them before the deadline.`,
-          cycleId,
-          read: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        managersNotified++;
-        // Note: Real implementation would also send email via Brevo here
+    for (const [managerUid, info] of managerMap) {
+      if (!info.email) continue;
+
+      // Send in-app notification to manager
+      const notifRef = firestore.collection("users").doc(managerUid).collection("notifications").doc();
+      batch.set(notifRef, {
+        type: "EVALUATION_REMINDER",
+        title: "Evaluation Deadline Reminder",
+        message: `You have ${info.count} incomplete evaluation(s) for the cycle "${cycleData.name}". Please complete them before the deadline.`,
+        cycleId,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      managersNotified++;
+      emailRecipients.push({ email: info.email, name: info.name });
     }
 
     await batch.commit();
+
+    // Send Brevo email to all managers with incomplete evaluations
+    if (emailRecipients.length > 0 && daysRemaining !== null) {
+      await sendEvaluationReminderEmail({
+        toEmails: emailRecipients,
+        cycleName: cycleData.name,
+        companyName,
+        deadlineDate: cycleData.timeline.evaluationDeadline.toDate(),
+        daysRemaining,
+        incompleteCount: evalsSnap.size,
+        recipientRole: "manager",
+      });
+    }
 
     await writeAuditLog({
       companyId,
@@ -2571,14 +2723,254 @@ exports.requestEvaluationDeadlineReminder = onCall(async (request) => {
       actorRole: role,
       targetType: "cycle",
       targetId: cycleId,
-      metadata: { managersNotified },
+      metadata: { managersNotified, emailsSent: emailRecipients.length },
     });
 
-    return { success: true, managersNotified };
+    return { success: true, managersNotified, emailsSent: emailRecipients.length };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     logger.error("Error in requestEvaluationDeadlineReminder:", error);
     throw new HttpsError("internal", error.message || "Failed to send reminders.");
+  }
+});
+
+// =============================================================================
+// Scheduled: evaluationDeadlineReminder
+// Runs daily at 09:00. Queries active/locked cycles and sends reminder emails
+// at configured days (default 7, 3, 1) before evaluationDeadline.
+// Respects per-company NotificationSettings and deduplicates via reminderLogs.
+// =============================================================================
+
+exports.evaluationDeadlineReminder = onSchedule("every day 09:00", async (event) => {
+  try {
+    const now = new Date();
+    logger.info(`[evaluationDeadlineReminder] START — ${now.toISOString()}`);
+
+    // Query active or locked cycles that have an evaluation deadline
+    const cyclesSnap = await firestore
+      .collection("cycles")
+      .where("status", "in", ["active", "locked"])
+      .get();
+
+    logger.info(`[evaluationDeadlineReminder] Found ${cyclesSnap.size} active/locked cycles`);
+
+    let cyclesProcessed = 0;
+    let remindersSent = 0;
+
+    for (const cycleDoc of cyclesSnap.docs) {
+      const cycleData = cycleDoc.data();
+      const cycleId = cycleDoc.id;
+      const companyId = cycleData.companyId;
+
+      if (!cycleData.timeline || !cycleData.timeline.evaluationDeadline) continue;
+
+      const daysRemaining = getDaysRemaining(cycleData.timeline.evaluationDeadline);
+
+      // Only process future deadlines (including today = 0)
+      if (daysRemaining < 0) continue;
+
+      cyclesProcessed++;
+
+      // Load company notification settings
+      let reminderDays = [7, 3, 1];
+      let reminderRecipient = "manager";
+      try {
+        const settingsDoc = await firestore
+          .collection("companies")
+          .doc(companyId)
+          .collection("settings")
+          .doc("notifications")
+          .get();
+        if (settingsDoc.exists) {
+          const s = settingsDoc.data();
+          if (Array.isArray(s.evaluationReminderDays) && s.evaluationReminderDays.length > 0) {
+            reminderDays = s.evaluationReminderDays;
+          }
+          if (["manager", "manager_hr", "all"].includes(s.reminderRecipient)) {
+            reminderRecipient = s.reminderRecipient;
+          }
+        }
+      } catch (e) {
+        logger.warn(`[evaluationDeadlineReminder] Failed to load settings for ${companyId}, using defaults`);
+      }
+
+      // Check if today matches one of the configured reminder days
+      if (!reminderDays.includes(daysRemaining)) continue;
+
+      // Deduplication: check if we already sent a reminder for this cycle + day offset today
+      const logId = `day_${daysRemaining}`;
+      const logRef = firestore.collection("cycles").doc(cycleId).collection("reminderLogs").doc(logId);
+      try {
+        const logDoc = await logRef.get();
+        if (logDoc.exists) {
+          const lastSent = logDoc.data().sentAt;
+          if (lastSent) {
+            const lastSentDate = lastSent.toDate ? lastSent.toDate() : new Date(lastSent);
+            // Normalize to midnight UTC
+            const lastMidnight = Date.UTC(lastSentDate.getFullYear(), lastSentDate.getMonth(), lastSentDate.getDate());
+            const todayMidnight = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+            if (lastMidnight === todayMidnight) {
+              logger.info(`[evaluationDeadlineReminder] Skipping ${cycleId} — already sent for day ${daysRemaining} today`);
+              continue;
+            }
+          }
+        }
+      } catch (e) {
+        logger.warn(`[evaluationDeadlineReminder] Deduplication check failed for ${cycleId}:`, e);
+      }
+
+      // Find incomplete evaluations for this cycle
+      let evalsSnap;
+      try {
+        evalsSnap = await firestore
+          .collection("evaluations")
+          .where("companyId", "==", companyId)
+          .where("cycleId", "==", cycleId)
+          .where("status", "in", ["not_started", "draft"])
+          .get();
+      } catch (e) {
+        logger.warn(`[evaluationDeadlineReminder] Failed to fetch evaluations for ${cycleId}:`, e);
+        continue;
+      }
+
+      if (evalsSnap.empty) continue;
+
+      // Resolve company name
+      let companyName = "MeritCyc";
+      try {
+        const companyDoc = await firestore.collection("companies").doc(companyId).get();
+        if (companyDoc.exists) companyName = companyDoc.data().name || "MeritCyc";
+      } catch (e) { /* ignore */ }
+
+      // Group evaluations by manager and collect unique employee emails if needed
+      const managerMap = new Map();
+      const employeeEmails = [];
+      for (const evDoc of evalsSnap.docs) {
+        const ev = evDoc.data();
+        if (ev.managerId) {
+          if (!managerMap.has(ev.managerId)) {
+            managerMap.set(ev.managerId, { count: 0 });
+          }
+          managerMap.get(ev.managerId).count++;
+        }
+        if (reminderRecipient === "all" && ev.employeeEmail) {
+          employeeEmails.push({ email: ev.employeeEmail, name: ev.employeeName || "Employee" });
+        }
+      }
+
+      // Resolve manager details
+      const managerEmails = [];
+      for (const [mgrUid, info] of managerMap) {
+        try {
+          const mgrDoc = await firestore.collection("users").doc(mgrUid).get();
+          if (mgrDoc.exists) {
+            const d = mgrDoc.data();
+            managerEmails.push({ email: d.email, name: d.name || "Manager", count: info.count });
+          }
+        } catch (e) {
+          logger.warn(`[evaluationDeadlineReminder] Failed to resolve manager ${mgrUid}`);
+        }
+      }
+
+      if (managerEmails.length === 0 && (reminderRecipient !== "all" || employeeEmails.length === 0)) continue;
+
+      const deadlineDate = cycleData.timeline.evaluationDeadline.toDate
+        ? cycleData.timeline.evaluationDeadline.toDate()
+        : new Date(cycleData.timeline.evaluationDeadline);
+
+      // Send emails based on reminderRecipient setting
+      try {
+        if (reminderRecipient === "manager" || reminderRecipient === "manager_hr" || reminderRecipient === "all") {
+          await sendEvaluationReminderEmail({
+            toEmails: managerEmails,
+            cycleName: cycleData.name,
+            companyName,
+            deadlineDate,
+            daysRemaining,
+            incompleteCount: evalsSnap.size,
+            recipientRole: "manager",
+          });
+        }
+
+        if (reminderRecipient === "manager_hr" || reminderRecipient === "all") {
+          // Fetch HR admins
+          const hrSnap = await firestore
+            .collection("users")
+            .where("companyId", "==", companyId)
+            .where("role", "in", ["hr_admin", "super_admin"])
+            .get();
+          const hrEmails = hrSnap.docs.map(d => ({ email: d.data().email, name: d.data().name || "HR" }));
+          if (hrEmails.length > 0) {
+            await sendEvaluationReminderEmail({
+              toEmails: hrEmails,
+              cycleName: cycleData.name,
+              companyName,
+              deadlineDate,
+              daysRemaining,
+              incompleteCount: evalsSnap.size,
+              recipientRole: "hr",
+            });
+          }
+        }
+
+        if (reminderRecipient === "all" && employeeEmails.length > 0) {
+          // Deduplicate employee emails
+          const seen = new Set();
+          const uniqueEmployees = employeeEmails.filter(e => {
+            if (seen.has(e.email)) return false;
+            seen.add(e.email);
+            return true;
+          });
+          await sendEvaluationReminderEmail({
+            toEmails: uniqueEmployees,
+            cycleName: cycleData.name,
+            companyName,
+            deadlineDate,
+            daysRemaining,
+            incompleteCount: evalsSnap.size,
+            recipientRole: "employee",
+          });
+        }
+      } catch (e) {
+        logger.error(`[evaluationDeadlineReminder] Failed to send emails for cycle ${cycleId}:`, e);
+        continue;
+      }
+
+      // Record reminder log to prevent duplicate sends
+      try {
+        await logRef.set({
+          daysRemaining,
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+          evaluationsPending: evalsSnap.size,
+          managerCount: managerEmails.length,
+          recipientSetting: reminderRecipient,
+        });
+      } catch (e) {
+        logger.warn(`[evaluationDeadlineReminder] Failed to write reminder log for ${cycleId}:`, e);
+      }
+
+      // Write audit log
+      try {
+        await writeAuditLog({
+          companyId,
+          action: "DEADLINE_REMINDER_AUTO_SENT",
+          actorUid: "system",
+          actorEmail: "system@meritcyc.com",
+          actorRole: "system",
+          targetType: "cycle",
+          targetId: cycleId,
+          metadata: { daysRemaining, evaluationsPending: evalsSnap.size, managerCount: managerEmails.length, recipientSetting: reminderRecipient },
+        });
+      } catch (e) {
+        logger.warn(`[evaluationDeadlineReminder] Failed to write audit log for ${cycleId}:`, e);
+      }
+
+      remindersSent++;
+    }
+
+    logger.info(`[evaluationDeadlineReminder] DONE — cyclesProcessed: ${cyclesProcessed}, remindersSent: ${remindersSent}`);
+  } catch (error) {
+    logger.error("[evaluationDeadlineReminder] CRITICAL ERROR:", error);
   }
 });
 
@@ -3690,6 +4082,126 @@ exports.updateCareerMap = onCall(async (request) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Helper: recalculate budget tracking for a cycle and write to RTDB
+// ---------------------------------------------------------------------------
+
+async function recalculateBudgetTracking(cycleId, companyId) {
+  const cycleRef = firestore.collection("cycles").doc(cycleId);
+  const cycleDoc = await cycleRef.get();
+
+  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
+    throw new Error("Cycle not found or company mismatch.");
+  }
+
+  const cycleData = cycleDoc.data();
+
+  // Fetch evaluations for this cycle
+  const evalsSnap = await firestore.collection("evaluations")
+      .where("companyId", "==", companyId)
+      .where("cycleId", "==", cycleId)
+      .get();
+
+  let committed = 0;
+  let projected = 0;
+  const byDepartment = {};
+  const byTier = {};
+
+  // Default tier tracking
+  if (cycleData.tiers) {
+      for (const t of cycleData.tiers) {
+          byTier[t.id] = { count: 0, totalAmount: 0 };
+      }
+  }
+
+  evalsSnap.docs.forEach(doc => {
+     const evalData = doc.data();
+     const amt = evalData.incrementAmount || 0;
+
+     if (evalData.status === 'finalized' || evalData.status === 'approved') {
+         committed += amt;
+     } else {
+         projected += amt;
+     }
+
+     // Department breakdown
+     if (evalData.departmentId) {
+         if (!byDepartment[evalData.departmentId]) {
+             byDepartment[evalData.departmentId] = { budget: 0, committed: 0, projected: 0 };
+         }
+         if (evalData.status === 'finalized' || evalData.status === 'approved') {
+             byDepartment[evalData.departmentId].committed += amt;
+         } else {
+             byDepartment[evalData.departmentId].projected += amt;
+         }
+     }
+
+     // Tier breakdown
+     if (evalData.tierId && byTier[evalData.tierId] !== undefined) {
+         byTier[evalData.tierId].count += 1;
+         byTier[evalData.tierId].totalAmount += amt;
+     }
+  });
+
+  let totalBudget = 0;
+  if (cycleData.budget.type === 'fixed_pool') {
+      totalBudget = cycleData.budget.totalBudget || 0;
+  } else {
+      // Approximate total payroll for percentage budget
+      const usersSnap = await firestore.collection("users").where("companyId", "==", companyId).where("status", "==", "active").get();
+      let payroll = 0;
+      usersSnap.docs.forEach(d => payroll += (d.data().currentSalary || 50000));
+      totalBudget = payroll * (cycleData.budget.maxPercentage || 0) / 100;
+  }
+
+  const remaining = Math.max(0, totalBudget - committed - projected);
+  const utilizationPercent = totalBudget > 0 ? ((committed + projected) / totalBudget) * 100 : 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  const newBurnPoint = { date: today, committed, projected };
+
+  // Update Realtime Database
+  const db = admin.database();
+  const budgetRef = db.ref(`budgetTracking/${cycleId}`);
+
+  const currentBudgetSnap = await budgetRef.get();
+  let burnRateData = [];
+
+  if (currentBudgetSnap.exists()) {
+      const currentData = currentBudgetSnap.val();
+      if (currentData.burnRateData) {
+          burnRateData = currentData.burnRateData;
+          const lastIndex = burnRateData.length - 1;
+          if (lastIndex >= 0 && burnRateData[lastIndex].date === today) {
+              burnRateData[lastIndex] = newBurnPoint;
+          } else {
+              burnRateData.push(newBurnPoint);
+          }
+      } else {
+           burnRateData = [newBurnPoint];
+      }
+  } else {
+      burnRateData = [newBurnPoint];
+  }
+
+  const updateData = {
+      companyId,
+      cycleId,
+      totalBudget,
+      currency: cycleData.budget.currency || "USD",
+      committed,
+      projected,
+      remaining,
+      utilizationPercent,
+      byDepartment,
+      byTier,
+      burnRateData,
+      lastUpdated: admin.database.ServerValue.TIMESTAMP
+  };
+
+  await budgetRef.set(updateData);
+}
+
 exports.updateBudgetTracking = onCall(async (request) => {
   const { uid, role, companyId } = requireHrOrAdmin(request);
   const { cycleId } = request.data;
@@ -3698,127 +4210,47 @@ exports.updateBudgetTracking = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Missing cycleId.");
   }
 
-  const cycleRef = firestore.collection("cycles").doc(cycleId);
-  const cycleDoc = await cycleRef.get();
-
-  if (!cycleDoc.exists || cycleDoc.data().companyId !== companyId) {
-    throw new HttpsError("not-found", "Cycle not found.");
-  }
-
-  const cycleData = cycleDoc.data();
-
   try {
-    // 1. Fetch evaluations for this cycle
-    const evalsSnap = await firestore.collection("evaluations")
-        .where("companyId", "==", companyId)
-        .where("cycleId", "==", cycleId)
-        .get();
-
-    let committed = 0;
-    let projected = 0;
-    const byDepartment = {};
-    const byTier = {};
-
-    // Default tier tracking
-    if (cycleData.tiers) {
-        for (const t of cycleData.tiers) {
-            byTier[t.id] = { count: 0, totalAmount: 0 };
-        }
-    }
-
-    evalsSnap.docs.forEach(doc => {
-       const evalData = doc.data();
-       const amt = evalData.incrementAmount || 0;
-
-       if (evalData.status === 'finalized' || evalData.status === 'approved') {
-           committed += amt;
-       } else {
-           projected += amt;
-       }
-
-       // Department breakdown
-       if (evalData.departmentId) {
-           if (!byDepartment[evalData.departmentId]) {
-               byDepartment[evalData.departmentId] = { budget: 0, committed: 0, projected: 0 };
-           }
-           if (evalData.status === 'finalized' || evalData.status === 'approved') {
-               byDepartment[evalData.departmentId].committed += amt;
-           } else {
-               byDepartment[evalData.departmentId].projected += amt;
-           }
-       }
-
-       // Tier breakdown
-       if (evalData.tierId && byTier[evalData.tierId] !== undefined) {
-           byTier[evalData.tierId].count += 1;
-           byTier[evalData.tierId].totalAmount += amt;
-       }
-    });
-
-    let totalBudget = 0;
-    if (cycleData.budget.type === 'fixed_pool') {
-        totalBudget = cycleData.budget.totalBudget || 0;
-    } else {
-        // Need to approximate total payroll for percentage budget
-        const usersSnap = await firestore.collection("users").where("companyId", "==", companyId).where("status", "==", "active").get();
-        let payroll = 0;
-        usersSnap.docs.forEach(d => payroll += (d.data().currentSalary || 50000));
-        totalBudget = payroll * (cycleData.budget.maxPercentage || 0) / 100;
-    }
-
-    const remaining = Math.max(0, totalBudget - committed - projected);
-    const utilizationPercent = totalBudget > 0 ? ((committed + projected) / totalBudget) * 100 : 0;
-
-    const today = new Date().toISOString().split('T')[0];
-    const newBurnPoint = { date: today, committed, projected };
-
-    // Update Realtime Database
-    const db = admin.database();
-    const budgetRef = db.ref(`budgetTracking/${cycleId}`);
-
-    const currentBudgetSnap = await budgetRef.get();
-    let burnRateData = [];
-
-    if (currentBudgetSnap.exists()) {
-        const currentData = currentBudgetSnap.val();
-        if (currentData.burnRateData) {
-            burnRateData = currentData.burnRateData;
-            // Update today's point or append
-            const lastIndex = burnRateData.length - 1;
-            if (lastIndex >= 0 && burnRateData[lastIndex].date === today) {
-                burnRateData[lastIndex] = newBurnPoint;
-            } else {
-                burnRateData.push(newBurnPoint);
-            }
-        } else {
-             burnRateData = [newBurnPoint];
-        }
-    } else {
-        burnRateData = [newBurnPoint];
-    }
-
-    const updateData = {
-        companyId,
-        cycleId,
-        totalBudget,
-        currency: cycleData.budget.currency || "USD",
-        committed,
-        projected,
-        remaining,
-        utilizationPercent,
-        byDepartment,
-        byTier,
-        burnRateData,
-        lastUpdated: admin.database.ServerValue.TIMESTAMP
-    };
-
-    await budgetRef.set(updateData);
-
+    await recalculateBudgetTracking(cycleId, companyId);
     return { success: true };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     logger.error("Error in updateBudgetTracking:", error);
     throw new HttpsError("internal", error.message || "Failed to update budget tracking.");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Firestore trigger: auto-recalculate budget tracking when evaluations change
+// ---------------------------------------------------------------------------
+
+exports.onEvaluationChanged = onDocumentWritten("evaluations/{evalId}", async (event) => {
+  try {
+    const before = event.data.before?.data();
+    const after = event.data.after?.data();
+
+    // Determine cycleId from the document that changed
+    const cycleId = after?.cycleId || before?.cycleId;
+    const companyId = after?.companyId || before?.companyId;
+
+    if (!cycleId || !companyId) {
+      logger.warn("[onEvaluationChanged] Missing cycleId or companyId, skipping.");
+      return;
+    }
+
+    // Only recalculate if the evaluation belongs to an active or locked cycle
+    const cycleDoc = await firestore.collection("cycles").doc(cycleId).get();
+    if (!cycleDoc.exists) return;
+
+    const cycleStatus = cycleDoc.data().status;
+    if (cycleStatus !== 'active' && cycleStatus !== 'locked' && cycleStatus !== 'completed') {
+      return;
+    }
+
+    await recalculateBudgetTracking(cycleId, companyId);
+    logger.info(`[onEvaluationChanged] Budget tracking updated for cycle ${cycleId}`);
+  } catch (error) {
+    logger.error("[onEvaluationChanged] Error:", error);
   }
 });
 

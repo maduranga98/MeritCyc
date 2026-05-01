@@ -13,7 +13,7 @@ import { salaryBandService } from '../../services/salaryBandService';
 import { employeeService } from '../../services/employeeService';
 import { getIncrementStories } from '../../services/incrementStoryService';
 import { type IncrementStory } from '../../types/incrementStory';
-import { Loader2, ArrowLeft, Mail, Building, Badge, Calendar, LogIn, AlertCircle, Edit2, UserX, UserCheck, Trophy, FileText, TrendingUp, Award } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, Building, Badge, Calendar, LogIn, AlertCircle, Edit2, UserX, UserCheck, Trophy, FileText } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
 

@@ -65,6 +65,7 @@ interface PathFormData {
   name: string;
   description: string;
   isActive: boolean;
+  companyId: string;
   levels: LevelFormData[];
 }
 
@@ -76,6 +77,7 @@ const emptyPath = (): PathFormData => ({
   name: '',
   description: '',
   isActive: true,
+  companyId: '',
   levels: [createEmptyLevel(1), createEmptyLevel(2)],
 });
 
@@ -145,8 +147,6 @@ function SortableLevelRow({
     zIndex: isDragging ? 50 : undefined,
     opacity: isDragging ? 0.5 : 1,
   };
-
-  const usedBandIds = new Set<string>();
 
   return (
     <div
@@ -953,13 +953,13 @@ const CareerPathManagement: React.FC = () => {
 
   const handleCreate = async (form: PathFormData) => {
     if (!user?.companyId) return;
-    await createCareerPath(form);
+    await createCareerPath({ ...form, companyId: user.companyId });
     toast.success('Career path created successfully.');
   };
 
   const handleUpdate = async (form: PathFormData) => {
     if (!editingPath) return;
-    await updateCareerPath(editingPath.id, form);
+    await updateCareerPath(editingPath.id, { ...form, companyId: user?.companyId || editingPath.companyId });
     toast.success('Career path updated successfully.');
   };
 
@@ -1174,6 +1174,7 @@ const CareerPathManagement: React.FC = () => {
                 name: editingPath.name,
                 description: editingPath.description,
                 isActive: editingPath.isActive,
+                companyId: editingPath.companyId,
                 levels: editingPath.levels.map((l) => ({ ...l })),
               }
             : null

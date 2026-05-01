@@ -15,13 +15,9 @@ import { type Evaluation } from '../../types/evaluation';
 import { type Cycle } from '../../types/cycle';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  TrendingUp,
   Lock,
   CheckCircle2,
-  ArrowRight,
   FileText,
-  Award,
-  AlertCircle,
   Loader2,
   MapPin,
   Calendar,
@@ -224,7 +220,7 @@ const CareerMapPage: React.FC = () => {
   // Check if employee is in active cycle scope
   const isInActiveCycle = activeCycle
     ? activeCycle.scope.allEmployees ||
-      activeCycle.scope.departmentIds.includes(user?.departmentId || '') ||
+      activeCycle.scope.departmentIds.includes((user as unknown as { departmentId?: string })?.departmentId || '') ||
       activeCycle.scope.salaryBandIds.includes(careerMap.currentSalaryBandId)
     : false;
 

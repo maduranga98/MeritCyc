@@ -8,10 +8,25 @@ export const CareerPathBuilder: React.FC<{ companyId: string; onSave: (cp: Caree
     await onSave({
       id: `${companyId}-${role.toLowerCase().replace(/\s+/g, '-')}`,
       companyId,
-      role,
+      name: `${role} Track`,
+      description: 'Starter career path for software engineers.',
       levels: [
-        { level: 'L1', nextLevel: 'L2', criteria: [{ name: 'Performance', weight: 0.5, threshold: 75 }, { name: 'Collaboration', weight: 0.5, threshold: 70 }] },
+        {
+          levelId: crypto.randomUUID(),
+          levelNumber: 1,
+          title: 'L1',
+          salaryBandId: '',
+          salaryBandName: '',
+          requiredScore: 75,
+          requiredCycles: 2,
+          description: 'Entry-level software engineer.',
+          milestones: [],
+        },
       ],
+      createdBy: '',
+      createdAt: new Date() as unknown as import('firebase/firestore').Timestamp,
+      updatedAt: new Date() as unknown as import('firebase/firestore').Timestamp,
+      isActive: true,
     });
   };
 

@@ -64,6 +64,9 @@ import NotificationSettings from "./pages/settings/NotificationSettings";
 import SecuritySettings from "./pages/settings/SecuritySettings";
 import DataPrivacySettings from "./pages/settings/DataPrivacySettings";
 
+// Help & Instructions
+import InstructionsPage from "./pages/help/InstructionsPage";
+
 // Session management (idle timeout — only active for logged-in users)
 import { useIdleTimeout } from "./hooks/useIdleTimeout";
 import { useAuth } from "./context/AuthContext";
@@ -370,6 +373,20 @@ function App() {
                 <SettingsLayout>
                   <DataPrivacySettings />
                 </SettingsLayout>
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================================================================= */}
+        {/* Help & Instructions                                               */}
+        {/* ================================================================= */}
+        <Route
+          path="/help/instructions"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin", "hr_admin"]}>
+              <AppLayout>
+                <InstructionsPage />
               </AppLayout>
             </ProtectedRoute>
           }

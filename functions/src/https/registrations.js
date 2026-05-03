@@ -407,6 +407,7 @@ exports.approveRegistration = onCall(async (request) => {
     return { success: true, uid: userRecord.uid };
   } catch (error) {
     logger.error("Error in approveRegistration:", error);
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message || "An error occurred.");
   }
 });
@@ -427,6 +428,9 @@ exports.bulkApprove = onCall(async (request) => {
 
   const failed = [];
   let approvedCount = 0;
+
+  const companyDoc = await firestore.collection("companies").doc(companyId).get();
+  const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
   for (const pendingId of pendingIds) {
     try {
@@ -497,9 +501,6 @@ exports.bulkApprove = onCall(async (request) => {
       });
 
       await batch.commit();
-
-      const companyDoc = await firestore.collection("companies").doc(companyId).get();
-      const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
       try {
         await sendEmail({
@@ -704,6 +705,7 @@ exports.rejectRegistration = onCall(async (request) => {
     return { success: true };
   } catch (error) {
     logger.error("Error in rejectRegistration:", error);
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message || "An error occurred.");
   }
 });
@@ -836,6 +838,7 @@ exports.requestMoreInfo = onCall(async (request) => {
     return { success: true };
   } catch (error) {
     logger.error("Error in requestMoreInfo:", error);
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message || "An error occurred.");
   }
 });

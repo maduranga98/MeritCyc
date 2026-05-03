@@ -12,6 +12,10 @@ export interface PendingRegistration {
   departmentId: string;
   jobTitle: string;
   status: PendingStatus;
+  salaryBandId?: string;
+  phoneNumber?: string;
+  employeeId?: string;
+  registrationMethod?: string;
   otpAttempts?: number;
   otpExpiresAt?: number;
   cooldownUntil?: number | null;

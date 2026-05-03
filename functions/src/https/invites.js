@@ -136,7 +136,7 @@ exports.sendEmployeeInvite = onCall(async (request) => {
           <p>Hi ${name},</p>
           <p>You have been invited to join ${companyName} on MeritCyc as a ${role}.</p>
           <p>Please click the link below to accept your invitation:</p>
-          <a href="https://app.meritcyc.com/accept-invite?token=${inviteToken}">Accept Invitation</a>
+          <a href="${process.env.APP_URL || "https://meritcyc-7a683.web.app"}/accept-invite?token=${inviteToken}">Accept Invitation</a>
           <p>This link expires in 7 days.</p>
         </body>
       </html>
@@ -377,7 +377,7 @@ exports.resendInvite = onCall(async (request) => {
           <p>Hi ${invite.name},</p>
           <p>You have been invited to join ${companyName} on MeritCyc as a ${invite.role}.</p>
           <p>Please click the link below to accept your invitation:</p>
-          <a href="https://app.meritcyc.com/accept-invite?token=${newInviteToken}">Accept Invitation</a>
+          <a href="${process.env.APP_URL || "https://meritcyc-7a683.web.app"}/accept-invite?token=${newInviteToken}">Accept Invitation</a>
           <p>This link expires in 7 days.</p>
         </body>
       </html>
@@ -558,7 +558,7 @@ exports.bulkImportEmployees = onCall(async (request) => {
             <p>Hi ${row.name},</p>
             <p>You have been invited to join ${companyName} on MeritCyc as a ${row.role}.</p>
             <p>Please click the link below to accept your invitation:</p>
-            <a href="https://app.meritcyc.com/accept-invite?token=${inviteToken}">Accept Invitation</a>
+            <a href="${process.env.APP_URL || "https://meritcyc-7a683.web.app"}/accept-invite?token=${inviteToken}">Accept Invitation</a>
             <p>This link expires in 7 days.</p>
           </body>
         </html>

@@ -114,7 +114,7 @@ exports.sendEmployeeInvite = onCall(async (request) => {
   };
 
   try {
-    // Write to Firestore
+    // Write invite document
     const inviteRef = await firestore
       .collection("companies")
       .doc(companyId)
@@ -122,6 +122,13 @@ exports.sendEmployeeInvite = onCall(async (request) => {
       .add(inviteData);
 
     const inviteId = inviteRef.id;
+
+    // Write flat token lookup — avoids collection-group query in preview/accept
+    await firestore.collection("inviteTokens").doc(inviteToken).set({
+      companyId,
+      inviteId,
+      expiresAt,
+    });
 
     // Send email
     const companyDoc = await firestore.collection("companies").doc(companyId).get();
@@ -176,25 +183,29 @@ exports.getInvitePreview = onCall(async (request) => {
   }
 
   try {
-    const invitesQuery = await firestore
-      .collectionGroup("invites")
-      .where("token", "==", token)
-      .where("status", "==", "pending")
-      .limit(1)
-      .get();
-
-    if (invitesQuery.empty) {
+    // Direct single-doc lookup — no index required
+    const tokenDoc = await firestore.collection("inviteTokens").doc(token).get();
+    if (!tokenDoc.exists) {
       throw new HttpsError("not-found", "Invalid, expired, or already accepted invitation.");
     }
 
-    const invite = invitesQuery.docs[0].data();
+    const { companyId, inviteId } = tokenDoc.data();
+    const inviteRef = firestore.collection("companies").doc(companyId).collection("invites").doc(inviteId);
+    const inviteDoc = await inviteRef.get();
+
+    if (!inviteDoc.exists || inviteDoc.data().status !== "pending") {
+      throw new HttpsError("not-found", "Invalid, expired, or already accepted invitation.");
+    }
+
+    const invite = inviteDoc.data();
 
     if (Date.now() > invite.expiresAt) {
-      await invitesQuery.docs[0].ref.update({ status: "expired" });
+      await inviteRef.update({ status: "expired" });
+      await tokenDoc.ref.delete();
       throw new HttpsError("failed-precondition", "Invitation has expired.");
     }
 
-    const companyDoc = await firestore.collection("companies").doc(invite.companyId).get();
+    const companyDoc = await firestore.collection("companies").doc(companyId).get();
     const companyName = companyDoc.exists ? companyDoc.data().name : "Unknown Company";
 
     return {
@@ -222,25 +233,25 @@ exports.acceptInvite = onCall(async (request) => {
   }
 
   try {
-    // 1. Find the invite with the matching token
-    const invitesQuery = await firestore
-      .collectionGroup("invites")
-      .where("token", "==", token)
-      .where("status", "==", "pending")
-      .limit(1)
-      .get();
-
-    if (invitesQuery.empty) {
+    // 1. Resolve token → invite via flat lookup (no index required)
+    const tokenDoc = await firestore.collection("inviteTokens").doc(token).get();
+    if (!tokenDoc.exists) {
       throw new HttpsError("not-found", "Invalid, expired, or already accepted invitation.");
     }
 
-    const inviteDoc = invitesQuery.docs[0];
+    const { companyId, inviteId } = tokenDoc.data();
+    const inviteRef = firestore.collection("companies").doc(companyId).collection("invites").doc(inviteId);
+    const inviteDoc = await inviteRef.get();
+
+    if (!inviteDoc.exists || inviteDoc.data().status !== "pending") {
+      throw new HttpsError("not-found", "Invalid, expired, or already accepted invitation.");
+    }
+
     const invite = inviteDoc.data();
-    const inviteId = inviteDoc.id;
-    const companyId = invite.companyId;
 
     if (Date.now() > invite.expiresAt) {
-      await inviteDoc.ref.update({ status: "expired" });
+      await inviteRef.update({ status: "expired" });
+      await tokenDoc.ref.delete();
       throw new HttpsError("failed-precondition", "Invitation has expired.");
     }
 
@@ -296,8 +307,9 @@ exports.acceptInvite = onCall(async (request) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
-    // 6. Update invite status to accepted
-    await inviteDoc.ref.update({ status: "accepted" });
+    // 6. Update invite status to accepted and clean up token lookup
+    await inviteRef.update({ status: "accepted" });
+    await tokenDoc.ref.delete();
 
     // 7. Audit log
     await writeAuditLog({
@@ -355,6 +367,7 @@ exports.resendInvite = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "Maximum resend limit reached.");
     }
 
+    const oldToken = invite.token;
     const newInviteToken = crypto.randomUUID();
     const newExpiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
 
@@ -362,6 +375,14 @@ exports.resendInvite = onCall(async (request) => {
       token: newInviteToken,
       expiresAt: newExpiresAt,
       resendCount: admin.firestore.FieldValue.increment(1),
+    });
+
+    // Swap the flat token lookup
+    await firestore.collection("inviteTokens").doc(oldToken).delete();
+    await firestore.collection("inviteTokens").doc(newInviteToken).set({
+      companyId,
+      inviteId,
+      expiresAt: newExpiresAt,
     });
 
     // Send email
@@ -441,6 +462,9 @@ exports.revokeInvite = onCall(async (request) => {
     await inviteRef.update({
       status: "revoked",
     });
+
+    // Remove the flat token lookup so the link no longer works
+    await firestore.collection("inviteTokens").doc(invite.token).delete();
 
     // Audit log
     await writeAuditLog({
@@ -548,6 +572,13 @@ exports.bulkImportEmployees = onCall(async (request) => {
 
     batch.set(inviteRef, inviteData);
     newInviteIds.push(inviteRef.id);
+
+    // Flat token lookup for index-free resolution
+    batch.set(firestore.collection("inviteTokens").doc(inviteToken), {
+      companyId,
+      inviteId: inviteRef.id,
+      expiresAt,
+    });
 
     emailsToSend.push({
       subject: `You've been invited to ${companyName}`,

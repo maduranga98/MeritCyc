@@ -4,8 +4,9 @@ import { analyticsService } from "../../services/analyticsService";
 import { pdfGenerationService } from "../../services/pdfGenerationService";
 import { companyService } from "../../services/companyService";
 import { type GeneratedReport, type ReportType } from "../../types/analytics";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
+import { departmentService } from "../../services/departmentService";
 import { type Cycle } from "../../types/cycle";
 import { type Evaluation } from "../../types/evaluation";
 import {
@@ -102,16 +103,19 @@ export default function ReportsGenerator() {
 
       // Handle cycle summary PDF generation
       if (selectedType === 'cycle_summary' && format === 'pdf') {
-        const cycleSnap = await getDocs(query(collection(db, "cycles"), where('id', '==', selectedCycle)));
-        const cycleDoc = cycleSnap.docs[0];
-        if (!cycleDoc) {
+        const cycleDoc = await getDoc(doc(db, "cycles", selectedCycle));
+        if (!cycleDoc.exists()) {
           toast.error("Cycle not found.");
           return;
         }
         const cycle = { id: cycleDoc.id, ...cycleDoc.data() } as Cycle;
 
-        const evalsSnap = await getDocs(query(collection(db, "evaluations"), where('cycleId', '==', selectedCycle)));
-        const evaluations = evalsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Evaluation[];
+        const [evalsSnap, departments] = await Promise.all([
+          getDocs(query(collection(db, "evaluations"), where('cycleId', '==', selectedCycle))),
+          user?.companyId ? departmentService.getDepartments(user.companyId) : Promise.resolve([]),
+        ]);
+        const evaluations = evalsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Evaluation[];
+        const deptNameMap = new Map(departments.map(d => [d.id, d.name]));
 
         // Calculate department breakdown
         const deptMap = new Map<string, { employees: number; totalScore: number }>();
@@ -126,7 +130,7 @@ export default function ReportsGenerator() {
         });
 
         const departmentBreakdown = Array.from(deptMap.entries()).map(([deptId, data]) => ({
-          departmentName: deptId === 'unknown' ? 'Unknown Department' : deptId,
+          departmentName: deptNameMap.get(deptId) ?? (deptId === 'unknown' ? 'Unknown Department' : deptId),
           averageScore: data.totalScore / data.employees,
           employeeCount: data.employees,
         }));

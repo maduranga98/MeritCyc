@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { type Cycle } from '../../types/cycle';
 import { type DistributionType, type SimulationParameters } from '../../types/simulation';
 import { simulationService } from '../../services/simulationService';
@@ -42,6 +42,55 @@ export default function RunSimulationModal({ cycle, onClose, onSuccess }: RunSim
   });
 
   const totalOverrideWeight = Object.values(criteriaWeights).reduce((a, b) => a + b, 0);
+
+  // Estimated tier distribution percentages per distribution type (lowest → highest tier)
+  const DIST_PCTS: Record<string, number[]> = {
+    normal:       [0.05, 0.20, 0.50, 0.20, 0.05],
+    uniform:      [0.20, 0.20, 0.20, 0.20, 0.20],
+    top_heavy:    [0.02, 0.10, 0.38, 0.30, 0.20],
+    bottom_heavy: [0.20, 0.30, 0.35, 0.12, 0.03],
+  };
+
+  const liveEstimate = useMemo(() => {
+    const numTiers = cycle.tiers.length;
+    if (numTiers === 0) return null;
+
+    const base = DIST_PCTS[assumedDistribution] ?? DIST_PCTS.normal;
+    // Interpolate base percentages to match actual tier count
+    const raw = Array.from({ length: numTiers }, (_, i) => {
+      const idx = Math.round((i / Math.max(numTiers - 1, 1)) * (base.length - 1));
+      return base[idx] ?? base[base.length - 1];
+    });
+    const sum = raw.reduce((a, b) => a + b, 0);
+    const pcts = raw.map(p => p / sum);
+
+    const activeTiers = showTiersOverride
+      ? tierThresholds
+      : cycle.tiers.map(t => ({
+          tierId: t.id,
+          minScore: t.minScore,
+          maxScore: t.maxScore,
+          incrementMin: t.incrementMin,
+          incrementMax: t.incrementMax,
+        }));
+    const sortedTiers = [...activeTiers].sort((a, b) => a.minScore - b.minScore);
+    const employeeCount = cycle.employeeCount || 0;
+
+    const tierRows = sortedTiers.map((t, i) => {
+      const tierDef = cycle.tiers.find(ct => ct.id === t.tierId);
+      const count = Math.round(employeeCount * pcts[i]);
+      return {
+        name: tierDef?.name ?? `Tier ${i + 1}`,
+        count,
+        midInc: (t.incrementMin + t.incrementMax) / 2,
+        color: tierDef?.color ?? '#94a3b8',
+        qualifies: t.incrementMin > 0,
+      };
+    });
+
+    const qualifying = tierRows.filter(t => t.qualifies).reduce((s, t) => s + t.count, 0);
+    return { tierRows, qualifying, employeeCount };
+  }, [assumedDistribution, tierThresholds, showTiersOverride, cycle]);
 
   const handleRun = async () => {
     if (!name.trim()) {
@@ -279,6 +328,43 @@ export default function RunSimulationModal({ cycle, onClose, onSuccess }: RunSim
             </div>
           </section>
 
+          {/* Live Estimate Preview */}
+          {liveEstimate && liveEstimate.employeeCount > 0 && (
+            <section>
+              <h3 className="text-sm font-bold text-slate-900 mb-3">Live Estimate</h3>
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                <p className="text-xs text-slate-500">
+                  Approximate distribution based on <span className="font-semibold text-slate-700">{assumedDistribution.replace('_', ' ')}</span> model — updates as you adjust parameters.
+                </p>
+                <div className="space-y-1.5">
+                  {liveEstimate.tierRows.map((tier) => (
+                    <div key={tier.name} className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tier.color }} />
+                      <span className="text-xs text-slate-600 w-28 truncate">{tier.name}</span>
+                      <div className="flex-1 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-1.5 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${liveEstimate.employeeCount > 0 ? (tier.count / liveEstimate.employeeCount) * 100 : 0}%`,
+                            backgroundColor: tier.color,
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium text-slate-700 w-16 text-right">
+                        ~{tier.count} · {tier.midInc.toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                  <span className="text-xs text-slate-500">Est. qualifying employees</span>
+                  <span className="text-sm font-bold text-emerald-600">
+                    ~{liveEstimate.qualifying} / {liveEstimate.employeeCount}
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Footer */}

@@ -7,14 +7,35 @@ export default function DataPrivacySettings() {
   const [exporting, setExporting] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
+  const triggerDownload = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('content-disposition');
+      const filenameMatch = contentDisposition?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      const filename = filenameMatch?.[1]?.replace(/['"]/g, '') ?? 'company-data-export.zip';
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      // Fallback: open in new tab if fetch fails (e.g. CORS)
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const handleExport = async () => {
     setExporting(true);
     setDownloadUrl(null);
     try {
       const res = await settingsService.exportCompanyData();
       if (res.success && res.downloadUrl) {
-          setDownloadUrl(res.downloadUrl);
-          toast.success("Data export prepared successfully");
+        setDownloadUrl(res.downloadUrl);
+        toast.success("Data export ready — click Download to save");
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to export data");
@@ -35,7 +56,7 @@ export default function DataPrivacySettings() {
         </h2>
 
         <p className="text-sm text-slate-600 mb-4">
-            Download a complete export of all your company data including employees, cycles, evaluations, and increment stories. Export is provided as a JSON file.
+            Download a complete export of all your company data including employees, cycles, evaluations, and increment stories. The export is prepared server-side and downloaded as a ZIP archive.
         </p>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
@@ -54,15 +75,13 @@ export default function DataPrivacySettings() {
                     {exporting ? "Preparing export..." : "Export All Data"}
                 </button>
             ) : (
-                <a
-                    href={downloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                <button
+                    onClick={() => triggerDownload(downloadUrl)}
                     className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
                 >
                     <Download className="w-4 h-4" />
-                    Your export is ready — Download
-                </a>
+                    Download Export
+                </button>
             )}
         </div>
       </div>

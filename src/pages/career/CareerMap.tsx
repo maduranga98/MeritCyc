@@ -10,7 +10,7 @@ import {
 import { getIncrementStories } from '../../services/incrementStoryService';
 import { evaluationService } from '../../services/evaluationService';
 import { type EmployeeCareerMap, type CareerPath, type CareerLevel } from '../../types/careerPath';
-import { type IncrementStory, type StoryRecommendation } from '../../types/incrementStory';
+import { type IncrementStory, type StoryRecommendation, type RecommendationPriority } from '../../types/incrementStory';
 import { type Evaluation } from '../../types/evaluation';
 import { type Cycle } from '../../types/cycle';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -160,6 +160,46 @@ const CareerMapPage: React.FC = () => {
 
     return () => unsubStories();
   }, [user?.uid]);
+
+  // Gap calculation: derive recommendations from active evaluation when none are stored
+  useEffect(() => {
+    if (recommendations === null) return; // still loading stored ones
+    if (recommendations.length > 0) return; // already have recommendations
+    if (!activeEvaluation || !activeCycle) return;
+
+    const computed: StoryRecommendation[] = activeCycle.criteria
+      .map((criterion) => {
+        const score = activeEvaluation.scores?.[criterion.id];
+        const currentScore = score?.normalizedScore ?? 0;
+        const targetScore = 90; // exceptional threshold
+        const gap = targetScore - currentScore;
+        if (gap <= 5) return null; // already close to exceptional
+        const priority: RecommendationPriority = gap > 25 ? 'high' : gap > 10 ? 'medium' : 'low';
+        return {
+          criteriaId: criterion.id,
+          criteriaName: criterion.name,
+          currentScore,
+          targetScore,
+          priority,
+          suggestion: `Improve your ${criterion.name.toLowerCase()} performance by ${gap.toFixed(0)} points to reach Exceptional level. ${
+            criterion.dataSource === 'manager'
+              ? 'Discuss specific improvement areas with your manager.'
+              : criterion.dataSource === 'self'
+              ? 'Track your own progress and document achievements.'
+              : 'Your system-measured metrics will update automatically.'
+          }`,
+        };
+      })
+      .filter(Boolean) as StoryRecommendation[];
+
+    computed.sort(
+      (a, b) => (b.targetScore - b.currentScore) - (a.targetScore - a.currentScore)
+    );
+
+    if (computed.length > 0) {
+      setRecommendations(computed);
+    }
+  }, [recommendations, activeEvaluation, activeCycle]);
 
   // Animate progress bar on mount
   useEffect(() => {

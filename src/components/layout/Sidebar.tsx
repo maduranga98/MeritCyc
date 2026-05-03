@@ -20,6 +20,7 @@ import {
   CheckSquare,
   ShieldCheck,
   BookOpen,
+  CreditCard,
 } from "lucide-react";
 import { type RoleCode } from "../../types/roles";
 import { useNotificationStore } from "../../stores/notificationStore";
@@ -96,6 +97,7 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
           ],
         },
         { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
+        { name: "Billing", href: "/billing", icon: CreditCard },
         { name: "Settings", href: "/settings/general", icon: Settings },
         { name: "Help & Instructions", href: "/help/instructions", icon: BookOpen },
       ];

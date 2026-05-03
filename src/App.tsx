@@ -67,6 +67,10 @@ import DataPrivacySettings from "./pages/settings/DataPrivacySettings";
 // Help & Instructions
 import InstructionsPage from "./pages/help/InstructionsPage";
 
+// Billing
+import BillingDashboard from "./pages/billing/BillingDashboard";
+import PricingPage from "./pages/billing/PricingPage";
+
 // Session management (idle timeout — only active for logged-in users)
 import { useIdleTimeout } from "./hooks/useIdleTimeout";
 import { useAuth } from "./context/AuthContext";
@@ -567,6 +571,30 @@ function App() {
             <ProtectedRoute allowedRoles={["manager"]}>
               <AppLayout>
                 <TeamEvaluationPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================================================================= */}
+        {/* Billing (10.1–10.5)                                                 */}
+        {/* ================================================================= */}
+        <Route
+          path="/billing"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <AppLayout>
+                <BillingDashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pricing"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <AppLayout>
+                <PricingPage />
               </AppLayout>
             </ProtectedRoute>
           }

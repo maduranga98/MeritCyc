@@ -14,7 +14,7 @@ import { markNotificationRead } from '../../services/notificationService';
 import { salaryBandService } from '../../services/salaryBandService';
 import { departmentService } from '../../services/departmentService';
 import { db } from '../../config/firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -92,28 +92,29 @@ const EmployeeDashboard: React.FC = () => {
     let evalUnsubscribe: (() => void) | null = null;
     let isMounted = true;
 
-    const init = async () => {
-      try {
-        const cyclesSnapshot = await getDocs(
-          query(
-            collection(db, 'cycles'),
-            where('companyId', '==', user.companyId),
-            where('status', 'in', ['active', 'locked'])
-          )
-        );
-
+    const cycleUnsub = onSnapshot(
+      query(
+        collection(db, 'cycles'),
+        where('companyId', '==', user.companyId),
+        where('status', 'in', ['active', 'locked'])
+      ),
+      (cyclesSnapshot) => {
         if (!isMounted) return;
+
+        // Clean up previous evaluation listener when cycle changes
+        evalUnsubscribe?.();
+        evalUnsubscribe = null;
 
         if (cyclesSnapshot.empty) {
           setActiveCycle(null);
           setActiveEvaluation(null);
+          setCurrentWeightedScore(0);
+          setEstimatedTier(null);
           return;
         }
 
         const cycleDoc = cyclesSnapshot.docs[0];
         const cycleData = cycleDoc.data() as Cycle;
-
-        if (!isMounted) return;
 
         setActiveCycle({ ...cycleData, isLocked: cycleData.status === 'locked' });
 
@@ -121,7 +122,7 @@ const EmployeeDashboard: React.FC = () => {
           query(
             collection(db, 'evaluations'),
             where('cycleId', '==', cycleDoc.id),
-            where('employeeId', '==', user.uid)
+            where('employeeUid', '==', user.uid)
           ),
           (snapshot) => {
             if (!isMounted) return;
@@ -151,15 +152,15 @@ const EmployeeDashboard: React.FC = () => {
             }
           }
         );
-      } catch (err) {
+      },
+      (err) => {
         console.error('Error loading active cycle:', err);
       }
-    };
-
-    init();
+    );
 
     return () => {
       isMounted = false;
+      cycleUnsub();
       evalUnsubscribe?.();
     };
   }, [user?.uid, user?.companyId]);

@@ -629,10 +629,10 @@ const QRLanding: React.FC = () => {
                 {submitting ? (
                   <>
                     <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    Sending code…
+                    Submitting…
                   </>
                 ) : (
-                  "Send Verification Code"
+                  "Submit Application"
                 )}
               </button>
             </form>

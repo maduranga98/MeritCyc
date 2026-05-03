@@ -84,7 +84,7 @@ export default function AcceptInvite() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center font-brand bg-merit-offwhite">
+      <div className="min-h-screen flex items-center justify-center font-brand bg-merit-bg">
         <p className="text-merit-slate">Loading invitation...</p>
       </div>
     );
@@ -92,13 +92,13 @@ export default function AcceptInvite() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center font-brand bg-merit-offwhite">
+      <div className="min-h-screen flex items-center justify-center font-brand bg-merit-bg">
         <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100 max-w-md w-full text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
           <p className="text-merit-slate mb-6">{error}</p>
           <button
             onClick={() => navigate("/")}
-            className="text-merit-primary font-medium hover:underline"
+            className="text-merit-emerald font-medium hover:underline"
           >
             Go to Login
           </button>
@@ -108,7 +108,7 @@ export default function AcceptInvite() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center font-brand bg-merit-offwhite">
+    <div className="min-h-screen flex items-center justify-center font-brand bg-merit-bg">
       <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100 max-w-md w-full">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-merit-navy mb-2">Accept Invitation</h1>
@@ -138,7 +138,7 @@ export default function AcceptInvite() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-merit-primary/20 focus:border-merit-primary outline-none transition-all"
+              className="w-full px-4 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-merit-emerald/20 focus:border-merit-emerald outline-none transition-all"
               placeholder="Minimum 6 characters"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -149,7 +149,7 @@ export default function AcceptInvite() {
           <button
             type="submit"
             disabled={submitting || password.length < 6}
-            className="w-full bg-merit-primary hover:bg-merit-primary/90 text-white font-medium py-2 px-4 rounded-md transition-colors disabled:opacity-50"
+            className="w-full bg-merit-emerald hover:bg-merit-emerald/90 text-white font-medium py-2 px-4 rounded-md transition-colors disabled:opacity-50"
           >
             {submitting ? "Accepting..." : "Accept Invitation"}
           </button>

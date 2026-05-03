@@ -457,10 +457,7 @@ exports.deleteCompany = onCall(async (request) => {
 // =============================================================================
 
 const crypto = require("crypto");
-const { BrevoClient } = require("@getbrevo/brevo");
-
-// Brevo transactional email client (v5.x)
-const transactionalEmailApi = new BrevoClient({ apiKey: process.env.BREVO_API_KEY || "" }).transactionalEmails;
+const { sendEmail } = require("./src/utils/mailer");
 
 // ---------------------------------------------------------------------------
 // Rate-limit helper
@@ -596,12 +593,12 @@ async function resolveCompanyCode(companyCode) {
 }
 
 // ---------------------------------------------------------------------------
-// Send OTP email via Brevo
+// Send OTP email via SMTP
 // ---------------------------------------------------------------------------
 
 async function sendOtpEmail(toEmail, toName, otp, companyName) {
   try {
-    await transactionalEmailApi.sendTransacEmail({
+    await sendEmail({
       sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
       to: [{ email: toEmail, name: toName }],
       subject: "Your MeritCyc Verification Code",
@@ -622,18 +619,17 @@ async function sendOtpEmail(toEmail, toName, otp, companyName) {
     </div>`,
     });
   } catch (e) {
-    // Log but don't surface Brevo errors to the caller
-    logger.error("Brevo send failed:", e);
+    logger.error("SMTP OTP send failed:", e);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Send "registration received, awaiting approval" email via Brevo
+// Send "registration received, awaiting approval" email via SMTP
 // ---------------------------------------------------------------------------
 
 async function sendApprovalPendingEmail(toEmail, toName, companyName) {
   try {
-    await transactionalEmailApi.sendTransacEmail({
+    await sendEmail({
       sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
       to: [{ email: toEmail, name: toName }],
       subject: "Registration received — awaiting HR approval",
@@ -651,12 +647,12 @@ async function sendApprovalPendingEmail(toEmail, toName, companyName) {
     </div>`,
     });
   } catch (e) {
-    logger.error("Brevo approval-pending email send failed:", e);
+    logger.error("SMTP approval-pending email send failed:", e);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Helper: send evaluation deadline reminder email via Brevo
+// Helper: send evaluation deadline reminder email via SMTP
 // ---------------------------------------------------------------------------
 
 async function sendEvaluationReminderEmail({ toEmails, cycleName, companyName, deadlineDate, daysRemaining, incompleteCount, recipientRole }) {
@@ -682,7 +678,7 @@ async function sendEvaluationReminderEmail({ toEmails, cycleName, companyName, d
   }
 
   try {
-    await transactionalEmailApi.sendTransacEmail({
+    await sendEmail({
       sender: { name: "MeritCyc", email: "noreply@meritcyc.com" },
       to: toEmails.map(e => ({ email: e.email, name: e.name || e.email })),
       subject: `[${companyName}] Evaluation deadline — ${urgencyLabel} for "${cycleName}"`,
@@ -716,7 +712,7 @@ async function sendEvaluationReminderEmail({ toEmails, cycleName, companyName, d
     </div>`,
     });
   } catch (e) {
-    logger.error("Brevo evaluation reminder email send failed:", e);
+    logger.error("SMTP evaluation reminder email send failed:", e);
   }
 }
 
@@ -2702,7 +2698,7 @@ exports.requestEvaluationDeadlineReminder = onCall(async (request) => {
 
     await batch.commit();
 
-    // Send Brevo email to all managers with incomplete evaluations
+    // Send email to all managers with incomplete evaluations
     if (emailRecipients.length > 0 && daysRemaining !== null) {
       await sendEvaluationReminderEmail({
         toEmails: emailRecipients,

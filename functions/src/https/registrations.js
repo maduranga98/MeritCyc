@@ -3,12 +3,9 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
-const { BrevoClient } = require("@getbrevo/brevo");
+const { sendEmail } = require("../utils/mailer");
 
 const firestore = admin.firestore();
-
-// Set up Brevo v5.x client
-const transactionalEmailsApi = new BrevoClient({ apiKey: process.env.BREVO_API_KEY || "" }).transactionalEmails;
 
 async function writeAuditLog({
   companyId,
@@ -246,7 +243,7 @@ exports.submitSelfRegistration = onCall(async (request) => {
       }));
 
       try {
-        await transactionalEmailsApi.sendTransacEmail({
+        await sendEmail({
           subject: `New self-registration pending approval at ${companyName}`,
           htmlContent: `
         <html>
@@ -374,7 +371,7 @@ exports.approveRegistration = onCall(async (request) => {
     const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
     try {
-      await transactionalEmailsApi.sendTransacEmail({
+      await sendEmail({
         subject: `Welcome to ${companyName} on MeritCyc!`,
         htmlContent: `
       <html>
@@ -505,7 +502,7 @@ exports.bulkApprove = onCall(async (request) => {
       const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
       try {
-        await transactionalEmailsApi.sendTransacEmail({
+        await sendEmail({
           subject: `Welcome to ${companyName} on MeritCyc!`,
           htmlContent: `
         <html>
@@ -602,7 +599,7 @@ exports.bulkReject = onCall(async (request) => {
 
     await Promise.all(emailsToSend.map(async (u) => {
       try {
-        await transactionalEmailsApi.sendTransacEmail({
+        await sendEmail({
           subject: "Your MeritCyc registration was not approved",
           htmlContent: `
         <html>
@@ -674,7 +671,7 @@ exports.rejectRegistration = onCall(async (request) => {
     });
 
     try {
-      await transactionalEmailsApi.sendTransacEmail({
+      await sendEmail({
         subject: "Your MeritCyc registration was not approved",
         htmlContent: `
       <html>
@@ -742,7 +739,7 @@ exports.pendingApprovalReminder = onSchedule("every 12 hours", async (event) => 
           const toEmails = hrAdminsSnapshot.docs.map(doc => ({ email: doc.data().email, name: doc.data().name }));
 
           try {
-            await transactionalEmailsApi.sendTransacEmail({
+            await sendEmail({
               subject: "Pending Registration Reminders",
               htmlContent: `
             <html>
@@ -805,7 +802,7 @@ exports.requestMoreInfo = onCall(async (request) => {
     const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
     try {
-      await transactionalEmailsApi.sendTransacEmail({
+      await sendEmail({
         subject: `Information requested for your ${companyName} registration`,
         htmlContent: `
       <html>

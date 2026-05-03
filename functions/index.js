@@ -1813,6 +1813,18 @@ exports.updateEmployeeProfile = onCall(async (request) => {
         transaction.update(userRef, updates);
     });
 
+    // Build audit "after" without FieldValue sentinels — delete() and
+    // serverTimestamp() are not valid in add() and would cause a 500.
+    const auditAfter = {
+      ...userDoc.data(),
+      ...(departmentId !== undefined ? { departmentId: departmentId || null } : {}),
+      ...(salaryBandId !== undefined ? { salaryBandId: salaryBandId || null } : {}),
+      ...(jobTitle !== undefined ? { jobTitle } : {}),
+      ...(status !== undefined ? { status } : {}),
+      ...(updates.departmentName !== undefined ? { departmentName: updates.departmentName || null } : {}),
+      ...(updates.salaryBandName !== undefined ? { salaryBandName: updates.salaryBandName || null } : {}),
+    };
+
     await writeAuditLog({
       companyId,
       action: "EMPLOYEE_PROFILE_UPDATED",
@@ -1822,7 +1834,7 @@ exports.updateEmployeeProfile = onCall(async (request) => {
       targetType: "user",
       targetId: targetUid,
       before: userDoc.data(),
-      after: { ...userDoc.data(), ...updates },
+      after: auditAfter,
     });
   }
 

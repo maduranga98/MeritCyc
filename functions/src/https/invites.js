@@ -2,13 +2,10 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
-const { BrevoClient } = require("@getbrevo/brevo");
+const { sendEmail } = require("../utils/mailer");
 
 // We assume firebase-admin is initialized in index.js
 const firestore = admin.firestore();
-
-// Set up Brevo v5.x client
-const transactionalEmailsApi = new BrevoClient({ apiKey: process.env.BREVO_API_KEY || "" }).transactionalEmails;
 
 // =============================================================================
 // Helper: write audit log entry
@@ -126,11 +123,11 @@ exports.sendEmployeeInvite = onCall(async (request) => {
 
     const inviteId = inviteRef.id;
 
-    // Send Brevo email
+    // Send email
     const companyDoc = await firestore.collection("companies").doc(companyId).get();
     const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
-    await transactionalEmailsApi.sendTransacEmail({
+    await sendEmail({
       subject: `You've been invited to ${companyName}`,
       htmlContent: `
       <html>
@@ -367,11 +364,11 @@ exports.resendInvite = onCall(async (request) => {
       resendCount: admin.firestore.FieldValue.increment(1),
     });
 
-    // Send new Brevo email
+    // Send email
     const companyDoc = await firestore.collection("companies").doc(companyId).get();
     const companyName = companyDoc.exists ? companyDoc.data().name : "MeritCyc";
 
-    await transactionalEmailsApi.sendTransacEmail({
+    await sendEmail({
       subject: `Reminder: You've been invited to ${companyName}`,
       htmlContent: `
       <html>
@@ -574,19 +571,17 @@ exports.bulkImportEmployees = onCall(async (request) => {
   try {
     await batch.commit();
 
-    // Send emails using Brevo (sending them individually for now,
-    // real batch might require an array of SendSmtpEmail or specific batch endpoint)
-    // Send in parallel
+    // Send emails in parallel via SMTP
     await Promise.all(emailsToSend.map(async (emailObj) => {
       try {
-        await transactionalEmailsApi.sendTransacEmail({
+        await sendEmail({
           subject: emailObj.subject,
           htmlContent: emailObj.htmlContent,
           sender: emailObj.sender,
           to: emailObj.to,
         });
       } catch (e) {
-        logger.error("Failed to send email via Brevo", e);
+        logger.error("Failed to send invite email", e);
       }
     }));
 

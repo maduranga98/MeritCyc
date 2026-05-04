@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cycleService } from '../../services/cycleService';
 import { simulationService } from '../../services/simulationService';
 import { type Cycle } from '../../types/cycle';
-import { type Simulation } from '../../types/simulation';
+import { type Simulation, type WhatIfParams, type WhatIfResults, type DistributionType } from '../../types/simulation';
 import {
   ArrowLeft,
   Plus,
@@ -12,7 +12,11 @@ import {
   BarChart2,
   TrendingUp,
   DollarSign,
-  Users
+  Users,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -44,6 +48,86 @@ const formatCurrency = (amount: number, currency: string = 'USD') => {
   }).format(amount);
 };
 
+function generateScores(count: number, distribution: DistributionType): number[] {
+  const scores: number[] = [];
+  for (let i = 0; i < count; i++) {
+    let score: number;
+    switch (distribution) {
+      case 'uniform':
+        score = Math.random() * 100;
+        break;
+      case 'top_heavy':
+        score = 100 - Math.pow(Math.random(), 0.5) * 100;
+        break;
+      case 'bottom_heavy':
+        score = Math.pow(Math.random(), 0.5) * 100;
+        break;
+      case 'normal':
+      default: {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
+        score = Math.max(0, Math.min(100, 50 + z * 20));
+        break;
+      }
+    }
+    scores.push(score);
+  }
+  return scores;
+}
+
+function calculateWhatIfResults(
+  params: WhatIfParams,
+  baseline: Simulation,
+  cycle: Cycle
+): WhatIfResults {
+  const employeeCount = cycle.employeeCount || Math.max(baseline.results.qualifyingEmployees, 10);
+  const scores = generateScores(employeeCount, params.distribution);
+  const qualifying = scores.filter(s => s >= params.scoreThreshold);
+
+  // Derive implied average salary from baseline simulation data
+  const avgSalary =
+    baseline.results.averageIncrement > 0 && baseline.results.qualifyingEmployees > 0
+      ? (baseline.results.totalProjectedCost / baseline.results.qualifyingEmployees) /
+        (baseline.results.averageIncrement / 100)
+      : 50000;
+
+  let totalCost = 0;
+  const increments: number[] = [];
+
+  qualifying.forEach(score => {
+    const tier = cycle.tiers.find(t => score >= t.minScore && score <= t.maxScore);
+    if (tier) {
+      const mid = (tier.incrementMin + tier.incrementMax) / 2;
+      increments.push(mid);
+      totalCost += avgSalary * (mid / 100);
+    }
+  });
+
+  const configuredBudget =
+    cycle.budget.type === 'fixed_pool' && cycle.budget.totalBudget
+      ? cycle.budget.totalBudget * params.budgetCapMultiplier
+      : baseline.results.totalProjectedCost * params.budgetCapMultiplier;
+
+  const budgetUtilization =
+    configuredBudget > 0 ? Math.min((totalCost / configuredBudget) * 100, 200) : 0;
+
+  const avgIncrement =
+    increments.length > 0
+      ? increments.reduce((a, b) => a + b, 0) / increments.length
+      : 0;
+
+  return {
+    qualifyingEmployees: qualifying.length,
+    totalProjectedCost: Math.round(totalCost),
+    averageIncrement: Math.round(avgIncrement * 10) / 10,
+    budgetUtilization: Math.round(budgetUtilization * 10) / 10,
+    qualifyingDelta: qualifying.length - baseline.results.qualifyingEmployees,
+    costDelta: Math.round(totalCost - baseline.results.totalProjectedCost),
+    avgIncrementDelta: Math.round((avgIncrement - baseline.results.averageIncrement) * 10) / 10,
+  };
+}
+
 export default function SimulationDashboard() {
   const { cycleId } = useParams<{ cycleId: string }>();
   const navigate = useNavigate();
@@ -53,6 +137,17 @@ export default function SimulationDashboard() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [applying, setApplying] = useState(false);
+
+  // What-If Explorer state
+  const [whatIfOpen, setWhatIfOpen] = useState(false);
+  const [whatIfParams, setWhatIfParams] = useState<WhatIfParams>({
+    scoreThreshold: 60,
+    budgetCapMultiplier: 1.0,
+    distribution: 'normal',
+  });
+  const [whatIfResults, setWhatIfResults] = useState<WhatIfResults | null>(null);
+  const [savingWhatIf, setSavingWhatIf] = useState(false);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!cycleId) return;
@@ -82,6 +177,48 @@ export default function SimulationDashboard() {
       unsubSims();
     };
   }, [cycleId, navigate, selectedSimId]);
+
+  const recalculateWhatIf = useCallback(
+    (params: WhatIfParams) => {
+      const baseline = simulations.find(s => s.id === selectedSimId);
+      if (!cycle || !baseline) return;
+      const results = calculateWhatIfResults(params, baseline, cycle);
+      setWhatIfResults(results);
+    },
+    [cycle, simulations, selectedSimId]
+  );
+
+  useEffect(() => {
+    if (!whatIfOpen) return;
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => recalculateWhatIf(whatIfParams), 200);
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [whatIfParams, whatIfOpen, recalculateWhatIf]);
+
+  const handleSaveWhatIf = async () => {
+    if (!cycle || !whatIfResults) return;
+    setSavingWhatIf(true);
+    try {
+      await simulationService.runSimulation({
+        cycleId: cycle.id,
+        name: `What-If (threshold ${whatIfParams.scoreThreshold}%, cap ${Math.round(whatIfParams.budgetCapMultiplier * 100)}%)`,
+        parameters: {
+          criteriaWeights: {},
+          tierThresholds: [],
+          budgetCap: whatIfParams.budgetCapMultiplier,
+          assumedDistribution: whatIfParams.distribution,
+        },
+      });
+      toast.success('What-If scenario saved.');
+      setWhatIfOpen(false);
+    } catch (e: unknown) {
+      toast.error((e as Error).message || 'Failed to save scenario.');
+    } finally {
+      setSavingWhatIf(false);
+    }
+  };
 
   const handleDelete = async (sim: Simulation) => {
     if (sim.isApplied) {
@@ -336,6 +473,199 @@ export default function SimulationDashboard() {
                     </ResponsiveContainer>
                   </div>
                 </div>
+              </div>
+
+              {/* What-If Explorer */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => {
+                    const next = !whatIfOpen;
+                    setWhatIfOpen(next);
+                    if (next) recalculateWhatIf(whatIfParams);
+                  }}
+                  className="w-full flex items-center justify-between px-6 py-4 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    <span className="font-semibold text-slate-900">What-If Explorer</span>
+                    <span className="text-xs text-slate-500 font-normal">Adjust parameters and see live results — no Cloud Function call</span>
+                  </div>
+                  {whatIfOpen ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                </button>
+
+                {whatIfOpen && (
+                  <div className="p-6 space-y-6">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                      {/* Controls */}
+                      <div className="space-y-6">
+                        {/* Score Threshold */}
+                        <div>
+                          <div className="flex justify-between mb-2">
+                            <label className="text-sm font-medium text-slate-700">Minimum Qualifying Score</label>
+                            <span className="text-sm font-bold text-emerald-600">{whatIfParams.scoreThreshold}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={whatIfParams.scoreThreshold}
+                            onChange={e =>
+                              setWhatIfParams(p => ({ ...p, scoreThreshold: Number(e.target.value) }))
+                            }
+                            className="w-full accent-emerald-500"
+                          />
+                          <div className="flex justify-between text-xs text-slate-400 mt-1">
+                            <span>0%</span><span>50%</span><span>100%</span>
+                          </div>
+                        </div>
+
+                        {/* Budget Cap */}
+                        <div>
+                          <div className="flex justify-between mb-2">
+                            <label className="text-sm font-medium text-slate-700">Budget Cap</label>
+                            <span className="text-sm font-bold text-emerald-600">
+                              {Math.round(whatIfParams.budgetCapMultiplier * 100)}% of baseline
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0.5}
+                            max={2.0}
+                            step={0.05}
+                            value={whatIfParams.budgetCapMultiplier}
+                            onChange={e =>
+                              setWhatIfParams(p => ({ ...p, budgetCapMultiplier: Number(e.target.value) }))
+                            }
+                            className="w-full accent-emerald-500"
+                          />
+                          <div className="flex justify-between text-xs text-slate-400 mt-1">
+                            <span>50%</span><span>100%</span><span>200%</span>
+                          </div>
+                        </div>
+
+                        {/* Score Distribution */}
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 block mb-2">Score Distribution</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(['normal', 'top_heavy', 'bottom_heavy', 'uniform'] as DistributionType[]).map(dist => (
+                              <label
+                                key={dist}
+                                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                  whatIfParams.distribution === dist
+                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                    : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="distribution"
+                                  value={dist}
+                                  checked={whatIfParams.distribution === dist}
+                                  onChange={() =>
+                                    setWhatIfParams(p => ({ ...p, distribution: dist }))
+                                  }
+                                  className="accent-emerald-500"
+                                />
+                                <span className="text-sm font-medium capitalize">
+                                  {dist.replace('_', ' ')}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Results panel */}
+                      <div className="space-y-4">
+                        {whatIfResults ? (
+                          <>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Live Results</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              {[
+                                {
+                                  label: 'Qualifying Employees',
+                                  value: whatIfResults.qualifyingEmployees.toString(),
+                                  delta: whatIfResults.qualifyingDelta,
+                                  icon: <Users className="w-4 h-4" />,
+                                },
+                                {
+                                  label: 'Avg Increment',
+                                  value: `${whatIfResults.averageIncrement}%`,
+                                  delta: whatIfResults.avgIncrementDelta,
+                                  icon: <TrendingUp className="w-4 h-4" />,
+                                },
+                                {
+                                  label: 'Projected Cost',
+                                  value: formatCurrency(whatIfResults.totalProjectedCost, cycle.budget.currency),
+                                  delta: whatIfResults.costDelta,
+                                  deltaPrefix: whatIfResults.costDelta >= 0 ? '+' : '',
+                                  deltaFormatted: formatCurrency(Math.abs(whatIfResults.costDelta), cycle.budget.currency),
+                                  icon: <DollarSign className="w-4 h-4" />,
+                                },
+                                {
+                                  label: 'Budget Utilization',
+                                  value: `${whatIfResults.budgetUtilization}%`,
+                                  delta: null,
+                                  icon: <BarChart2 className="w-4 h-4" />,
+                                  utilization: whatIfResults.budgetUtilization,
+                                },
+                              ].map(card => (
+                                <div
+                                  key={card.label}
+                                  className={`p-4 rounded-xl border ${
+                                    'utilization' in card
+                                      ? card.utilization! >= 95
+                                        ? 'bg-red-50 border-red-100'
+                                        : card.utilization! >= 80
+                                        ? 'bg-amber-50 border-amber-100'
+                                        : 'bg-emerald-50 border-emerald-100'
+                                      : 'bg-slate-50 border-slate-100'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 text-slate-500 mb-1">
+                                    {card.icon}
+                                    <span className="text-xs font-medium">{card.label}</span>
+                                  </div>
+                                  <p className="text-xl font-bold text-slate-900">{card.value}</p>
+                                  {card.delta !== null && (
+                                    <p className={`text-xs mt-1 font-medium ${card.delta > 0 ? 'text-emerald-600' : card.delta < 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                      {card.delta > 0 ? '▲' : card.delta < 0 ? '▼' : '—'}{' '}
+                                      {'deltaFormatted' in card && card.deltaFormatted
+                                        ? `${card.deltaPrefix ?? ''}${card.deltaFormatted}`
+                                        : `${card.delta > 0 ? '+' : ''}${card.delta}`}{' '}
+                                      from baseline
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            <button
+                              onClick={handleSaveWhatIf}
+                              disabled={savingWhatIf || simulations.length >= 5}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-500 text-white font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {savingWhatIf ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4" />
+                              )}
+                              {savingWhatIf ? 'Saving...' : 'Save as Scenario'}
+                            </button>
+                            {simulations.length >= 5 && (
+                              <p className="text-xs text-center text-slate-400">Maximum 5 scenarios reached.</p>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                            Adjust a parameter to see live results
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Comparison Table (if multiple simulations) */}

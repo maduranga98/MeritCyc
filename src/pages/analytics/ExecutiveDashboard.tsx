@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { analyticsService } from "../../services/analyticsService";
-import { type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYTierData } from "../../types/analytics";
+import { type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYMetricsPoint } from "../../types/analytics";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Users,
@@ -21,6 +21,7 @@ import {
   ComposedChart,
   Bar,
   Line,
+  LineChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -35,7 +36,6 @@ import {
   AreaChart,
   Area,
   ReferenceLine,
-  BarChart,
 } from "recharts";
 
 export default function ExecutiveDashboard() {
@@ -44,7 +44,7 @@ export default function ExecutiveDashboard() {
   const [kpis, setKpis] = useState<CompanyKPIs | null>(null);
   const [trends, setTrends] = useState<IncrementTrendPoint[]>([]);
   const [deptData, setDeptData] = useState<DepartmentPerformance[]>([]);
-  const [yoyData, setYoyData] = useState<YoYTierData[]>([]);
+  const [yoyMetrics, setYoyMetrics] = useState<YoYMetricsPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState("12m");
   const [selectedDept, setSelectedDept] = useState<DepartmentPerformance | null>(null);
@@ -85,8 +85,8 @@ export default function ExecutiveDashboard() {
         setCycleGrowth(1); // At least 1 new completed cycle
       }
 
-      const yoyData = await analyticsService.getYoYComparison(user.companyId);
-      setYoyData(yoyData);
+      const yoyMetrics = await analyticsService.getYoYMetrics(user.companyId);
+      setYoyMetrics(yoyMetrics);
     } catch (error) {
       console.error(error);
     } finally {
@@ -273,23 +273,83 @@ export default function ExecutiveDashboard() {
 
         {/* SECTION 4 - YoY Comparison */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-6">Year-over-Year Tier Distribution</h2>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={yoyData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="year" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} label={{ value: 'Employees', angle: -90, position: 'insideLeft' }} />
-                <Tooltip cursor={{ fill: '#f8fafc' }} />
-                <Legend />
-                <Bar dataKey="Tier 1" fill="#10B981" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Tier 2" fill="#3B82F6" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Tier 3" fill="#F59E0B" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Tier 4" fill="#EF4444" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Tier 5" fill="#8B5CF6" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-6">Year-over-Year Comparison</h2>
+          {yoyMetrics.length <= 1 ? (
+            <p className="text-sm text-slate-500 text-center py-8">
+              Complete more cycles to see year-over-year trends.
+            </p>
+          ) : (
+            <>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={yoyMetrics} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+                    <YAxis yAxisId="pct" axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} tick={{ fill: '#64748B', fontSize: 11 }} width={40} />
+                    <YAxis yAxisId="count" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11 }} width={40} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'Avg Increment %') return [`${value}%`, name];
+                        if (name === 'Employees Reviewed') return [value, name];
+                        return [value, name];
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+                    <Line yAxisId="pct" type="monotone" dataKey="avgIncrement" name="Avg Increment %" stroke="#10B981" strokeWidth={3} dot={{ fill: '#10B981', r: 5, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} />
+                    <Line yAxisId="count" type="monotone" dataKey="employeesReviewed" name="Employees Reviewed" stroke="#64748B" strokeWidth={2} strokeDasharray="5 3" dot={{ fill: '#64748B', r: 4, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Summary table */}
+              <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                    <tr>
+                      <th className="px-4 py-3">Year</th>
+                      <th className="px-4 py-3">Cycles Run</th>
+                      <th className="px-4 py-3">Employees Reviewed</th>
+                      <th className="px-4 py-3">Avg Increment %</th>
+                      <th className="px-4 py-3">Total Spend</th>
+                      <th className="px-4 py-3">YoY Change</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {yoyMetrics.map((row, idx) => {
+                      const prev = yoyMetrics[idx - 1];
+                      const yoyChange = prev && prev.avgIncrement > 0
+                        ? Math.round(((row.avgIncrement - prev.avgIncrement) / prev.avgIncrement) * 1000) / 10
+                        : null;
+                      return (
+                        <tr key={row.year} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-semibold text-slate-900">{row.year}</td>
+                          <td className="px-4 py-3 text-slate-700">{row.cyclesRun}</td>
+                          <td className="px-4 py-3 text-slate-700">{row.employeesReviewed}</td>
+                          <td className="px-4 py-3 text-slate-700">{row.avgIncrement}%</td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {row.totalSpend > 0
+                              ? new Intl.NumberFormat('en-US', { style: 'currency', currency: kpis?.currency ?? 'USD', maximumFractionDigits: 0 }).format(row.totalSpend)
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {yoyChange === null ? (
+                              <span className="text-slate-400">—</span>
+                            ) : (
+                              <span className={`flex items-center gap-1 font-semibold text-xs ${yoyChange > 0 ? 'text-emerald-600' : yoyChange < 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                {yoyChange > 0 ? <ArrowUp className="w-3 h-3" /> : yoyChange < 0 ? <ArrowDown className="w-3 h-3" /> : null}
+                                {yoyChange > 0 ? '+' : ''}{yoyChange}%
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

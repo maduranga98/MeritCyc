@@ -1,7 +1,7 @@
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../config/firebase";
-import { type GeneratedReport, type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYTierData } from "../types/analytics";
+import { type GeneratedReport, type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYTierData, type YoYMetricsPoint } from "../types/analytics";
 
 export const analyticsService = {
   // Aggregate from Firestore reads
@@ -195,6 +195,62 @@ export const analyticsService = {
     }
 
     return result;
+  },
+
+  getYoYMetrics: async (companyId: string): Promise<YoYMetricsPoint[]> => {
+    const cyclesSnap = await getDocs(
+      query(
+        collection(db, "cycles"),
+        where("companyId", "==", companyId),
+        where("status", "==", "completed"),
+        orderBy("createdAt", "asc")
+      )
+    );
+
+    const yoyMap = new Map<string, {
+      cyclesRun: number;
+      employeesReviewed: Set<string>;
+      increments: number[];
+      totalSpend: number;
+    }>();
+
+    for (const cycleDoc of cyclesSnap.docs) {
+      const cycle = cycleDoc.data();
+      const cycleYear = cycle.createdAt?.toDate().getFullYear().toString() ?? 'Unknown';
+
+      if (!yoyMap.has(cycleYear)) {
+        yoyMap.set(cycleYear, { cyclesRun: 0, employeesReviewed: new Set(), increments: [], totalSpend: 0 });
+      }
+      const yearData = yoyMap.get(cycleYear)!;
+      yearData.cyclesRun++;
+
+      const evals = await getDocs(
+        query(collection(db, "evaluations"), where("cycleId", "==", cycleDoc.id))
+      );
+
+      evals.forEach(evalDoc => {
+        const ev = evalDoc.data();
+        if (ev.status !== 'submitted' && ev.status !== 'finalized' && ev.status !== 'overridden') return;
+        const increment = ev.recommendedIncrement ?? 0;
+        const baseSalary = ev.baseSalary ?? 0;
+        yearData.employeesReviewed.add(ev.employeeId);
+        yearData.increments.push(increment);
+        yearData.totalSpend += baseSalary * (increment / 100);
+      });
+    }
+
+    return Array.from(yoyMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([year, data]) => ({
+        year,
+        cyclesRun: data.cyclesRun,
+        employeesReviewed: data.employeesReviewed.size,
+        avgIncrement:
+          data.increments.length > 0
+            ? Math.round((data.increments.reduce((a, b) => a + b, 0) / data.increments.length) * 10) / 10
+            : 0,
+        totalSpend: Math.round(data.totalSpend),
+      }));
   },
 
   generateReport: async (params: any): Promise<{ success: boolean; reportId?: string }> => {

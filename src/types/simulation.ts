@@ -55,3 +55,19 @@ export interface Simulation {
   createdBy: string;
   updatedAt: Timestamp;
 }
+
+export interface WhatIfParams {
+  scoreThreshold: number;
+  budgetCapMultiplier: number;
+  distribution: DistributionType;
+}
+
+export interface WhatIfResults {
+  qualifyingEmployees: number;
+  totalProjectedCost: number;
+  averageIncrement: number;
+  budgetUtilization: number;
+  qualifyingDelta: number;
+  costDelta: number;
+  avgIncrementDelta: number;
+}

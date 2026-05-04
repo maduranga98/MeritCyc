@@ -6,6 +6,8 @@ import { useAuth } from "../../context/AuthContext";
 import { type Invite } from "../../types/invite";
 import { InviteEmployeeModal } from "../../components/shared/InviteEmployeeModal";
 import { BulkImportModal } from "../../components/shared/BulkImportModal";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function InviteTracker() {
   const { user } = useAuth();
@@ -16,12 +18,12 @@ export default function InviteTracker() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [maxResendError, setMaxResendError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.companyId) return;
 
     const invitesRef = collection(db, "companies", user.companyId, "invites");
-    // Sort by most recent first
     const q = query(invitesRef, orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -39,15 +41,22 @@ export default function InviteTracker() {
     return () => unsubscribe();
   }, [user?.companyId]);
 
-  const handleResend = async (inviteId: string) => {
-    setActionLoading(inviteId);
+  const handleResend = async (invite: Invite) => {
+    setMaxResendError(null);
+
+    if ((invite.resendCount ?? 0) >= 3) {
+      setMaxResendError(invite.id);
+      return;
+    }
+
+    setActionLoading(invite.id);
     try {
       const functions = getFunctions();
       const resendInvite = httpsCallable(functions, "resendInvite");
-      await resendInvite({ inviteId });
-    } catch (error) {
-      console.error("Error resending invite:", error);
-      alert("Failed to resend invite.");
+      await resendInvite({ inviteId: invite.id });
+      toast.success(`Invite resent to ${invite.email}. New link expires in 7 days.`);
+    } catch (error: unknown) {
+      toast.error((error as Error)?.message || "Failed to resend invite.");
     } finally {
       setActionLoading(null);
     }
@@ -61,9 +70,9 @@ export default function InviteTracker() {
       const functions = getFunctions();
       const revokeInvite = httpsCallable(functions, "revokeInvite");
       await revokeInvite({ inviteId });
-    } catch (error) {
-      console.error("Error revoking invite:", error);
-      alert("Failed to revoke invite.");
+      toast.success("Invitation revoked.");
+    } catch (error: unknown) {
+      toast.error((error as Error)?.message || "Failed to revoke invite.");
     } finally {
       setActionLoading(null);
     }
@@ -73,17 +82,30 @@ export default function InviteTracker() {
     filterStatus === "all" ? true : inv.status === filterStatus
   );
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (invite: Invite) => {
     const colors: Record<string, string> = {
       pending: "bg-yellow-100 text-yellow-800",
       accepted: "bg-green-100 text-green-800",
       expired: "bg-gray-100 text-gray-800",
       revoked: "bg-red-100 text-red-800",
     };
+    const label = invite.status.charAt(0).toUpperCase() + invite.status.slice(1);
+    const resendCount = invite.resendCount ?? 0;
+    const showResendCount = resendCount > 0 && (invite.status === "pending" || invite.status === "expired");
+
     return (
-      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${colors[status] || colors.pending}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
+      <div>
+        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${colors[invite.status] || colors.pending}`}>
+          {label}
+        </span>
+        {showResendCount && (
+          <div className="text-xs text-slate-500 mt-1">
+            {invite.status === "expired"
+              ? `Expired · ${resendCount}/3 resends used`
+              : `Resent ${resendCount}/3`}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -189,38 +211,47 @@ export default function InviteTracker() {
                       <div className="text-xs text-gray-500">{invite.departmentId || "No Dept"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(invite.status)}
-                      {invite.status === "pending" && invite.resendCount > 0 && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          Resent {invite.resendCount}/3
-                        </div>
-                      )}
+                      {getStatusBadge(invite)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div>Sent: {formatDate(invite.createdAt)}</div>
-                      {invite.status === "pending" && (
+                      {(invite.status === "pending" || invite.status === "expired") && (
                         <div className="text-xs mt-1">Exp: {formatDate(invite.expiresAt)}</div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {invite.status === "pending" && (
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            onClick={() => handleResend(invite.id)}
-                            disabled={actionLoading === invite.id || invite.resendCount >= 3}
-                            className="text-merit-primary hover:text-merit-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Resend
-                          </button>
-                          <button
-                            onClick={() => handleRevoke(invite.id)}
-                            disabled={actionLoading === invite.id}
-                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                          >
-                            Revoke
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex flex-col items-end gap-1">
+                        {(invite.status === "pending" || invite.status === "expired") && (
+                          <div className="flex justify-end space-x-3">
+                            <div className="flex flex-col items-end">
+                              <button
+                                onClick={() => handleResend(invite)}
+                                disabled={actionLoading === invite.id || (invite.resendCount ?? 0) >= 3}
+                                className="flex items-center gap-1.5 border border-slate-300 text-slate-700 text-sm px-3 py-1 rounded-md hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {actionLoading === invite.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : null}
+                                Resend
+                              </button>
+                              {maxResendError === invite.id && (
+                                <p className="text-xs text-red-500 mt-1 max-w-[180px] text-right">
+                                  Maximum resends reached (3/3). Create a new invite instead.
+                                </p>
+                              )}
+                            </div>
+                            {invite.status === "pending" && (
+                              <button
+                                onClick={() => handleRevoke(invite.id)}
+                                disabled={actionLoading === invite.id}
+                                className="text-red-600 hover:text-red-800 disabled:opacity-50 text-sm"
+                              >
+                                Revoke
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

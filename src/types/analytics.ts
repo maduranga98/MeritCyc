@@ -54,3 +54,11 @@ export interface YoYTierData {
   year: string;
   [tierKey: string]: string | number;
 }
+
+export interface YoYMetricsPoint {
+  year: string;
+  cyclesRun: number;
+  employeesReviewed: number;
+  avgIncrement: number;
+  totalSpend: number;
+}

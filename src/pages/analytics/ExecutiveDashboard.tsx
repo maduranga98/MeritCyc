@@ -289,9 +289,8 @@ export default function ExecutiveDashboard() {
                     <YAxis yAxisId="count" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11 }} width={40} />
                     <Tooltip
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number, name: string) => {
+                      formatter={(value, name) => {
                         if (name === 'Avg Increment %') return [`${value}%`, name];
-                        if (name === 'Employees Reviewed') return [value, name];
                         return [value, name];
                       }}
                     />

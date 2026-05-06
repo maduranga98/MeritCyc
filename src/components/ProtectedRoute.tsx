@@ -5,8 +5,7 @@
 // Check order:
 //   1. loading   → spinner
 //   2. !user     → /login
-//   3. !approved → /login  (non-platform_admin only)
-//   4. role not in allowedRoles / below minimumRole → /unauthorized
+//   3. role not in allowedRoles / below minimumRole → /unauthorized
 // =============================================================================
 
 import React from "react";
@@ -46,18 +45,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  // 3. Account not approved → login with message
-  //    (platform_admin is always implicitly approved)
-  if (!user.approved && user.role !== "platform_admin") {
-    return <Navigate to="/pending-approval" replace />;
-  }
-
-  // 4a. allowedRoles check (takes priority over minimumRole)
+  // 3a. allowedRoles check (takes priority over minimumRole)
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  // 4b. minimumRole hierarchy check
+  // 3b. minimumRole hierarchy check
   if (minimumRole && !hasMinimumRole(user.role, minimumRole)) {
     return <Navigate to="/unauthorized" replace />;
   }

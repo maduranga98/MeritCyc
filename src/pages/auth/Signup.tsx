@@ -114,7 +114,7 @@ const SignupPage: React.FC = () => {
           name: data.fullName,
           role: "employee",
           companyId: "",
-          approved: false,
+          approved: true,
           emailVerified: false,
           registrationMethod: "direct_signup",
           createdAt: serverTimestamp(),
@@ -152,8 +152,7 @@ const SignupPage: React.FC = () => {
           Create Account
         </h2>
         <p className="text-merit-slate mb-8 text-sm">
-          Join MeritCyc to get started. Your account will be reviewed by your
-          HR team.
+          Join MeritCyc to get started.
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">

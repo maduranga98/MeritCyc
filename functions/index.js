@@ -1016,12 +1016,12 @@ exports.submitSelfRegistration = onCall(async (request) => {
     }
   }
 
-  // STEP B: Set custom claims (approved: false — pending HR review)
+  // STEP B: Set custom claims
   logger.info(`[submitSelfRegistration] STEP B — setting custom claims for uid: "${firebaseUid}"`);
   await admin.auth().setCustomUserClaims(firebaseUid, {
     role: "employee",
     companyId,
-    approved: false,
+    approved: true,
   });
   logger.info(`[submitSelfRegistration] STEP B — custom claims set`);
 
@@ -1037,9 +1037,9 @@ exports.submitSelfRegistration = onCall(async (request) => {
     departmentId: departmentId || "",
     jobTitle: jobTitle.trim(),
     role: "employee",
-    status: "pending_approval",
+    status: "active",
     registrationPath: "qr_self_register",
-    approved: false,
+    approved: true,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
@@ -1055,7 +1055,7 @@ exports.submitSelfRegistration = onCall(async (request) => {
     actorRole: "employee",
     targetType: "user",
     targetId: firebaseUid,
-    after: { status: "pending_approval", registrationPath: "qr_self_register" },
+    after: { status: "active", registrationPath: "qr_self_register" },
   });
   logger.info(`[submitSelfRegistration] STEP D — audit log written`);
 
@@ -1225,11 +1225,11 @@ exports.verifyEmailOTP = onCall(async (request) => {
     }
   }
 
-  // STEP B: Set custom claims (approved: false — pending HR review)
+  // STEP B: Set custom claims
   await admin.auth().setCustomUserClaims(firebaseUid, {
     role: "employee",
     companyId,
-    approved: false,
+    approved: true,
   });
 
   // STEP C: Write user doc to /users/{uid}
@@ -1243,9 +1243,9 @@ exports.verifyEmailOTP = onCall(async (request) => {
     departmentId: reg.departmentId || "",
     jobTitle: reg.jobTitle,
     role: "employee",
-    status: "pending_approval",
+    status: "active",
     registrationPath: "qr_self_register",
-    approved: false,
+    approved: true,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
@@ -1259,7 +1259,7 @@ exports.verifyEmailOTP = onCall(async (request) => {
     actorRole: "employee",
     targetType: "user",
     targetId: firebaseUid,
-    after: { status: "pending_approval", registrationPath: "qr_self_register" },
+    after: { status: "active", registrationPath: "qr_self_register" },
   });
 
   // STEP E: Notify all HR admins and super admins of the new registration

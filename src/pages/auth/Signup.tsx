@@ -9,7 +9,6 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
-  sendEmailVerification,
   type AuthError,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -96,14 +95,7 @@ const SignupPage: React.FC = () => {
         displayName: data.fullName,
       });
 
-      // 3. Send email verification
-      try {
-        await sendEmailVerification(userCredential.user);
-      } catch (err) {
-        console.warn("Email verification failed, but account was created:", err);
-      }
-
-      // 4. Create minimal user document in Firestore
+      // 3. Create minimal user document in Firestore
       // NOTE: Security rules prevent direct writes to /users/{uid}, so we use try-catch
       // The user document should be created by Cloud Functions (when company approves)
       // For now, we create a minimal unverified user doc to bootstrap the system
@@ -125,16 +117,14 @@ const SignupPage: React.FC = () => {
           "Firestore write blocked (expected — rules restrict writes)",
           firestoreErr
         );
-        // Continue anyway — user can still sign in after email verification
       }
 
-      // 5. Sign user out — they should log in after signup
+      // 4. Sign user out — they should log in after signup
       // (to ensure custom claims are properly set by Cloud Functions)
       await auth.signOut();
 
-      toast.success(
-        "Account created! Check your email to verify, then sign in."
-      );
+      toast.success("Account created! Sign in to get started.");
+
       navigate("/", { replace: true });
     } catch (err: unknown) {
       const code = (err as AuthError).code ?? "";

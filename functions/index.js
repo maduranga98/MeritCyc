@@ -1091,15 +1091,6 @@ exports.submitSelfRegistration = onCall(async (request) => {
   await notifBatch.commit();
   logger.info(`[submitSelfRegistration] STEP E — notifications sent`);
 
-  // STEP F: Send approval-pending confirmation email
-  logger.info(`[submitSelfRegistration] STEP F — sending approval pending email to "${normalizedEmail}"`);
-  try {
-    await sendApprovalPendingEmail(normalizedEmail, name.trim(), companyName);
-    logger.info(`[submitSelfRegistration] STEP F — email sent`);
-  } catch (emailErr) {
-    logger.error(`[submitSelfRegistration] STEP F — email failed (non-fatal):`, emailErr.message);
-  }
-
   logger.info(`[submitSelfRegistration] COMPLETE — user "${normalizedEmail}" (uid: "${firebaseUid}") registered in company "${companyId}"`);
   return { success: true, message: "Registration submitted" };
 });
@@ -1293,9 +1284,6 @@ exports.verifyEmailOTP = onCall(async (request) => {
 
   // STEP F: Delete the pendingRegistration doc (user doc now exists)
   await pendingRef.delete();
-
-  // STEP G: Send approval-pending confirmation email to the employee
-  await sendApprovalPendingEmail(normalizedEmail, reg.name, companyName);
 
   return { success: true };
 });

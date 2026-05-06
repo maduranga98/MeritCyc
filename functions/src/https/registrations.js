@@ -211,7 +211,7 @@ exports.submitSelfRegistration = onCall(async (request) => {
       companyCode: companyCode.toUpperCase(),
       departmentId: departmentId || "",
       jobTitle: jobTitle.trim(),
-      status: "pending_approval",
+      status: "approved",
       phoneNumber: phoneNumber?.trim() || "",
       employeeId: employeeId?.trim() || "",
       registrationMethod: "self_registration",

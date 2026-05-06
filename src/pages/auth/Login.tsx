@@ -97,22 +97,14 @@ const LoginPage: React.FC = () => {
   }, [user, loading, navigate]);
 
   // ---------------------------------------------------------------------------
-  // Post-login: check approval, then redirect
+  // Post-login: verify token, then redirect
   // ---------------------------------------------------------------------------
   const handlePostLogin = async (): Promise<boolean> => {
     const currentUser = auth.currentUser;
     if (!currentUser) return false;
 
     try {
-      const tokenResult = await currentUser.getIdTokenResult(true);
-      const claims = tokenResult.claims;
-
-      if (claims.approved === false) {
-        // User is not yet approved - they should see the pending approval page
-        // Don't sign them out - let the auth flow handle it
-        return true; // Return true to allow the redirect in Login component
-      }
-
+      await currentUser.getIdTokenResult(true);
       return true;
     } catch {
       await signOut(auth);

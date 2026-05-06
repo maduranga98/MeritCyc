@@ -157,10 +157,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
                 useNotificationStore.getState().setNotifications(notifs);
               });
             } else {
-              // No document found. This can happen for:
-              // 1. Newly signed-up users (not yet approved by company)
-              // 2. Users created via direct signup (awaiting verification)
-              // In these cases, create a minimal user object from Firebase profile
+              // No document found. This can happen for newly signed-up users
+              // or users created via direct signup (awaiting verification).
+              // Create a minimal user object from Firebase profile.
               console.warn(
                 "No custom claims and no Firestore doc for UID:",
                 firebaseUser.uid,
@@ -175,9 +174,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
                     firebaseUser.displayName ??
                     firebaseUser.email?.split("@")[0] ??
                     "User",
-                  role: "employee", // Default to employee for new signups
+                  role: "employee",
                   companyId: "",
-                  approved: false, // New users must be approved
+                  approved: true,
                 },
                 firebaseUser,
                 claims: null,

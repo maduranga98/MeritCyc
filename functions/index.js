@@ -1019,7 +1019,7 @@ exports.submitSelfRegistration = onCall(async (request) => {
   // STEP B: Set custom claims
   logger.info(`[submitSelfRegistration] STEP B — setting custom claims for uid: "${firebaseUid}"`);
   await admin.auth().setCustomUserClaims(firebaseUid, {
-    role: "employee",
+    role: "super_admin",
     companyId,
     approved: true,
   });
@@ -1036,7 +1036,7 @@ exports.submitSelfRegistration = onCall(async (request) => {
     companyId,
     departmentId: departmentId || "",
     jobTitle: jobTitle.trim(),
-    role: "employee",
+    role: "super_admin",
     status: "active",
     registrationPath: "qr_self_register",
     approved: true,
@@ -1218,7 +1218,7 @@ exports.verifyEmailOTP = onCall(async (request) => {
 
   // STEP B: Set custom claims
   await admin.auth().setCustomUserClaims(firebaseUid, {
-    role: "employee",
+    role: "super_admin",
     companyId,
     approved: true,
   });
@@ -1233,7 +1233,7 @@ exports.verifyEmailOTP = onCall(async (request) => {
     companyId,
     departmentId: reg.departmentId || "",
     jobTitle: reg.jobTitle,
-    role: "employee",
+    role: "super_admin",
     status: "active",
     registrationPath: "qr_self_register",
     approved: true,

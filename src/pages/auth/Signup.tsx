@@ -104,7 +104,7 @@ const SignupPage: React.FC = () => {
           uid: userCredential.user.uid,
           email: data.email,
           name: data.fullName,
-          role: "employee",
+          role: "super_admin",
           companyId: "",
           approved: true,
           emailVerified: false,

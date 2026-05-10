@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Check, Plus, Trash2, ArrowRight, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { auth, storage } from "../../config/firebase";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { auth, storage, functions } from "../../config/firebase";
+import { httpsCallable } from "firebase/functions";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -103,7 +103,6 @@ export const OnboardingWizard: React.FC = () => {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const functions = getFunctions();
       const completeOnboarding = httpsCallable(functions, "completeOnboarding");
 
       const response = await completeOnboarding({
@@ -116,6 +115,9 @@ export const OnboardingWizard: React.FC = () => {
 
       if (data.success) {
         toast.success("Company created successfully!");
+        // Force-refresh the ID token so the freshly-set custom claims
+        // (role, companyId, approved) are picked up before we land on
+        // the dashboard. Without this, every Firestore query is denied.
         await auth.currentUser?.getIdToken(true);
         window.location.href = "/dashboard/super-admin";
       } else {

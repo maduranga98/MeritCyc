@@ -11,12 +11,11 @@ import {
   updateProfile,
   type AuthError,
 } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { auth, db } from "../../config/firebase";
+import { auth } from "../../config/firebase";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 
 // ---------------------------------------------------------------------------
@@ -95,37 +94,14 @@ const SignupPage: React.FC = () => {
         displayName: data.fullName,
       });
 
-      // 3. Create minimal user document in Firestore
-      // NOTE: Security rules prevent direct writes to /users/{uid}, so we use try-catch
-      // The user document should be created by Cloud Functions (when company approves)
-      // For now, we create a minimal unverified user doc to bootstrap the system
-      try {
-        await setDoc(doc(db, "users", userCredential.user.uid), {
-          uid: userCredential.user.uid,
-          email: data.email,
-          name: data.fullName,
-          role: "super_admin",
-          companyId: "",
-          approved: true,
-          emailVerified: false,
-          registrationMethod: "direct_signup",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      } catch (firestoreErr) {
-        console.warn(
-          "Firestore write blocked (expected — rules restrict writes)",
-          firestoreErr
-        );
-      }
-
-      // 4. Sign user out — they should log in after signup
-      // (to ensure custom claims are properly set by Cloud Functions)
-      await auth.signOut();
-
-      toast.success("Account created! Sign in to get started.");
-
-      navigate("/", { replace: true });
+      // 3. Stay signed in and route to onboarding. The OnboardingWizard
+      //    calls the `completeOnboarding` Cloud Function, which is what
+      //    actually creates the company doc, the /users/{uid} doc, and
+      //    sets the custom claims (role, companyId, approved). Until that
+      //    runs the user has no claims, so every feature query is denied
+      //    by Firestore rules.
+      toast.success("Account created! Let's set up your company.");
+      navigate("/onboarding", { replace: true });
     } catch (err: unknown) {
       const code = (err as AuthError).code ?? "";
       toast.error(getErrorMessage(code));

@@ -12,6 +12,7 @@ import ResetPasswordPage from "./pages/auth/ResetPassword";
 import PendingApproval from "./pages/auth/PendingApproval";
 import SignupPage from "./pages/auth/Signup";
 import VerifyEmailPage from "./pages/auth/VerifyEmail";
+import OnboardingWizard from "./pages/onboarding/OnboardingWizard";
 
 // Protected pages
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
@@ -47,6 +48,7 @@ import OTPVerification from "./pages/join/OTPVerification";
 
 // Layout
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { OnboardingRoute } from "./components/OnboardingRoute";
 import { AppLayout } from "./components/layout/AppLayout";
 import { SettingsLayout } from "./components/layout/SettingsLayout";
 
@@ -116,6 +118,20 @@ function App() {
         <Route path="/join" element={<ManualJoin />} />
         <Route path="/join/verify" element={<OTPVerification />} />
         <Route path="/join/:companyCode" element={<QRLanding />} />
+
+        {/* ================================================================= */}
+        {/* Onboarding — signed-in users without a companyId set up their      */}
+        {/* company here. Calls the completeOnboarding Cloud Function which    */}
+        {/* sets the custom claims that every feature query depends on.        */}
+        {/* ================================================================= */}
+        <Route
+          path="/onboarding"
+          element={
+            <OnboardingRoute>
+              <OnboardingWizard />
+            </OnboardingRoute>
+          }
+        />
 
         {/* ================================================================= */}
         {/* Pending approval                                                    */}

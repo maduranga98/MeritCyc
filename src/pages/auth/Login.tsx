@@ -89,11 +89,17 @@ const LoginPage: React.FC = () => {
     }
   }, [searchParams]);
 
-  // Redirect if already authenticated and fully resolved
+  // Redirect if already authenticated and fully resolved.
+  // Users who signed up but haven't completed company setup have no
+  // companyId yet — send them to /onboarding so the completeOnboarding
+  // Cloud Function can populate their custom claims.
   useEffect(() => {
-    if (user && !loading) {
-      navigate(getDashboardPath(user.role), { replace: true });
+    if (!user || loading) return;
+    if (!user.companyId && user.role !== "platform_admin") {
+      navigate("/onboarding", { replace: true });
+      return;
     }
+    navigate(getDashboardPath(user.role), { replace: true });
   }, [user, loading, navigate]);
 
   // ---------------------------------------------------------------------------

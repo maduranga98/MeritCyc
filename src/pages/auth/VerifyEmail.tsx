@@ -14,33 +14,37 @@ import { AuthLayout } from "../../components/auth/AuthLayout";
 const VerifyEmailPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const oobCode = searchParams.get("oobCode");
   const [status, setStatus] = useState<
     "verifying" | "success" | "error" | "waiting"
-  >("waiting");
+  >(() => (oobCode ? "verifying" : "waiting"));
 
   useEffect(() => {
-    // If there's an oobCode in URL, verify it
-    const oobCode = searchParams.get("oobCode");
-    if (oobCode) {
-      verifyEmail(oobCode);
-    }
-  }, [searchParams]);
+    if (!oobCode) return;
 
-  const verifyEmail = async (code: string) => {
-    setStatus("verifying");
-    try {
-      await applyActionCode(auth, code);
-      setStatus("success");
-      toast.success("Email verified successfully! Redirecting to sign in...");
-      setTimeout(() => navigate("/", { replace: true }), 2000);
-    } catch (err) {
-      setStatus("error");
-      console.error("Email verification error:", err);
-      toast.error(
-        "Email verification failed. The link may be expired or invalid."
-      );
-    }
-  };
+    let cancelled = false;
+    applyActionCode(auth, oobCode)
+      .then(() => {
+        if (cancelled) return;
+        setStatus("success");
+        toast.success("Email verified successfully! Redirecting to sign in...");
+        setTimeout(() => {
+          if (!cancelled) navigate("/", { replace: true });
+        }, 2000);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setStatus("error");
+        console.error("Email verification error:", err);
+        toast.error(
+          "Email verification failed. The link may be expired or invalid."
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [oobCode, navigate]);
 
   return (
     <AuthLayout>

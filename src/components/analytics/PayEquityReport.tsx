@@ -90,7 +90,9 @@ export const PayEquityReport: React.FC<PayEquityReportProps> = ({ report, onClos
               <div className="bg-white p-5 rounded-xl border border-slate-200">
                 <p className="text-sm font-medium text-slate-500 mb-1">Report Date</p>
                 <p className="text-xl font-bold text-slate-900 mt-2">
-                  {new Date(report.generatedAt?.toMillis() || Date.now()).toLocaleDateString()}
+                  {report.generatedAt
+                    ? new Date(report.generatedAt.toMillis()).toLocaleDateString()
+                    : "—"}
                 </p>
               </div>
             </div>

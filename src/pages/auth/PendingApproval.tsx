@@ -23,20 +23,23 @@ const PendingApproval: React.FC = () => {
 
   // Fetch company name from Firestore once we have a companyId
   useEffect(() => {
-    if (!user?.companyId) {
-      setCompanyName(null);
-      return;
-    }
+    if (!user?.companyId) return;
+    let cancelled = false;
     getDoc(doc(db, "companies", user.companyId))
       .then((snap) => {
+        if (cancelled) return;
         if (snap.exists()) {
           setCompanyName((snap.data().name as string) ?? null);
         }
       })
       .catch(() => {
+        if (cancelled) return;
         console.warn("Could not fetch company name");
         setCompanyName(null);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.companyId]);
 
   // Poll for claim changes — force-refresh the token every 10 s.

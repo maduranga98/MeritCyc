@@ -244,6 +244,14 @@ function App() {
         {/* Module 2 — Company & People Management                             */}
         {/* ================================================================= */}
         <Route
+          path="/people"
+          element={
+            <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>
+              <Navigate to="/people/directory" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/people/directory"
           element={
             <ProtectedRoute allowedRoles={["hr_admin", "super_admin"]}>

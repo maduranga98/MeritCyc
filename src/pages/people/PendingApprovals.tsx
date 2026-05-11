@@ -41,7 +41,8 @@ export default function PendingApprovals() {
     if (!user || !user.companyId) return;
 
     const qPending = query(
-      collection(db, 'companies', user.companyId, 'pendingRegistrations'),
+      collection(db, 'users'),
+      where('companyId', '==', user.companyId),
       where('status', 'in', ['pending_approval', 'info_requested'])
     );
 
@@ -67,14 +68,16 @@ export default function PendingApprovals() {
         sevenDaysAgo.setDate(today.getDate() - 7);
 
         const qApprovedToday = query(
-          collection(db, 'companies', user.companyId, 'pendingRegistrations'),
+          collection(db, 'users'),
+          where('companyId', '==', user.companyId),
           where('status', '==', 'approved'),
           where('approvedAt', '>=', today)
         );
         const approvedSnap = await getDocs(qApprovedToday);
 
         const qRejected7d = query(
-          collection(db, 'companies', user.companyId, 'pendingRegistrations'),
+          collection(db, 'users'),
+          where('companyId', '==', user.companyId),
           where('status', '==', 'rejected'),
           where('rejectedAt', '>=', sevenDaysAgo)
         );
@@ -112,7 +115,8 @@ export default function PendingApprovals() {
     setLoadingHistory(true);
     try {
       let qHistory = query(
-        collection(db, 'companies', user.companyId, 'pendingRegistrations'),
+        collection(db, 'users'),
+        where('companyId', '==', user.companyId),
         where('status', 'in', ['approved', 'rejected']),
         orderBy('createdAt', 'desc'),
         limit(20)

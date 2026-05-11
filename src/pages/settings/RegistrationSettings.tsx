@@ -25,8 +25,7 @@ export default function RegistrationSettings() {
     try {
       if (!user?.companyId) return;
       const q = query(
-        collection(db, "users"),
-        where("companyId", "==", user.companyId),
+        collection(db, "companies", user.companyId, "pendingRegistrations"),
         where("status", "in", ["pending_approval", "info_requested"])
       );
       const snap = await getDocs(q);

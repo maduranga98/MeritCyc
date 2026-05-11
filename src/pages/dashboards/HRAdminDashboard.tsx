@@ -14,8 +14,7 @@ const HRAdminDashboard: React.FC = () => {
     if (!user || !user.companyId) return;
 
     const q = query(
-      collection(db, 'users'),
-      where('companyId', '==', user.companyId),
+      collection(db, 'companies', user.companyId, 'pendingRegistrations'),
       where('status', 'in', ['pending_approval', 'info_requested'])
     );
 

@@ -99,6 +99,10 @@ const LoginPage: React.FC = () => {
       navigate("/onboarding", { replace: true });
       return;
     }
+    if (!user.approved) {
+      navigate("/pending-approval", { replace: true });
+      return;
+    }
     navigate(getDashboardPath(user.role), { replace: true });
   }, [user, loading, navigate]);
 

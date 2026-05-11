@@ -45,6 +45,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
+  // 2a. Authenticated but not yet approved → pending approval page
+  if (!user.approved) {
+    return <Navigate to="/pending-approval" replace />;
+  }
+
   // 3a. allowedRoles check (takes priority over minimumRole)
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;

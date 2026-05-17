@@ -199,8 +199,11 @@ service cloud.firestore {
     // parent cycle's companyId without storing it redundantly on each sim doc.
     match /cycles/{cycleId}/simulations/{simId} {
       allow read: if isPlatformAdmin() ||
-                     isHrOrAdmin(
-                       get(/databases/$(database)/documents/cycles/$(cycleId)).data.companyId
+                     (
+                       exists(/databases/$(database)/documents/cycles/$(cycleId)) &&
+                       isHrOrAdmin(
+                         get(/databases/$(database)/documents/cycles/$(cycleId)).data.companyId
+                       )
                      );
       allow write: if false; // Cloud Functions only
     }

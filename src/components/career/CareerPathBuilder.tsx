@@ -1,4 +1,5 @@
 import React from 'react';
+import { Timestamp } from 'firebase/firestore';
 import { type CareerPath } from '../../types/careerPath';
 
 export const CareerPathBuilder: React.FC<{ companyId: string; onSave: (cp: CareerPath) => Promise<void> }> = ({ companyId, onSave }) => {
@@ -24,8 +25,8 @@ export const CareerPathBuilder: React.FC<{ companyId: string; onSave: (cp: Caree
         },
       ],
       createdBy: '',
-      createdAt: new Date() as unknown as import('firebase/firestore').Timestamp,
-      updatedAt: new Date() as unknown as import('firebase/firestore').Timestamp,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
       isActive: true,
     });
   };

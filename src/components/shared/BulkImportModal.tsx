@@ -23,7 +23,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [results, setResults] = useState<{ sent: number; failed: { row: any; reason: string }[] } | null>(null);
+  const [results, setResults] = useState<{ sent: number; failed: { row: unknown; reason: string }[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,10 +108,17 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
       const functions = getFunctions();
       const bulkImport = httpsCallable(functions, "bulkImportEmployees");
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response: any = await bulkImport({ employees: validRows });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setResults(response.data as any);
+      const response = await bulkImport({ employees: validRows });
+      const data = response.data as unknown;
+      if (
+        !data ||
+        typeof data !== "object" ||
+        typeof (data as { sent?: unknown }).sent !== "number" ||
+        !Array.isArray((data as { failed?: unknown }).failed)
+      ) {
+        throw new Error("Unexpected response from bulkImportEmployees.");
+      }
+      setResults(data as { sent: number; failed: { row: unknown; reason: string }[] });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error("Error bulk importing:", err);

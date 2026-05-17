@@ -89,7 +89,7 @@ export default function BudgetTracker() {
 
   useEffect(() => {
     if (user?.companyId) {
-       departmentService.getDepartments(user.companyId).then(setDepartments).catch(() => {});
+       departmentService.getDepartments(user.companyId).then(setDepartments).catch((err) => console.error("Load failed:", err));
     }
   }, [user?.companyId]);
 

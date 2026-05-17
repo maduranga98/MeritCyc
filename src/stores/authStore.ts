@@ -174,9 +174,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
                     firebaseUser.displayName ??
                     firebaseUser.email?.split("@")[0] ??
                     "User",
-                  role: "super_admin",
+                  role: "employee",
                   companyId: "",
-                  approved: true,
+                  approved: false,
                 },
                 firebaseUser,
                 claims: null,

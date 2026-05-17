@@ -420,8 +420,8 @@ export default function CreateCycleWizard({ onClose, onCreated }: CreateCycleWiz
 
   useEffect(() => {
     if (!user?.companyId) return;
-    departmentService.getDepartments(user.companyId).then(setDepartments).catch(() => {});
-    salaryBandService.getSalaryBands(user.companyId).then(setSalaryBands).catch(() => {});
+    departmentService.getDepartments(user.companyId).then(setDepartments).catch((err) => console.error("Load failed:", err));
+    salaryBandService.getSalaryBands(user.companyId).then(setSalaryBands).catch((err) => console.error("Load failed:", err));
   }, [user?.companyId]);
 
   const merge = (partial: Partial<WizardData>) => setData((d) => ({ ...d, ...partial }));

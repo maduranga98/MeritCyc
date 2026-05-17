@@ -42,7 +42,7 @@ export default function HRScoreReview() {
   useEffect(() => {
     if (!user?.companyId) return;
 
-    departmentService.getDepartments(user.companyId).then(setDepartments).catch(() => {});
+    departmentService.getDepartments(user.companyId).then(setDepartments).catch((err) => console.error("Load failed:", err));
 
     const unsubCycles = cycleService.subscribeToCycles(user.companyId, (cyclesData) => {
       const activeLocked = cyclesData.filter(c => c.status === 'active' || c.status === 'locked');

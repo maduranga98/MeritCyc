@@ -72,9 +72,13 @@ const QRCodeManager: React.FC = () => {
     if (!companyId) return;
 
     // Fetch company name
-    getDoc(doc(db, "companies", companyId)).then((snap) => {
-      if (snap.exists()) setFetchedCompanyName((snap.data().name as string) ?? "");
-    });
+    getDoc(doc(db, "companies", companyId))
+      .then((snap) => {
+        if (snap.exists()) setFetchedCompanyName((snap.data().name as string) ?? "");
+      })
+      .catch((err) => {
+        console.error("Failed to fetch company name:", err);
+      });
 
     const regRef = doc(
       db,
@@ -84,13 +88,20 @@ const QRCodeManager: React.FC = () => {
       companyId,
     );
 
-    const unsub = onSnapshot(regRef, (snap) => {
-      if (!snap.exists()) {
-        setRegDoc(null);
-      } else {
-        setRegDoc(snap.data() as RegistrationDoc);
-      }
-    });
+    const unsub = onSnapshot(
+      regRef,
+      (snap) => {
+        if (!snap.exists()) {
+          setRegDoc(null);
+        } else {
+          setRegDoc(snap.data() as RegistrationDoc);
+        }
+      },
+      (err) => {
+        console.error("Registration listener error:", err);
+        setActionError("Failed to load registration data.");
+      },
+    );
 
     return unsub;
   }, [companyId]);

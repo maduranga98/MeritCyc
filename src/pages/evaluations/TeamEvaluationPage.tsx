@@ -44,7 +44,7 @@ export default function TeamEvaluationPage() {
       }
     });
 
-    departmentService.getDepartments(user.companyId).then(setDepartments).catch(() => {});
+    departmentService.getDepartments(user.companyId).then(setDepartments).catch((err) => console.error("Load failed:", err));
 
     return () => {
       unsubCycle();

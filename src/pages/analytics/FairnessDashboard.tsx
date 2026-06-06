@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { fairnessService } from "../../services/fairnessService";
 import { type FairnessReport } from "../../types/fairness";
@@ -21,6 +22,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { PayEquityReport } from "../../components/analytics/PayEquityReport";
+import { companyService } from "../../services/companyService";
 import {
   AlertTriangle,
   Info,
@@ -35,6 +37,7 @@ import { toast } from "sonner";
 
 export default function FairnessDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [report, setReport] = useState<FairnessReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -42,6 +45,7 @@ export default function FairnessDashboard() {
   const [selectedCycle, setSelectedCycle] = useState<string>("all");
   const [cycles, setCycles] = useState<{ id: string; name: string }[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [companyName, setCompanyName] = useState<string>("Company");
 
   useEffect(() => {
     if (user?.companyId) {
@@ -68,6 +72,13 @@ export default function FairnessDashboard() {
         query(collection(db, "auditLogs"), where("companyId", "==", user.companyId), orderBy("timestamp", "desc"), limit(20))
       );
       setAuditLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      try {
+        const company = await companyService.getCompany(user.companyId);
+        if (company?.name) setCompanyName(company.name);
+      } catch {
+        // Non-critical: fall back to default name on the PDF.
+      }
     } catch (error) {
       console.error(error);
       toast.error("Failed to load fairness data");
@@ -94,6 +105,33 @@ export default function FairnessDashboard() {
 
   const handleExportPdf = () => {
     setShowPayEquityModal(true);
+  };
+
+  const handleExportAuditLog = () => {
+    if (auditLogs.length === 0) {
+      toast.info("No audit log entries to export");
+      return;
+    }
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const header = ["Timestamp", "Actor Email", "Actor Role", "Action", "Target Type", "Target ID"];
+    const rows = auditLogs.map((log) => [
+      log.timestamp ? new Date(log.timestamp.toMillis ? log.timestamp.toMillis() : log.timestamp).toISOString() : "",
+      log.actorEmail,
+      log.actorRole,
+      log.action,
+      log.targetType,
+      log.targetId,
+    ].map(esc).join(","));
+    const csv = [header.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `fairness_audit_log_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -442,7 +480,7 @@ export default function FairnessDashboard() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
              <div className="flex justify-between items-center mb-6">
                  <h2 className="text-lg font-bold text-slate-900">Recent Actions</h2>
-                 <button className="text-sm text-emerald-600 font-medium hover:text-emerald-700">Export Audit Log</button>
+                 <button onClick={handleExportAuditLog} className="text-sm text-emerald-600 font-medium hover:text-emerald-700">Export Audit Log</button>
              </div>
              <div className="overflow-x-auto">
                <table className="w-full text-sm text-left">
@@ -475,7 +513,7 @@ export default function FairnessDashboard() {
                          <div className="text-xs text-slate-400 truncate w-32">{log.targetId}</div>
                        </td>
                        <td className="px-4 py-3 text-slate-600">
-                         <button className="text-emerald-600 hover:underline">View details</button>
+                         <button onClick={() => navigate('/audit-trail')} className="text-emerald-600 hover:underline">View details</button>
                        </td>
                      </tr>
                    ))}
@@ -490,6 +528,7 @@ export default function FairnessDashboard() {
       {showPayEquityModal && report && (
         <PayEquityReport
           report={report}
+          companyName={companyName}
           onClose={() => setShowPayEquityModal(false)}
         />
       )}

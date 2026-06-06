@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { type Cycle } from '../types/cycle';
 import { type Evaluation } from '../types/evaluation';
+import { type FairnessReport } from '../types/fairness';
 
 export interface CycleSummaryPDFData {
   cycle: Cycle;
@@ -332,6 +333,168 @@ export const pdfGenerationService = {
 
     // Save the PDF
     pdf.save(`${data.cycle.name.replace(/\s+/g, '_')}_Summary_Report.pdf`);
+  },
+
+  generateFairnessReportPDF: async (report: FairnessReport, companyName: string): Promise<void> => {
+    const pdf = new jsPDF();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentWidth = pageWidth - 2 * margin;
+
+    const ensureSpace = (needed: number, y: number): number => {
+      if (y > pageHeight - needed) {
+        pdf.addPage();
+        pdf.setFillColor(...BRAND.primary);
+        pdf.rect(0, 0, pageWidth, 6, 'F');
+        return margin + 10;
+      }
+      return y;
+    };
+
+    const totalEmployees = report.metrics.departmentDisparity.reduce((s, d) => s + d.employeeCount, 0);
+
+    // COVER
+    pdf.setFillColor(...BRAND.primary);
+    pdf.rect(0, 0, pageWidth, 8, 'F');
+    let y = margin + 12;
+
+    pdf.setFontSize(24);
+    pdf.setTextColor(...BRAND.primaryDark);
+    pdf.text(companyName, margin, y);
+    y += 10;
+    pdf.setFontSize(11);
+    pdf.setTextColor(...BRAND.textMuted);
+    pdf.text('Pay Equity & Fairness Report', margin, y);
+    y += 18;
+
+    pdf.setDrawColor(...BRAND.primary);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, y, margin + 60, y);
+    y += 14;
+
+    pdf.setFontSize(10);
+    pdf.setTextColor(...BRAND.textMuted);
+    const genDate = report.generatedAt ? new Date(report.generatedAt.toMillis()).toLocaleDateString() : new Date().toLocaleDateString();
+    pdf.text(`Scope: ${report.cycleId ? (report.cycleName || 'Selected cycle') : 'All completed cycles'}`, margin, y);
+    y += 7;
+    pdf.text(`Employees Analyzed: ${totalEmployees}`, margin, y);
+    y += 7;
+    pdf.text(`Generated: ${genDate}`, margin, y);
+    y += 16;
+
+    // Overall score KPI
+    const score = report.overallFairnessScore;
+    const scoreColor: [number, number, number] = score >= 75 ? BRAND.primary : score >= 60 ? BRAND.accent : [220, 38, 38];
+    pdf.setFillColor(...BRAND.surface);
+    pdf.rect(margin, y, contentWidth, 26, 'F');
+    pdf.setFontSize(9);
+    pdf.setTextColor(...BRAND.textMuted);
+    pdf.text('Overall Fairness Score', margin + 5, y + 9);
+    pdf.setFontSize(18);
+    pdf.setTextColor(...scoreColor);
+    pdf.text(`${score}/100`, margin + 5, y + 21);
+    y += 38;
+
+    // DEPARTMENT PAY ANALYSIS
+    y = ensureSpace(40, y);
+    pdf.setFontSize(14);
+    pdf.setTextColor(...BRAND.textDark);
+    pdf.text('Department Pay Analysis', margin, y);
+    y += 10;
+
+    const dCols = [contentWidth * 0.34, contentWidth * 0.16, contentWidth * 0.16, contentWidth * 0.17, contentWidth * 0.17];
+    const rowH = 8;
+    pdf.setFillColor(...BRAND.surface);
+    pdf.rect(margin, y, contentWidth, rowH, 'F');
+    pdf.setFontSize(8);
+    pdf.setTextColor(...BRAND.textDark);
+    pdf.text('Department', margin + 2, y + 5);
+    pdf.text('Employees', margin + dCols[0] + 2, y + 5);
+    pdf.text('Avg Score', margin + dCols[0] + dCols[1] + 2, y + 5);
+    pdf.text('Avg Incr.', margin + dCols[0] + dCols[1] + dCols[2] + 2, y + 5);
+    pdf.text('vs Avg', margin + dCols[0] + dCols[1] + dCols[2] + dCols[3] + 2, y + 5);
+    y += rowH;
+
+    report.metrics.departmentDisparity.forEach((d, i) => {
+      y = ensureSpace(rowH + 4, y);
+      const bg = i % 2 === 0 ? 255 : 248;
+      pdf.setFillColor(bg, bg, bg);
+      pdf.rect(margin, y, contentWidth, rowH, 'F');
+      pdf.setTextColor(...BRAND.textDark);
+      pdf.setFontSize(8);
+      pdf.text(d.departmentName.substring(0, 24), margin + 2, y + 5);
+      pdf.text(d.employeeCount.toString(), margin + dCols[0] + 2, y + 5);
+      pdf.text(d.averageScore.toFixed(1), margin + dCols[0] + dCols[1] + 2, y + 5);
+      pdf.text(`${d.averageIncrement.toFixed(1)}%`, margin + dCols[0] + dCols[1] + dCols[2] + 2, y + 5);
+      pdf.text(`${d.disparity > 0 ? '+' : ''}${d.disparity.toFixed(1)}%`, margin + dCols[0] + dCols[1] + dCols[2] + dCols[3] + 2, y + 5);
+      y += rowH;
+    });
+    y += 10;
+
+    // FLAGGED DISCREPANCIES
+    if (report.alerts.length > 0) {
+      y = ensureSpace(30, y);
+      pdf.setFontSize(14);
+      pdf.setTextColor(...BRAND.textDark);
+      pdf.text('Flagged Discrepancies', margin, y);
+      y += 9;
+      report.alerts.forEach((a) => {
+        y = ensureSpace(18, y);
+        pdf.setFontSize(9);
+        pdf.setTextColor(220, 38, 38);
+        pdf.text(`• [${a.severity.toUpperCase()}] ${a.type.replace(/_/g, ' ')}`, margin + 2, y);
+        y += 5;
+        pdf.setFontSize(8);
+        pdf.setTextColor(...BRAND.textLight);
+        const lines = pdf.splitTextToSize(`${a.message} (Affected: ${a.affectedEntity})`, contentWidth - 6);
+        pdf.text(lines, margin + 6, y);
+        y += lines.length * 4 + 4;
+      });
+      y += 6;
+    }
+
+    // RECOMMENDATIONS
+    if (report.recommendations?.length > 0) {
+      y = ensureSpace(30, y);
+      pdf.setFontSize(14);
+      pdf.setTextColor(...BRAND.textDark);
+      pdf.text('Recommendations', margin, y);
+      y += 9;
+      pdf.setFontSize(9);
+      pdf.setTextColor(...BRAND.textLight);
+      report.recommendations.forEach((r) => {
+        y = ensureSpace(12, y);
+        const lines = pdf.splitTextToSize(`• ${r}`, contentWidth - 4);
+        pdf.text(lines, margin + 2, y);
+        y += lines.length * 5 + 2;
+      });
+      y += 6;
+    }
+
+    // COMPLIANCE STATEMENT
+    y = ensureSpace(40, y);
+    pdf.setFontSize(14);
+    pdf.setTextColor(...BRAND.textDark);
+    pdf.text('Compliance Statement', margin, y);
+    y += 9;
+    pdf.setFontSize(9);
+    pdf.setTextColor(...BRAND.textLight);
+    const statement = `Based on ${totalEmployees} evaluated employees across ${report.metrics.departmentDisparity.length} departments in ${report.cycleId ? 'the selected increment cycle' : 'all completed increment cycles'}, the compensation adjustment process yields an overall fairness score of ${score}/100. ${report.alerts.length > 0 ? `${report.alerts.length} area(s) of concern have been flagged and require review.` : 'No significant discrepancies were identified.'}`;
+    const stmtLines = pdf.splitTextToSize(statement, contentWidth);
+    pdf.text(stmtLines, margin, y);
+
+    // Footer on all pages
+    const totalPages = pdf.internal.pages.length - 1;
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.setTextColor(...BRAND.textMuted);
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 20, pageHeight - 10);
+      pdf.text(`© ${new Date().getFullYear()} ${companyName} • Powered by MeritCyc`, margin, pageHeight - 10);
+    }
+
+    pdf.save(`Pay_Equity_Report_${genDate.replace(/\//g, '-')}.pdf`);
   },
 
   downloadPDF: (pdfBlob: Blob, filename: string): void => {

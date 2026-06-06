@@ -152,14 +152,20 @@ export default function ReportsGenerator() {
           };
         });
 
-        // Calculate budget metrics
+        // Calculate budget metrics from real evaluation data.
         const totalBudgetUtilized = evaluations.reduce((sum, e) => {
-          const baseSalary = e.currentSalary || 50000;
+          if (typeof e.incrementAmount === 'number') return sum + e.incrementAmount;
+          const baseSalary = e.currentSalary || 0;
           const increment = (e.incrementPercent || 0) / 100;
           return sum + (baseSalary * increment);
         }, 0);
 
-        const totalBudgetAllocated = cycle.budget.type === 'fixed_pool' ? (cycle.budget.totalBudget || 0) : 1000000; // mock
+        // For a fixed pool, the allocation is the configured total. For a
+        // percentage-based budget, derive the cap from current salaries.
+        const totalSalaries = evaluations.reduce((sum, e) => sum + (e.currentSalary || 0), 0);
+        const totalBudgetAllocated = cycle.budget.type === 'fixed_pool'
+          ? (cycle.budget.totalBudget || 0)
+          : Math.round(totalSalaries * ((cycle.budget.maxPercentage || 0) / 100));
 
         // Fetch company branding info
         let companyName = 'Company';
@@ -197,9 +203,9 @@ export default function ReportsGenerator() {
           format: 'pdf',
           generatedAt: { toMillis: () => Date.now() } as any,
           generatedBy: user?.uid || "",
-          fileSizeBytes: Math.floor(Math.random() * 5000000) + 1000000,
         };
-        setGeneratedPreview(newReport);
+        // PDF is generated client-side and saved on generation.
+        setGeneratedPreview({ ...newReport, downloadedAtGeneration: true } as GeneratedReport & { downloadedAtGeneration?: boolean });
         fetchData();
         return;
       }
@@ -212,7 +218,12 @@ export default function ReportsGenerator() {
 
       if (res.success) {
           toast.success("Report generated successfully!");
-          const newReport: GeneratedReport = {
+          // Refresh the list, then surface the freshly persisted report (which
+          // carries the real downloadUrl / csvData) as the preview.
+          const reports = await analyticsService.getGeneratedReports(user?.companyId || "");
+          setRecentReports(reports);
+          const persisted = reports.find(r => r.id === res.reportId);
+          setGeneratedPreview(persisted || {
               id: res.reportId || "temp-id",
               companyId: user?.companyId || "",
               reportType: selectedType,
@@ -220,10 +231,7 @@ export default function ReportsGenerator() {
               format,
               generatedAt: { toMillis: () => Date.now() } as any,
               generatedBy: user?.uid || "",
-              fileSizeBytes: Math.floor(Math.random() * 5000000) + 1000000 // mock size
-          };
-          setGeneratedPreview(newReport);
-          fetchData();
+          });
       }
     } catch (error) {
       console.error(error);
@@ -231,6 +239,32 @@ export default function ReportsGenerator() {
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handleDownloadReport = (report: GeneratedReport) => {
+    if (report.downloadUrl) {
+      window.open(report.downloadUrl, "_blank");
+      return;
+    }
+    if (report.csvData) {
+      const blob = new Blob([report.csvData], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const title = reportTypes.find(t => t.id === report.reportType)?.title || "report";
+      link.download = `${title.replace(/\s+/g, "_")}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      return;
+    }
+    // Client-side PDFs are downloaded at generation time and aren't re-stored.
+    if ((report as GeneratedReport & { downloadedAtGeneration?: boolean }).downloadedAtGeneration) {
+      toast.info("This PDF was already downloaded when generated. Re-generate to download again.");
+      return;
+    }
+    toast.error("Download is not available for this report.");
   };
 
   const renderConfigForm = () => {
@@ -414,10 +448,11 @@ export default function ReportsGenerator() {
                   <div className="flex-1">
                       <h3 className="text-lg font-bold text-slate-900">{reportTypes.find(t => t.id === generatedPreview.reportType)?.title}</h3>
                       <p className="text-sm text-slate-500 mb-4">
-                          Generated on {new Date(generatedPreview.generatedAt.toMillis()).toLocaleString()} • ~{(generatedPreview.fileSizeBytes! / 1024 / 1024).toFixed(1)} MB
+                          Generated on {new Date(generatedPreview.generatedAt.toMillis()).toLocaleString()}
+                          {generatedPreview.fileSizeBytes ? ` • ${(generatedPreview.fileSizeBytes / 1024 / 1024).toFixed(1)} MB` : ""}
                       </p>
                       <div className="flex items-center gap-3">
-                          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-lg hover:bg-emerald-100 transition-colors">
+                          <button onClick={() => handleDownloadReport(generatedPreview)} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-lg hover:bg-emerald-100 transition-colors">
                               <Download className="w-4 h-4" />
                               Download {generatedPreview.format.toUpperCase()}
                           </button>
@@ -463,7 +498,7 @@ export default function ReportsGenerator() {
                              </span>
                          </td>
                          <td className="px-4 py-3 text-right">
-                             <button className="text-emerald-600 hover:text-emerald-700 font-medium text-sm flex items-center gap-1 justify-end w-full">
+                             <button onClick={() => handleDownloadReport(report)} className="text-emerald-600 hover:text-emerald-700 font-medium text-sm flex items-center gap-1 justify-end w-full">
                                  <Download className="w-4 h-4" /> Download
                              </button>
                          </td>

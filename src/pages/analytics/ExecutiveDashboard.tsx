@@ -77,21 +77,67 @@ export default function ExecutiveDashboard() {
         setEmployeeGrowth(empGrowth);
       }
 
-      const deptData = await analyticsService.getDepartmentPerformance(user.companyId);
+      const deptData = await analyticsService.getDepartmentPerformance(user.companyId, dateRange);
       setDeptData(deptData);
-
-      // Calculate completed cycle growth
-      if (kpiData.completedCycles > 0) {
-        setCycleGrowth(1); // At least 1 new completed cycle
-      }
 
       const yoyMetrics = await analyticsService.getYoYMetrics(user.companyId);
       setYoyMetrics(yoyMetrics);
+
+      // Completed-cycle growth: compare this year's completed cycles to last year's.
+      if (yoyMetrics.length > 1) {
+        const last = yoyMetrics[yoyMetrics.length - 1];
+        const prev = yoyMetrics[yoyMetrics.length - 2];
+        const growth = prev.cyclesRun > 0
+          ? Math.round(((last.cyclesRun - prev.cyclesRun) / prev.cyclesRun) * 100)
+          : 0;
+        setCycleGrowth(growth);
+      } else {
+        setCycleGrowth(0);
+      }
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExport = () => {
+    if (!kpis) return;
+    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    const lines: string[] = [];
+
+    lines.push('Company KPIs');
+    lines.push('Metric,Value');
+    lines.push(`Total Employees,${kpis.totalEmployees}`);
+    lines.push(`Active Cycles,${kpis.activeCycles}`);
+    lines.push(`Completed Cycles,${kpis.completedCycles}`);
+    lines.push(`Total Increments Awarded (${kpis.currency}),${kpis.totalSalaryIncrementsAwarded}`);
+    lines.push(`Average Increment %,${kpis.averageIncrementPercent}`);
+    lines.push(`Fairness Score,${kpis.fairnessScore}`);
+    lines.push('');
+
+    lines.push('Department Performance');
+    lines.push('Department,Employees,Avg Score,Avg Increment %');
+    deptData.forEach(d => {
+      lines.push([esc(d.departmentName), d.employeeCount, d.averageScore, d.averageIncrement].join(','));
+    });
+    lines.push('');
+
+    lines.push('Increment Trends');
+    lines.push('Cycle,Date,Avg Increment %,Employees,Total Cost,Budget Utilization %');
+    trends.forEach(t => {
+      lines.push([esc(t.cycleName), t.date, t.averageIncrement, t.totalEmployees, t.totalCost, t.budgetUtilization].join(','));
+    });
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics_export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -118,7 +164,10 @@ export default function ExecutiveDashboard() {
             <option value="6m">Last 6 months</option>
             <option value="ytd">This year</option>
           </select>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+          >
             <Download className="w-4 h-4" />
             Export Report
           </button>
@@ -163,9 +212,10 @@ export default function ExecutiveDashboard() {
               <div className="p-2 bg-slate-50 rounded-lg">
                 <CheckCircle className="w-5 h-5 text-slate-500" />
               </div>
-              {cycleGrowth > 0 && (
-                <span className="flex items-center text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                  <ArrowUp className="w-3 h-3 mr-1" /> {cycleGrowth}
+              {cycleGrowth !== 0 && (
+                <span className={`flex items-center text-xs font-bold ${cycleGrowth >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'} px-2 py-1 rounded-full`}>
+                  {cycleGrowth >= 0 ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(cycleGrowth)}%
                 </span>
               )}
             </div>

@@ -35,6 +35,13 @@ export default function EmployeeDetail() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [actionModal, setActionModal] = useState<'deactivate' | 'reactivate' | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [editForm, setEditForm] = useState<{ jobTitle: string; departmentId: string; salaryBandId: string }>({
+    jobTitle: '',
+    departmentId: '',
+    salaryBandId: '',
+  });
 
   const loadData = async () => {
     if (!uid || !currentUser?.companyId) return;
@@ -203,6 +210,38 @@ export default function EmployeeDetail() {
     return { bg: '#64748b', text: '#ffffff' };
   };
 
+  const openEditModal = () => {
+    if (!employee) return;
+    setEditForm({
+      jobTitle: employee.jobTitle || '',
+      departmentId: employee.departmentId || '',
+      salaryBandId: employee.salaryBandId || '',
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!employee) return;
+    setIsSubmittingEdit(true);
+    try {
+      await employeeService.updateEmployeeProfile({
+        targetUid: employee.uid,
+        jobTitle: editForm.jobTitle.trim(),
+        // Empty selection clears the assignment (null), otherwise pass the id.
+        departmentId: editForm.departmentId || null,
+        salaryBandId: editForm.salaryBandId || null,
+      });
+      toast.success('Profile updated');
+      setEditModalOpen(false);
+      await loadData();
+    } catch (err) {
+      const e = err as Error;
+      toast.error(e.message || 'Failed to update profile');
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
   const handleStatusChange = async (action: 'deactivate' | 'reactivate') => {
     if (!employee) return;
     setIsSubmittingAction(true);
@@ -271,7 +310,7 @@ export default function EmployeeDetail() {
             {currentUser?.role && ['hr_admin', 'super_admin'].includes(currentUser.role) && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => toast.info('Edit profile feature coming soon')}
+                  onClick={openEditModal}
                   className="flex items-center gap-2 border border-slate-300 rounded-md px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -602,6 +641,76 @@ export default function EmployeeDetail() {
           </div>
         )}
       </div>
+
+      {/* Edit Profile Modal */}
+      {editModalOpen && employee && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !isSubmittingEdit && setEditModalOpen(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6 border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Edit Profile</h3>
+            <p className="text-sm text-slate-500 mb-5">Update {employee.name}'s job title, department, and salary band.</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Job Title</label>
+                <input
+                  type="text"
+                  value={editForm.jobTitle}
+                  onChange={(e) => setEditForm((f) => ({ ...f, jobTitle: e.target.value }))}
+                  placeholder="e.g. Senior Engineer"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+                <select
+                  value={editForm.departmentId}
+                  onChange={(e) => setEditForm((f) => ({ ...f, departmentId: e.target.value }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                >
+                  <option value="">— No department —</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Salary Band</label>
+                <select
+                  value={editForm.salaryBandId}
+                  onChange={(e) => setEditForm((f) => ({ ...f, salaryBandId: e.target.value }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                >
+                  <option value="">— No salary band —</option>
+                  {salaryBands.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setEditModalOpen(false)}
+                disabled={isSubmittingEdit}
+                className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSubmit}
+                disabled={isSubmittingEdit}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSubmittingEdit && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Deactivate/Reactivate Confirmation Modal */}
       {actionModal && employee && (

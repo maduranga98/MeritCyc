@@ -253,6 +253,9 @@ const ProfilePage: React.FC = () => {
       });
       const downloadUrl = await getDownloadURL(storageRef);
       await updateProfile(currentUser, { photoURL: downloadUrl });
+      // Persist to the Firestore user doc so the photo shows everywhere
+      // it is read from (employee directory, profile detail, etc.).
+      await updateDoc(doc(db, "users", user.uid), { photoURL: downloadUrl });
       setAvatarUrl(downloadUrl);
       toast.success("Profile photo updated.");
     } catch {

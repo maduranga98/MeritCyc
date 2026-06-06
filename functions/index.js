@@ -3706,15 +3706,14 @@ async function recalculateBudgetTracking(cycleId, companyId) {
   const today = new Date().toISOString().split('T')[0];
   const newBurnPoint = { date: today, committed, projected };
 
-  // Update Realtime Database
-  const db = admin.database();
-  const budgetRef = db.ref(`budgetTracking/${cycleId}`);
+  // Update budget tracking doc in Firestore
+  const budgetRef = firestore.collection("budgetTracking").doc(cycleId);
 
   const currentBudgetSnap = await budgetRef.get();
   let burnRateData = [];
 
-  if (currentBudgetSnap.exists()) {
-      const currentData = currentBudgetSnap.val();
+  if (currentBudgetSnap.exists) {
+      const currentData = currentBudgetSnap.data();
       if (currentData.burnRateData) {
           burnRateData = currentData.burnRateData;
           const lastIndex = burnRateData.length - 1;
@@ -3742,7 +3741,7 @@ async function recalculateBudgetTracking(cycleId, companyId) {
       byDepartment,
       byTier,
       burnRateData,
-      lastUpdated: admin.database.ServerValue.TIMESTAMP
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
   };
 
   await budgetRef.set(updateData);

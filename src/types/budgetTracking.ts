@@ -1,3 +1,5 @@
+import { type Timestamp } from 'firebase/firestore';
+
 export interface BurnRatePoint {
   date: string;
   committed: number;
@@ -27,5 +29,6 @@ export interface BudgetTracking {
   byDepartment: Record<string, DepartmentBudget>;
   byTier: Record<string, TierBudget>;
   burnRateData: BurnRatePoint[];
-  lastUpdated: number;
+  // Firestore server timestamp set by the updateBudgetTracking Cloud Function.
+  lastUpdated: Timestamp;
 }

@@ -12,6 +12,9 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  // Required by the Realtime Database client (budget tracking). Without this
+  // getDatabase() falls back to a guessed URL and budget listeners silently fail.
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
 };
 
 // Initialize Firebase (guard against duplicate init on HMR)

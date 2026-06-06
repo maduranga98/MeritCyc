@@ -41,6 +41,13 @@ export interface AuthUser {
   role: RoleCode;
   companyId: string; // empty string for platform_admin
   approved: boolean;
+  /**
+   * True when the token carries a company-scoped role but no companyId claim
+   * (claims desync). Company-scoped Firestore reads cannot succeed in this
+   * state, so the UI should route the user to a "finish setup" screen rather
+   * than let every listener fail with permission-denied.
+   */
+  setupRequired?: boolean;
 }
 
 /**

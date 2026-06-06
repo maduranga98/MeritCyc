@@ -50,6 +50,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/pending-approval" replace />;
   }
 
+  // 2b. Claims desync (company-scoped role but no companyId claim). Company
+  // reads would all fail with permission-denied, so route to the pending /
+  // finish-setup screen instead of dropping the user into a broken dashboard.
+  if (user.setupRequired) {
+    return <Navigate to="/pending-approval" replace />;
+  }
+
   // 3a. allowedRoles check (takes priority over minimumRole)
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;

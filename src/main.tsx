@@ -5,12 +5,14 @@ import { Toaster } from "sonner";
 import "./index.css";
 import App from "./App.tsx";
 import { AuthProvider } from "./context/AuthContext";
+import ErrorBoundary from "./components/shared/ErrorBoundary";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <App />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <App />
         <Toaster
           position="top-right"
           richColors
@@ -18,8 +20,9 @@ createRoot(document.getElementById("root")!).render(
           toastOptions={{
             style: { fontFamily: "Inter, ui-sans-serif, system-ui" },
           }}
-        />
-      </AuthProvider>
-    </BrowserRouter>
+          />
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>
 );

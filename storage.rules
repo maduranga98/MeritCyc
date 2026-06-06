@@ -1,0 +1,80 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // =========================================================================
+    // Helper functions (read role / companyId from the caller's JWT claims)
+    // =========================================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.role;
+    }
+
+    function callerCompanyId() {
+      return request.auth.token.companyId;
+    }
+
+    function isHrOrAdmin(cId) {
+      return isSignedIn() &&
+             callerCompanyId() == cId &&
+             (role() == 'super_admin' || role() == 'hr_admin');
+    }
+
+    // Upload guards — images only, capped at 5 MB.
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function sizeUnder5MB() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // =========================================================================
+    // User avatars — owner writes; any signed-in user reads (avatars are
+    // displayed across the app on profiles, directories, evaluations, etc.)
+    // =========================================================================
+
+    match /users/{uid}/avatar {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn() &&
+                      request.auth.uid == uid &&
+                      isImage() && sizeUnder5MB();
+    }
+
+    // =========================================================================
+    // Company logos — HR / super_admin of the company write; same-company reads
+    // =========================================================================
+
+    match /companies/{companyId}/{fileName} {
+      allow read:  if isSignedIn() && callerCompanyId() == companyId;
+      allow write: if isHrOrAdmin(companyId) && isImage() && sizeUnder5MB();
+    }
+
+    // =========================================================================
+    // Onboarding logos — uploaded during onboarding before the company link is
+    // finalized. Restricted to authenticated admins; readable by signed-in users.
+    // =========================================================================
+
+    match /logos/{fileName} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn() &&
+                      (role() == 'super_admin' ||
+                       role() == 'hr_admin' ||
+                       role() == 'platform_admin') &&
+                      isImage() && sizeUnder5MB();
+    }
+
+    // =========================================================================
+    // Catch-all: deny everything not explicitly matched above
+    // =========================================================================
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

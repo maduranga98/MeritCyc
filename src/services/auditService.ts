@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import { collection, query, where, orderBy, limit, startAfter, getDocs, QueryConstraint } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, Timestamp, QueryConstraint } from 'firebase/firestore';
 import type { AuditLogEntry, AuditAction } from '../types/audit';
 
 const BATCH_SIZE = 50;
@@ -26,12 +26,14 @@ export const auditService = {
       orderBy('timestamp', 'desc'),
     ];
 
-    // Add optional filters
+    // Add optional filters. Audit log `timestamp` is stored as a Firestore
+    // serverTimestamp (Timestamp), so range bounds must also be Timestamps —
+    // comparing against a raw number silently matches nothing.
     if (filters.startDate) {
-      constraints.push(where('timestamp', '>=', filters.startDate.getTime()));
+      constraints.push(where('timestamp', '>=', Timestamp.fromDate(filters.startDate)));
     }
     if (filters.endDate) {
-      constraints.push(where('timestamp', '<=', filters.endDate.getTime()));
+      constraints.push(where('timestamp', '<=', Timestamp.fromDate(filters.endDate)));
     }
     if (filters.actionType) {
       constraints.push(where('action', '==', filters.actionType));

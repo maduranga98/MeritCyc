@@ -2,76 +2,82 @@
 // MeritCyc App — Route Configuration
 // =============================================================================
 
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
+// -----------------------------------------------------------------------------
+// Page components are lazy-loaded so each route ships its own chunk instead of
+// one ~3 MB monolith. Layout / route-guard components stay eager because they
+// wrap nearly every route and are tiny.
+// -----------------------------------------------------------------------------
+
 // Auth pages
-import LoginPage from "./pages/auth/Login";
-import ForgotPasswordPage from "./pages/auth/ForgotPassword";
-import ResetPasswordPage from "./pages/auth/ResetPassword";
-import PendingApproval from "./pages/auth/PendingApproval";
-import SignupPage from "./pages/auth/Signup";
-import VerifyEmailPage from "./pages/auth/VerifyEmail";
-import OnboardingWizard from "./pages/onboarding/OnboardingWizard";
+const LoginPage = lazy(() => import("./pages/auth/Login"));
+const ForgotPasswordPage = lazy(() => import("./pages/auth/ForgotPassword"));
+const ResetPasswordPage = lazy(() => import("./pages/auth/ResetPassword"));
+const PendingApproval = lazy(() => import("./pages/auth/PendingApproval"));
+const SignupPage = lazy(() => import("./pages/auth/Signup"));
+const VerifyEmailPage = lazy(() => import("./pages/auth/VerifyEmail"));
+const OnboardingWizard = lazy(() => import("./pages/onboarding/OnboardingWizard"));
 
 // Protected pages
-import PlatformDashboard from "./pages/platform/PlatformDashboard";
-import CareerMap from "./pages/career/CareerMap";
-import CareerPathManagement from "./pages/career/CareerPathManagement";
-import IncrementStories from "./pages/increments/IncrementStories";
-import IncrementStoryDetail from "./pages/increments/IncrementStoryDetail";
-import NotificationsPage from "./pages/notifications/NotificationsPage";
-import SuperAdminDashboard from "./pages/dashboards/SuperAdminDashboard";
-import HRAdminDashboard from "./pages/dashboards/HRAdminDashboard";
-import ManagerDashboard from "./pages/dashboards/ManagerDashboard";
-import EmployeeDashboard from "./pages/dashboards/EmployeeDashboard";
-import AcceptInvite from "./pages/auth/AcceptInvite";
-import InviteTracker from "./pages/people/InviteTracker";
-import PendingApprovals from "./pages/people/PendingApprovals";
-import DepartmentManagement from "./pages/people/DepartmentManagement";
-import SalaryBandManagement from "./pages/people/SalaryBandManagement";
-import EmployeeDirectory from "./pages/people/EmployeeDirectory";
-import EmployeeDetail from "./pages/people/EmployeeDetail";
-import ProfilePage from "./pages/settings/Profile";
-import CyclesList from "./pages/cycles/CyclesList";
-import CycleDetail from "./pages/cycles/CycleDetail";
-import SimulationDashboard from "./pages/cycles/SimulationDashboard";
-import BudgetTracker from "./pages/cycles/BudgetTracker";
-import ManagerEvaluationsHub from "./pages/evaluations/ManagerEvaluationsHub";
-import TeamEvaluationPage from "./pages/evaluations/TeamEvaluationPage";
-import HRScoreReview from "./pages/evaluations/HRScoreReview";
+const PlatformDashboard = lazy(() => import("./pages/platform/PlatformDashboard"));
+const CareerMap = lazy(() => import("./pages/career/CareerMap"));
+const CareerPathManagement = lazy(() => import("./pages/career/CareerPathManagement"));
+const IncrementStories = lazy(() => import("./pages/increments/IncrementStories"));
+const IncrementStoryDetail = lazy(() => import("./pages/increments/IncrementStoryDetail"));
+const NotificationsPage = lazy(() => import("./pages/notifications/NotificationsPage"));
+const SuperAdminDashboard = lazy(() => import("./pages/dashboards/SuperAdminDashboard"));
+const HRAdminDashboard = lazy(() => import("./pages/dashboards/HRAdminDashboard"));
+const ManagerDashboard = lazy(() => import("./pages/dashboards/ManagerDashboard"));
+const EmployeeDashboard = lazy(() => import("./pages/dashboards/EmployeeDashboard"));
+const AcceptInvite = lazy(() => import("./pages/auth/AcceptInvite"));
+const InviteTracker = lazy(() => import("./pages/people/InviteTracker"));
+const PendingApprovals = lazy(() => import("./pages/people/PendingApprovals"));
+const DepartmentManagement = lazy(() => import("./pages/people/DepartmentManagement"));
+const SalaryBandManagement = lazy(() => import("./pages/people/SalaryBandManagement"));
+const EmployeeDirectory = lazy(() => import("./pages/people/EmployeeDirectory"));
+const EmployeeDetail = lazy(() => import("./pages/people/EmployeeDetail"));
+const ProfilePage = lazy(() => import("./pages/settings/Profile"));
+const CyclesList = lazy(() => import("./pages/cycles/CyclesList"));
+const CycleDetail = lazy(() => import("./pages/cycles/CycleDetail"));
+const SimulationDashboard = lazy(() => import("./pages/cycles/SimulationDashboard"));
+const BudgetTracker = lazy(() => import("./pages/cycles/BudgetTracker"));
+const ManagerEvaluationsHub = lazy(() => import("./pages/evaluations/ManagerEvaluationsHub"));
+const TeamEvaluationPage = lazy(() => import("./pages/evaluations/TeamEvaluationPage"));
+const HRScoreReview = lazy(() => import("./pages/evaluations/HRScoreReview"));
 
 // Join / self-registration pages (public)
-import ManualJoin from "./pages/join/ManualJoin";
-import QRLanding from "./pages/join/QRLanding";
-import OTPVerification from "./pages/join/OTPVerification";
+const ManualJoin = lazy(() => import("./pages/join/ManualJoin"));
+const QRLanding = lazy(() => import("./pages/join/QRLanding"));
+const OTPVerification = lazy(() => import("./pages/join/OTPVerification"));
 
-// Layout
+// Analytics & Fairness
+const FairnessDashboard = lazy(() => import("./pages/analytics/FairnessDashboard"));
+const ExecutiveDashboard = lazy(() => import("./pages/analytics/ExecutiveDashboard"));
+const ReportsGenerator = lazy(() => import("./pages/analytics/ReportsGenerator"));
+const AuditTrail = lazy(() => import("./pages/analytics/AuditTrail"));
+const DepartmentAnalyticsDetail = lazy(() => import("./pages/analytics/DepartmentAnalyticsDetail"));
+
+// Settings
+const GeneralSettings = lazy(() => import("./pages/settings/GeneralSettings"));
+const RegistrationSettings = lazy(() => import("./pages/settings/RegistrationSettings"));
+const NotificationSettings = lazy(() => import("./pages/settings/NotificationSettings"));
+const SecuritySettings = lazy(() => import("./pages/settings/SecuritySettings"));
+const DataPrivacySettings = lazy(() => import("./pages/settings/DataPrivacySettings"));
+
+// Help & Instructions
+const InstructionsPage = lazy(() => import("./pages/help/InstructionsPage"));
+
+// Billing
+const BillingDashboard = lazy(() => import("./pages/billing/BillingDashboard"));
+const PricingPage = lazy(() => import("./pages/billing/PricingPage"));
+
+// Layout / route guards — eager (wrap almost every route, small footprint)
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { OnboardingRoute } from "./components/OnboardingRoute";
 import { AppLayout } from "./components/layout/AppLayout";
 import { SettingsLayout } from "./components/layout/SettingsLayout";
-
-// Analytics & Fairness
-import FairnessDashboard from "./pages/analytics/FairnessDashboard";
-import ExecutiveDashboard from "./pages/analytics/ExecutiveDashboard";
-import ReportsGenerator from "./pages/analytics/ReportsGenerator";
-import AuditTrail from "./pages/analytics/AuditTrail";
-import DepartmentAnalyticsDetail from "./pages/analytics/DepartmentAnalyticsDetail";
-
-// Settings
-import GeneralSettings from "./pages/settings/GeneralSettings";
-import RegistrationSettings from "./pages/settings/RegistrationSettings";
-import NotificationSettings from "./pages/settings/NotificationSettings";
-import SecuritySettings from "./pages/settings/SecuritySettings";
-import DataPrivacySettings from "./pages/settings/DataPrivacySettings";
-
-// Help & Instructions
-import InstructionsPage from "./pages/help/InstructionsPage";
-
-// Billing
-import BillingDashboard from "./pages/billing/BillingDashboard";
-import PricingPage from "./pages/billing/PricingPage";
 
 // Session management (idle timeout — only active for logged-in users)
 import { useIdleTimeout } from "./hooks/useIdleTimeout";
@@ -86,6 +92,13 @@ const SessionManager: React.FC = () => {
   return null;
 };
 
+// Fallback shown while a lazily-loaded route chunk is being fetched.
+const RouteFallback: React.FC = () => (
+  <div className="min-h-screen bg-merit-bg flex items-center justify-center font-brand">
+    <div className="h-8 w-8 rounded-full border-4 border-merit-emerald border-t-transparent animate-spin" />
+  </div>
+);
+
 // ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
@@ -98,6 +111,7 @@ function App() {
       {/* Mount idle-timeout tracker only when a user is signed in */}
       {user && <SessionManager />}
 
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* ================================================================= */}
         {/* Public routes                                                       */}
@@ -629,6 +643,7 @@ function App() {
         {/* ================================================================= */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </Suspense>
     </>
   );
 }

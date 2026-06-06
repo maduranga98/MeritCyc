@@ -39,7 +39,9 @@ function StatusBadge({ status }: { status: CycleStatus }) {
 // ---------------------------------------------------------------------------
 
 function CycleCard({ cycle, onClick }: { cycle: Cycle; onClick: () => void }) {
-  const criteriaComplete = cycle.criteria.length > 0 && Math.round(cycle.totalWeight) === 100;
+  const criteriaCount = cycle.criteria?.length ?? 0;
+  const totalWeight = cycle.totalWeight ?? 0;
+  const criteriaComplete = criteriaCount > 0 && Math.round(totalWeight) === 100;
 
   const formatDate = (ts: Cycle['timeline']['startDate'] | undefined) => {
     if (!ts) return '—';
@@ -85,9 +87,9 @@ function CycleCard({ cycle, onClick }: { cycle: Cycle; onClick: () => void }) {
           <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
             {cycle.budget?.type === 'fixed_pool' ? 'Fixed Pool' : 'Percentage Based'}
           </span>
-          {cycle.criteria.length > 0 && (
+          {criteriaCount > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
-              {cycle.criteria.length} criteria
+              {criteriaCount} criteria
             </span>
           )}
         </div>
@@ -100,13 +102,13 @@ function CycleCard({ cycle, onClick }: { cycle: Cycle; onClick: () => void }) {
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
             <span>Criteria weight</span>
             <span className={criteriaComplete ? 'text-emerald-600 font-semibold' : 'text-red-500'}>
-              {cycle.totalWeight}%
+              {totalWeight}%
             </span>
           </div>
           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${criteriaComplete ? 'bg-emerald-500' : 'bg-red-400'}`}
-              style={{ width: `${Math.min(cycle.totalWeight, 100)}%` }}
+              style={{ width: `${Math.min(totalWeight, 100)}%` }}
             />
           </div>
         </div>

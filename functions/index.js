@@ -312,6 +312,7 @@ exports.completeOnboarding = onCall(async (request) => {
       const deptRef = companyRef.collection("departments").doc();
       deptBatch.set(deptRef, {
         name: dept.name,
+        employeeCount: 0,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
@@ -324,8 +325,10 @@ exports.completeOnboarding = onCall(async (request) => {
       bandBatch.set(bandRef, {
         name: band.name,
         level: band.level,
-        min: band.min,
-        max: band.max,
+        minSalary: band.min,
+        maxSalary: band.max,
+        currency: company.currency || "USD",
+        employeeCount: 0,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
@@ -912,6 +915,10 @@ exports.createDepartment = onCall(async (request) => {
 
   if (managerId) {
     deptData.managerId = managerId;
+    const managerDoc = await firestore.collection("users").doc(managerId).get();
+    if (managerDoc.exists) {
+      deptData.managerName = managerDoc.data().name || "";
+    }
   }
 
   const docRef = await firestore
@@ -977,7 +984,14 @@ exports.updateDepartment = onCall(async (request) => {
 
   if (managerId !== undefined) {
     // Allow unsetting manager with null or empty string
-    updates.managerId = managerId || admin.firestore.FieldValue.delete();
+    if (managerId) {
+      updates.managerId = managerId;
+      const managerDoc = await firestore.collection("users").doc(managerId).get();
+      updates.managerName = managerDoc.exists ? (managerDoc.data().name || "") : "";
+    } else {
+      updates.managerId = admin.firestore.FieldValue.delete();
+      updates.managerName = admin.firestore.FieldValue.delete();
+    }
   }
 
   if (Object.keys(updates).length > 0) {

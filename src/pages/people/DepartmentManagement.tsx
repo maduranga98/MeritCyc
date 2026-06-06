@@ -49,7 +49,12 @@ export default function DepartmentManagement() {
     };
   }, [user?.companyId]);
 
-  const totalEmployees = departments.reduce((acc, dept) => acc + dept.employeeCount, 0);
+  // Derive employee counts from the live employees list rather than the
+  // denormalized `employeeCount` field, which is absent on seeded departments
+  // and can drift out of sync.
+  const countForDept = (deptId: string) =>
+    employees.filter((e) => e.departmentId === deptId).length;
+  const totalEmployees = employees.filter((e) => !!e.departmentId).length;
   const deptsWithoutManager = departments.filter((d) => !d.managerId).length;
 
   const columnHelper = createColumnHelper<Department>();
@@ -63,14 +68,17 @@ export default function DepartmentManagement() {
       header: "Manager",
       cell: (info) => {
         const managerId = info.getValue();
-        if (!managerId) return <span className="text-slate-400 italic">Not Assigned</span>;
+        const managerName = info.row.original.managerName;
+        if (!managerId && !managerName) return <span className="text-slate-400 italic">Not Assigned</span>;
         const manager = employees.find((e) => e.uid === managerId);
-        return manager ? <span>{manager.name}</span> : <span className="text-slate-400 italic">Unknown</span>;
+        const name = manager?.name || managerName;
+        return name ? <span>{name}</span> : <span className="text-slate-400 italic">Unknown</span>;
       },
     }),
-    columnHelper.accessor("employeeCount", {
+    columnHelper.display({
+      id: "employeeCount",
       header: "Employee Count",
-      cell: (info) => <span>{info.getValue()}</span>,
+      cell: (info) => <span>{countForDept(info.row.original.id)}</span>,
     }),
     columnHelper.display({
       id: "actions",

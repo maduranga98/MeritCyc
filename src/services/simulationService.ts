@@ -2,10 +2,9 @@
 // Simulation & Budget Service — Module 4
 // =============================================================================
 
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import { ref, onValue } from 'firebase/database';
+import { collection, doc, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions, rtdb } from '../config/firebase';
+import { db, functions } from '../config/firebase';
 import { type Simulation, type SimulationParameters } from '../types/simulation';
 import { type BudgetTracking } from '../types/budgetTracking';
 
@@ -38,13 +37,13 @@ export const simulationService = {
 
   /** Subscribe to real-time budget tracking */
   getBudgetTracking: (cycleId: string, callback: (budget: BudgetTracking | null) => void): (() => void) => {
-    const budgetRef = ref(rtdb, `budgetTracking/${cycleId}`);
+    const budgetRef = doc(db, 'budgetTracking', cycleId);
 
-    return onValue(
+    return onSnapshot(
       budgetRef,
       (snapshot) => {
         if (snapshot.exists()) {
-          callback(snapshot.val() as BudgetTracking);
+          callback(snapshot.data() as BudgetTracking);
         } else {
           callback(null);
         }

@@ -195,6 +195,15 @@ service cloud.firestore {
       allow write: if false; // Cloud Functions only
     }
 
+    // Budget tracking — one doc per cycle (doc id == cycleId). Sensitive
+    // compensation data: HR / admin of the same company or platform admin.
+    // Written by Cloud Functions (updateBudgetTracking) only.
+    match /budgetTracking/{cycleId} {
+      allow read: if isPlatformAdmin() ||
+                     isHrOrAdmin(resource.data.companyId);
+      allow write: if false; // Cloud Functions only
+    }
+
     // Budget simulations — HR / admin only; uses get() to resolve the
     // parent cycle's companyId without storing it redundantly on each sim doc.
     match /cycles/{cycleId}/simulations/{simId} {

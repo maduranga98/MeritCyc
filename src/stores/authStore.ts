@@ -94,11 +94,31 @@ export const useAuthStore = create<AuthStore>((set) => ({
           }
 
           if (raw.role) {
+            // Claims-desync recovery: a company-scoped role with no companyId
+            // claim means every company-scoped read will be permission-denied.
+            // Force one more token refresh in case the claim was just written,
+            // then flag the user for the "finish setup" path if still missing.
+            if (raw.role !== "platform_admin" && !raw.companyId) {
+              tokenResult = await firebaseUser.getIdTokenResult(true);
+              raw = tokenResult.claims;
+            }
+
             const claims: CustomClaims = {
               role: raw.role as RoleCode,
               companyId: raw.companyId as string | undefined,
               approved: (raw.approved as boolean) ?? false,
             };
+
+            const setupRequired =
+              claims.role !== "platform_admin" && !claims.companyId;
+
+            if (setupRequired) {
+              console.warn(
+                "Claims desync: role present but no companyId claim for UID:",
+                firebaseUser.uid,
+                "— routing to finish-setup state."
+              );
+            }
 
             const user: AuthUser = {
               uid: firebaseUser.uid,
@@ -111,6 +131,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
               role: claims.role,
               companyId: claims.companyId ?? "",
               approved: claims.approved,
+              setupRequired,
             };
 
             set({ user, firebaseUser, claims, loading: false });

@@ -9,13 +9,19 @@ export const getNotifications = (uid: string, callback: (notifications: AppNotif
     orderBy('createdAt', 'desc')
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const notifications = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as AppNotification));
-    callback(notifications);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const notifications = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as AppNotification));
+      callback(notifications);
+    },
+    (error) => {
+      console.error('[getNotifications] snapshot error:', error);
+    }
+  );
 };
 
 export const markNotificationRead = async (notificationId: string): Promise<void> => {

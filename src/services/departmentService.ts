@@ -6,16 +6,24 @@ import { type Department } from "../types/department";
 export const departmentService = {
   subscribeToDepartments: (
     companyId: string,
-    callback: (departments: Department[]) => void
+    callback: (departments: Department[]) => void,
+    onError?: (error: Error) => void
   ) => {
     const q = query(collection(db, "companies", companyId, "departments"));
-    return onSnapshot(q, (snapshot) => {
-      const depts = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Department[];
-      callback(depts);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const depts = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Department[];
+        callback(depts);
+      },
+      (error) => {
+        console.error("[subscribeToDepartments] snapshot error:", error);
+        onError?.(error);
+      }
+    );
   },
 
   getDepartments: async (companyId: string): Promise<Department[]> => {

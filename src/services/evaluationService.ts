@@ -72,12 +72,18 @@ export const evaluationService = {
     // We cannot reliably sort by updatedAt without an index if we have multiple wheres.
     // Assuming simple query for now.
 
-    return onSnapshot(q, (snapshot) => {
-      const evaluations = snapshot.docs.map((d) =>
-        mapDocToEvaluation(d.id, d.data() as Record<string, unknown>)
-      );
-      if (callback) callback(evaluations);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const evaluations = snapshot.docs.map((d) =>
+          mapDocToEvaluation(d.id, d.data() as Record<string, unknown>)
+        );
+        if (callback) callback(evaluations);
+      },
+      (error) => {
+        console.error('[getManagerEvaluations] snapshot error:', error);
+      }
+    );
   },
 
   /** Subscribe to all evaluations for a specific cycle (for HR use) */
@@ -89,12 +95,18 @@ export const evaluationService = {
       collection(db, 'evaluations'),
       where('cycleId', '==', cycleId)
     );
-    return onSnapshot(q, (snapshot) => {
-      const evaluations = snapshot.docs.map((d) =>
-        mapDocToEvaluation(d.id, d.data() as Record<string, unknown>)
-      );
-      callback(evaluations);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const evaluations = snapshot.docs.map((d) =>
+          mapDocToEvaluation(d.id, d.data() as Record<string, unknown>)
+        );
+        callback(evaluations);
+      },
+      (error) => {
+        console.error('[getCycleEvaluations] snapshot error:', error);
+      }
+    );
   },
 
   /** Fetch a single evaluation document */

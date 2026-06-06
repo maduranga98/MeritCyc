@@ -4,12 +4,18 @@ import { type IncrementStory, type CareerMap } from '../types/incrementStory';
 
 export const getIncrementStories = (uid: string, callback: (stories: IncrementStory[]) => void) => {
   const q = collection(db, 'users', uid, 'incrementStories');
-  return onSnapshot(q, (snapshot) => {
-    const stories = snapshot.docs.map(doc => ({ ...doc.data() } as IncrementStory));
-    // Sort descending by completedAt
-    stories.sort((a, b) => b.completedAt.toMillis() - a.completedAt.toMillis());
-    callback(stories);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const stories = snapshot.docs.map(doc => ({ ...doc.data() } as IncrementStory));
+      // Sort descending by completedAt
+      stories.sort((a, b) => b.completedAt.toMillis() - a.completedAt.toMillis());
+      callback(stories);
+    },
+    (error) => {
+      console.error('[getIncrementStories] snapshot error:', error);
+    }
+  );
 };
 
 export const getIncrementStory = async (uid: string, cycleId: string): Promise<IncrementStory | null> => {
@@ -23,11 +29,18 @@ export const getIncrementStory = async (uid: string, cycleId: string): Promise<I
 
 export const getCareerMap = (uid: string, callback: (map: CareerMap | null) => void) => {
   const docRef = doc(db, 'users', uid, 'careerMap', 'current');
-  return onSnapshot(docRef, (snapshot) => {
-    if (snapshot.exists()) {
-      callback(snapshot.data() as CareerMap);
-    } else {
+  return onSnapshot(
+    docRef,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.data() as CareerMap);
+      } else {
+        callback(null);
+      }
+    },
+    (error) => {
+      console.error('[getCareerMap] snapshot error:', error);
       callback(null);
     }
-  });
+  );
 };

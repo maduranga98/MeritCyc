@@ -7,16 +7,24 @@ import { type RoleCode } from "../types/roles";
 export const employeeService = {
   subscribeToEmployees: (
     companyId: string,
-    callback: (employees: Employee[]) => void
+    callback: (employees: Employee[]) => void,
+    onError?: (error: Error) => void
   ) => {
     const q = query(collection(db, "users"), where("companyId", "==", companyId));
-    return onSnapshot(q, (snapshot) => {
-      const emps = snapshot.docs.map((doc) => ({
-        uid: doc.id,
-        ...doc.data(),
-      })) as Employee[];
-      callback(emps);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const emps = snapshot.docs.map((doc) => ({
+          uid: doc.id,
+          ...doc.data(),
+        })) as Employee[];
+        callback(emps);
+      },
+      (error) => {
+        console.error("[subscribeToEmployees] snapshot error:", error);
+        onError?.(error);
+      }
+    );
   },
 
   getEmployees: async (companyId: string): Promise<Employee[]> => {

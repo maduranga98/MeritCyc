@@ -6,16 +6,24 @@ import { type SalaryBand } from "../types/salaryBand";
 export const salaryBandService = {
   subscribeToSalaryBands: (
     companyId: string,
-    callback: (bands: SalaryBand[]) => void
+    callback: (bands: SalaryBand[]) => void,
+    onError?: (error: Error) => void
   ) => {
     const q = query(collection(db, "companies", companyId, "salaryBands"));
-    return onSnapshot(q, (snapshot) => {
-      const bands = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as SalaryBand[];
-      callback(bands);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const bands = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as SalaryBand[];
+        callback(bands);
+      },
+      (error) => {
+        console.error("[subscribeToSalaryBands] snapshot error:", error);
+        onError?.(error);
+      }
+    );
   },
 
   getSalaryBands: async (companyId: string): Promise<SalaryBand[]> => {

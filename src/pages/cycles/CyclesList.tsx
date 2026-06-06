@@ -145,16 +145,36 @@ export default function CyclesList() {
   const navigate = useNavigate();
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CycleStatus | 'all'>('all');
   const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
-    if (!user?.companyId) return;
-
-    const unsub = cycleService.subscribeToCycles(user.companyId, (data) => {
-      setCycles(data);
+    if (!user?.companyId) {
       setLoading(false);
-    });
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const unsub = cycleService.subscribeToCycles(
+      user.companyId,
+      (data) => {
+        setCycles(data);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => {
+        const isPermission = err.message?.includes('permission');
+        setError(
+          isPermission
+            ? "You don't have permission to view cycles. Your account may still be syncing — try signing out and back in. If this persists, contact your administrator."
+            : 'Failed to load cycles. Please try again.'
+        );
+        setLoading(false);
+      }
+    );
 
     return () => unsub();
   }, [user?.companyId]);
@@ -214,6 +234,14 @@ export default function CyclesList() {
         ))}
       </div>
 
+      {/* Error */}
+      {!loading && error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+          <p className="text-sm font-semibold text-red-700 mb-1">Unable to load cycles</p>
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-20">
@@ -222,7 +250,7 @@ export default function CyclesList() {
       )}
 
       {/* Empty state */}
-      {!loading && filtered.length === 0 && (
+      {!loading && !error && filtered.length === 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-16 text-center">
           <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
             <ClipboardList className="w-7 h-7 text-slate-400" />
@@ -248,7 +276,7 @@ export default function CyclesList() {
       )}
 
       {/* Cycles grid */}
-      {!loading && filtered.length > 0 && (
+      {!loading && !error && filtered.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((cycle) => (
             <CycleCard

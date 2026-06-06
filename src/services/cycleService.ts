@@ -57,33 +57,53 @@ export const cycleService = {
   /** Subscribe to all cycles for a company — real-time */
   subscribeToCycles: (
     companyId: string,
-    callback: (cycles: Cycle[]) => void
+    callback: (cycles: Cycle[]) => void,
+    onError?: (error: Error) => void
   ): (() => void) => {
     const q = query(
       collection(db, 'cycles'),
       where('companyId', '==', companyId),
       orderBy('createdAt', 'desc')
     );
-    return onSnapshot(q, (snapshot) => {
-      const cycles = snapshot.docs.map((d) =>
-        mapDocToCycle(d.id, d.data() as Record<string, unknown>)
-      );
-      callback(cycles);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const cycles = snapshot.docs.map((d) =>
+          mapDocToCycle(d.id, d.data() as Record<string, unknown>)
+        );
+        callback(cycles);
+      },
+      (error) => {
+        // Without this handler Firestore re-throws as an uncaught error
+        // ("Uncaught Error in snapshot listener") and the UI spins forever.
+        // Most common cause: the signed-in user's ID token has no companyId
+        // claim, so the cycles read rule (isSameCompany) denies the listen.
+        console.error('[subscribeToCycles] snapshot error:', error);
+        onError?.(error);
+      }
+    );
   },
 
   /** Subscribe to a single cycle — real-time */
   subscribeToCycle: (
     cycleId: string,
-    callback: (cycle: Cycle | null) => void
+    callback: (cycle: Cycle | null) => void,
+    onError?: (error: Error) => void
   ): (() => void) => {
-    return onSnapshot(doc(db, 'cycles', cycleId), (d) => {
-      if (!d.exists()) {
-        callback(null);
-        return;
+    return onSnapshot(
+      doc(db, 'cycles', cycleId),
+      (d) => {
+        if (!d.exists()) {
+          callback(null);
+          return;
+        }
+        callback(mapDocToCycle(d.id, d.data() as Record<string, unknown>));
+      },
+      (error) => {
+        console.error('[subscribeToCycle] snapshot error:', error);
+        onError?.(error);
       }
-      callback(mapDocToCycle(d.id, d.data() as Record<string, unknown>));
-    });
+    );
   },
 
   // -------------------------------------------------------------------------

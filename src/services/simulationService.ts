@@ -21,26 +21,39 @@ export const simulationService = {
       orderBy('createdAt', 'desc')
     );
 
-    return onSnapshot(q, (snapshot) => {
-      const simulations = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Simulation[];
-      callback(simulations);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const simulations = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Simulation[];
+        callback(simulations);
+      },
+      (error) => {
+        console.error('[getSimulations] snapshot error:', error);
+      }
+    );
   },
 
   /** Subscribe to real-time budget tracking */
   getBudgetTracking: (cycleId: string, callback: (budget: BudgetTracking | null) => void): (() => void) => {
     const budgetRef = ref(rtdb, `budgetTracking/${cycleId}`);
 
-    return onValue(budgetRef, (snapshot) => {
-      if (snapshot.exists()) {
-        callback(snapshot.val() as BudgetTracking);
-      } else {
+    return onValue(
+      budgetRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          callback(snapshot.val() as BudgetTracking);
+        } else {
+          callback(null);
+        }
+      },
+      (error) => {
+        console.error('[getBudgetTracking] snapshot error:', error);
         callback(null);
       }
-    });
+    );
   },
 
   // ---------------------------------------------------------------------------

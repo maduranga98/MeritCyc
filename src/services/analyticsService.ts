@@ -2,6 +2,19 @@ import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../config/firebase";
 import { type GeneratedReport, type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYTierData, type YoYMetricsPoint } from "../types/analytics";
+import { fairnessService } from "./fairnessService";
+
+// An evaluation only counts toward analytics once it has a finalized outcome.
+const COUNTED_STATUSES = ['submitted', 'finalized', 'overridden'];
+
+// Resolve the salary increase amount for an evaluation, preferring the
+// precomputed incrementAmount and falling back to currentSalary * percent.
+const resolveIncrementAmount = (ev: { incrementAmount?: number; incrementPercent?: number; currentSalary?: number }): number => {
+  if (typeof ev.incrementAmount === 'number') return ev.incrementAmount;
+  const pct = ev.incrementPercent || 0;
+  const salary = ev.currentSalary || 0;
+  return salary * (pct / 100);
+};
 
 export const analyticsService = {
   // Aggregate from Firestore reads
@@ -21,17 +34,13 @@ export const analyticsService = {
 
     let totalSalaryIncrementsAwarded = 0;
     const incrementsList: number[] = [];
-    let fairnessScores: number[] = [];
 
     evals.forEach(evalDoc => {
       const eval_ = evalDoc.data();
-      if (eval_.status === 'submitted' || eval_.status === 'finalized' || eval_.status === 'overridden') {
-        const increment = eval_.recommendedIncrement || 0;
-        const baseSalary = eval_.baseSalary || 0;
-        const incrementAmount = baseSalary * (increment / 100);
-        totalSalaryIncrementsAwarded += incrementAmount;
+      if (COUNTED_STATUSES.includes(eval_.status)) {
+        const increment = eval_.incrementPercent || 0;
+        totalSalaryIncrementsAwarded += resolveIncrementAmount(eval_);
         if (increment > 0) incrementsList.push(increment);
-        if (eval_.fairnessScore !== undefined) fairnessScores.push(eval_.fairnessScore);
       }
     });
 
@@ -39,9 +48,17 @@ export const analyticsService = {
       ? Math.round((incrementsList.reduce((a, b) => a + b, 0) / incrementsList.length) * 10) / 10
       : 0;
 
-    const fairnessScore = fairnessScores.length > 0
-      ? Math.round((fairnessScores.reduce((a, b) => a + b, 0) / fairnessScores.length))
-      : 75;
+    // Fairness score comes from the latest persisted fairness report rather than
+    // a per-evaluation field (evaluations carry no fairness score). 0 = not yet generated.
+    let fairnessScore = 0;
+    try {
+      const latestFairness = await fairnessService.getLatestFairnessReport(companyId);
+      if (latestFairness?.overallFairnessScore !== undefined) {
+        fairnessScore = Math.round(latestFairness.overallFairnessScore);
+      }
+    } catch {
+      fairnessScore = 0;
+    }
 
     return {
       totalEmployees,
@@ -62,7 +79,7 @@ export const analyticsService = {
       const cycle = cycleDoc.data();
       const cycleName = cycle.name || `Cycle ${cycleDoc.id.slice(0, 8)}`;
       const date = cycle.createdAt?.toDate().toISOString().split('T')[0] || '';
-      const budget = cycle.budget || 0;
+      const budget = cycle.budget?.totalBudget || 0;
 
       const evals = await getDocs(
         query(collection(db, "evaluations"), where("cycleId", "==", cycleDoc.id))
@@ -74,12 +91,11 @@ export const analyticsService = {
 
       evals.forEach(evalDoc => {
         const eval_ = evalDoc.data();
-        if (eval_.status === 'submitted' || eval_.status === 'finalized' || eval_.status === 'overridden') {
-          const increment = eval_.recommendedIncrement || 0;
-          const baseSalary = eval_.baseSalary || 0;
-          totalCost += baseSalary * (increment / 100);
+        if (COUNTED_STATUSES.includes(eval_.status)) {
+          const increment = eval_.incrementPercent || 0;
+          totalCost += resolveIncrementAmount(eval_);
           increments.push(increment);
-          employees.add(eval_.employeeId);
+          employees.add(eval_.employeeUid);
         }
       });
 
@@ -104,18 +120,23 @@ export const analyticsService = {
   },
 
   getDepartmentPerformance: async (companyId: string): Promise<DepartmentPerformance[]> => {
-    const evaluationsSnap = await getDocs(
-      query(collection(db, "evaluations"), where("companyId", "==", companyId))
-    );
+    const [evaluationsSnap, departmentsSnap] = await Promise.all([
+      getDocs(query(collection(db, "evaluations"), where("companyId", "==", companyId))),
+      getDocs(query(collection(db, "departments"), where("companyId", "==", companyId))),
+    ]);
+
+    // Department names live on the departments collection, not on evaluations.
+    const deptNames = new Map<string, string>();
+    departmentsSnap.forEach(d => deptNames.set(d.id, d.data().name || 'Unknown'));
 
     const deptMap = new Map<string, { scores: number[]; increments: number[]; employees: Set<string>; name: string }>();
 
     evaluationsSnap.forEach(doc => {
       const eval_ = doc.data();
-      if (eval_.status !== 'submitted' && eval_.status !== 'finalized' && eval_.status !== 'overridden') return;
+      if (!COUNTED_STATUSES.includes(eval_.status)) return;
 
       const deptId = eval_.departmentId || 'unknown';
-      const deptName = eval_.departmentName || 'Unknown';
+      const deptName = deptNames.get(deptId) || 'Unknown';
 
       if (!deptMap.has(deptId)) {
         deptMap.set(deptId, { scores: [], increments: [], employees: new Set(), name: deptName });
@@ -123,11 +144,11 @@ export const analyticsService = {
 
       const dept = deptMap.get(deptId)!;
       const score = eval_.weightedTotalScore || 0;
-      const increment = eval_.recommendedIncrement || 0;
+      const increment = eval_.incrementPercent || 0;
 
       dept.scores.push(score);
       dept.increments.push(increment);
-      dept.employees.add(eval_.employeeId);
+      dept.employees.add(eval_.employeeUid);
     });
 
     return Array.from(deptMap.entries()).map(([deptId, data]) => ({
@@ -154,13 +175,18 @@ export const analyticsService = {
         yoyMap.set(cycleYear, { tier1: 0, tier2: 0, tier3: 0, tier4: 0, tier5: 0 });
       }
 
+      // Map each evaluation's assignedTierId to its ordinal position in the cycle's tier config.
+      const tierOrder: string[] = (cycle.tiers || []).map((t: { id: string }) => t.id);
+
       const evals = await getDocs(
         query(collection(db, "evaluations"), where("cycleId", "==", cycleDoc.id))
       );
 
       evals.forEach(evalDoc => {
         const eval_ = evalDoc.data();
-        const tier = eval_.assignedTierIndex ?? 0;
+        if (!COUNTED_STATUSES.includes(eval_.status)) return;
+        const tier = eval_.assignedTierId ? tierOrder.indexOf(eval_.assignedTierId) : -1;
+        if (tier < 0) return;
         const tierKey = `tier${tier + 1}` as 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5';
         const tierData = yoyMap.get(cycleYear);
         if (tierData && tierKey in tierData) {
@@ -230,12 +256,11 @@ export const analyticsService = {
 
       evals.forEach(evalDoc => {
         const ev = evalDoc.data();
-        if (ev.status !== 'submitted' && ev.status !== 'finalized' && ev.status !== 'overridden') return;
-        const increment = ev.recommendedIncrement ?? 0;
-        const baseSalary = ev.baseSalary ?? 0;
-        yearData.employeesReviewed.add(ev.employeeId);
+        if (!COUNTED_STATUSES.includes(ev.status)) return;
+        const increment = ev.incrementPercent ?? 0;
+        yearData.employeesReviewed.add(ev.employeeUid);
         yearData.increments.push(increment);
-        yearData.totalSpend += baseSalary * (increment / 100);
+        yearData.totalSpend += resolveIncrementAmount(ev);
       });
     }
 

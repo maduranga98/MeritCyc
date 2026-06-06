@@ -1,0 +1,13 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "budgetTracking": {
+      "$cycleId": {
+        ".read": "auth != null && (auth.token.role === 'platform_admin' || ((auth.token.role === 'hr_admin' || auth.token.role === 'super_admin') && data.child('companyId').val() === auth.token.companyId))",
+        ".write": false
+      }
+    }
+  }
+}

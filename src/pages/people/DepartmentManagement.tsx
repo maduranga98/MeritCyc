@@ -55,7 +55,22 @@ export default function DepartmentManagement() {
   const countForDept = (deptId: string) =>
     employees.filter((e) => e.departmentId === deptId).length;
   const totalEmployees = employees.filter((e) => !!e.departmentId).length;
-  const deptsWithoutManager = departments.filter((d) => !d.managerId).length;
+
+  // Resolve a department's manager: prefer the explicitly assigned manager,
+  // then fall back to an employee with the `manager` role in that department.
+  const managerForDept = (dept: Department): string | null => {
+    if (dept.managerId) {
+      const assigned = employees.find((e) => e.uid === dept.managerId);
+      return assigned?.name || dept.managerName || null;
+    }
+    if (dept.managerName) return dept.managerName;
+    const deptManager = employees.find(
+      (e) => e.departmentId === dept.id && e.role === "manager"
+    );
+    return deptManager?.name || null;
+  };
+
+  const deptsWithoutManager = departments.filter((d) => !managerForDept(d)).length;
 
   const columnHelper = createColumnHelper<Department>();
 
@@ -67,12 +82,8 @@ export default function DepartmentManagement() {
     columnHelper.accessor("managerId", {
       header: "Manager",
       cell: (info) => {
-        const managerId = info.getValue();
-        const managerName = info.row.original.managerName;
-        if (!managerId && !managerName) return <span className="text-slate-400 italic">Not Assigned</span>;
-        const manager = employees.find((e) => e.uid === managerId);
-        const name = manager?.name || managerName;
-        return name ? <span>{name}</span> : <span className="text-slate-400 italic">Unknown</span>;
+        const name = managerForDept(info.row.original);
+        return name ? <span>{name}</span> : <span className="text-slate-400 italic">Not Assigned</span>;
       },
     }),
     columnHelper.display({

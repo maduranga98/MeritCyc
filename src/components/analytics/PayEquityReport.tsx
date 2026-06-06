@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { type FairnessReport } from "../../types/fairness";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Download, ShieldCheck, AlertCircle } from "lucide-react";
+import { X, Download, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+import { pdfGenerationService } from "../../services/pdfGenerationService";
+import { toast } from "sonner";
 import {
   LineChart,
   Line,
@@ -16,12 +18,23 @@ import {
 interface PayEquityReportProps {
   report: FairnessReport;
   onClose: () => void;
+  companyName?: string;
 }
 
-export const PayEquityReport: React.FC<PayEquityReportProps> = ({ report, onClose }) => {
-  const handleDownloadPdf = () => {
-    // In a real app, this would use jsPDF and html2canvas to capture the modal content
-    alert("PDF generation would start here using jsPDF + html2canvas");
+export const PayEquityReport: React.FC<PayEquityReportProps> = ({ report, onClose, companyName }) => {
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    setDownloading(true);
+    try {
+      await pdfGenerationService.generateFairnessReportPDF(report, companyName || "Company");
+      toast.success("Pay equity report downloaded");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const totalEmployeesAnalyzed = report.metrics.departmentDisparity.reduce((sum, d) => sum + d.employeeCount, 0);
@@ -54,9 +67,10 @@ export const PayEquityReport: React.FC<PayEquityReportProps> = ({ report, onClos
             <div className="flex items-center gap-3">
               <button
                 onClick={handleDownloadPdf}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                disabled={downloading}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
               >
-                <Download className="w-4 h-4" />
+                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 Download PDF
               </button>
               <button

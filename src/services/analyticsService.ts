@@ -7,6 +7,35 @@ import { fairnessService } from "./fairnessService";
 // An evaluation only counts toward analytics once it has a finalized outcome.
 const COUNTED_STATUSES = ['submitted', 'finalized', 'overridden'];
 
+// Translate a UI date-range selection into a cutoff Date. null = no lower bound.
+const dateRangeToCutoff = (dateRange: string): Date | null => {
+  const now = new Date();
+  switch (dateRange) {
+    case '6m': {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - 6);
+      return d;
+    }
+    case '12m': {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - 12);
+      return d;
+    }
+    case 'ytd':
+      return new Date(now.getFullYear(), 0, 1);
+    default:
+      return null;
+  }
+};
+
+// Whether a Firestore document's createdAt falls on/after the cutoff.
+const withinRange = (createdAt: { toDate?: () => Date } | undefined, cutoff: Date | null): boolean => {
+  if (!cutoff) return true;
+  const d = createdAt?.toDate?.();
+  if (!d) return true; // keep records with no timestamp rather than silently dropping them
+  return d >= cutoff;
+};
+
 // Resolve the salary increase amount for an evaluation, preferring the
 // precomputed incrementAmount and falling back to currentSalary * percent.
 const resolveIncrementAmount = (ev: { incrementAmount?: number; incrementPercent?: number; currentSalary?: number }): number => {
@@ -18,18 +47,22 @@ const resolveIncrementAmount = (ev: { incrementAmount?: number; incrementPercent
 
 export const analyticsService = {
   // Aggregate from Firestore reads
-  getCompanyKPIs: async (companyId: string, _dateRange: string): Promise<CompanyKPIs> => {
+  getCompanyKPIs: async (companyId: string, dateRange: string): Promise<CompanyKPIs> => {
+    const cutoff = dateRangeToCutoff(dateRange);
     const usersSnap = await getDocs(query(collection(db, "users"), where("companyId", "==", companyId), where("status", "==", "active")));
     const cyclesSnap = await getDocs(query(collection(db, "cycles"), where("companyId", "==", companyId)));
     const evals = await getDocs(query(collection(db, "evaluations"), where("companyId", "==", companyId)));
 
+    // Current active headcount is a point-in-time figure, not date-range scoped.
     const totalEmployees = usersSnap.size;
 
     let activeCycles = 0;
     let completedCycles = 0;
     cyclesSnap.forEach(c => {
-       if (c.data().status === 'active') activeCycles++;
-       if (c.data().status === 'completed') completedCycles++;
+       const data = c.data();
+       if (!withinRange(data.createdAt, cutoff)) return;
+       if (data.status === 'active') activeCycles++;
+       if (data.status === 'completed') completedCycles++;
     });
 
     let totalSalaryIncrementsAwarded = 0;
@@ -37,7 +70,7 @@ export const analyticsService = {
 
     evals.forEach(evalDoc => {
       const eval_ = evalDoc.data();
-      if (COUNTED_STATUSES.includes(eval_.status)) {
+      if (COUNTED_STATUSES.includes(eval_.status) && withinRange(eval_.createdAt, cutoff)) {
         const increment = eval_.incrementPercent || 0;
         totalSalaryIncrementsAwarded += resolveIncrementAmount(eval_);
         if (increment > 0) incrementsList.push(increment);
@@ -71,12 +104,14 @@ export const analyticsService = {
     };
   },
 
-  getIncrementTrends: async (companyId: string, _dateRange: string): Promise<IncrementTrendPoint[]> => {
+  getIncrementTrends: async (companyId: string, dateRange: string): Promise<IncrementTrendPoint[]> => {
+    const cutoff = dateRangeToCutoff(dateRange);
     const cyclesSnap = await getDocs(query(collection(db, "cycles"), where("companyId", "==", companyId), where("status", "==", "completed")));
     const trends: IncrementTrendPoint[] = [];
 
     for (const cycleDoc of cyclesSnap.docs) {
       const cycle = cycleDoc.data();
+      if (!withinRange(cycle.createdAt, cutoff)) continue;
       const cycleName = cycle.name || `Cycle ${cycleDoc.id.slice(0, 8)}`;
       const date = cycle.createdAt?.toDate().toISOString().split('T')[0] || '';
       const budget = cycle.budget?.totalBudget || 0;
@@ -119,7 +154,8 @@ export const analyticsService = {
     return trends.sort((a, b) => a.date.localeCompare(b.date));
   },
 
-  getDepartmentPerformance: async (companyId: string): Promise<DepartmentPerformance[]> => {
+  getDepartmentPerformance: async (companyId: string, dateRange: string = 'all'): Promise<DepartmentPerformance[]> => {
+    const cutoff = dateRangeToCutoff(dateRange);
     const [evaluationsSnap, departmentsSnap] = await Promise.all([
       getDocs(query(collection(db, "evaluations"), where("companyId", "==", companyId))),
       getDocs(query(collection(db, "departments"), where("companyId", "==", companyId))),
@@ -133,7 +169,7 @@ export const analyticsService = {
 
     evaluationsSnap.forEach(doc => {
       const eval_ = doc.data();
-      if (!COUNTED_STATUSES.includes(eval_.status)) return;
+      if (!COUNTED_STATUSES.includes(eval_.status) || !withinRange(eval_.createdAt, cutoff)) return;
 
       const deptId = eval_.departmentId || 'unknown';
       const deptName = deptNames.get(deptId) || 'Unknown';

@@ -277,7 +277,11 @@ export default function PendingApprovals() {
     }),
     columnHelper.accessor('createdAt', {
       header: 'Registered',
-      cell: info => formatDistanceToNow(info.getValue().toDate(), { addSuffix: true })
+      cell: info => {
+        const ts = info.getValue();
+        if (!ts?.toDate) return '—';
+        return formatDistanceToNow(ts.toDate(), { addSuffix: true });
+      }
     }),
     columnHelper.accessor('status', {
       header: 'Status',

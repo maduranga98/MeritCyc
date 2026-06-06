@@ -57,7 +57,9 @@ export default function SalaryBandManagement() {
 
     const hasOverlap = bands.some((b) => {
       if (editingBand && b.id === editingBand.id) return false;
-      return Math.max(formData.minSalary, b.minSalary) < Math.min(formData.maxSalary, b.maxSalary);
+      const bMin = b.minSalary ?? b.min ?? 0;
+      const bMax = b.maxSalary ?? b.max ?? 0;
+      return Math.max(formData.minSalary, bMin) < Math.min(formData.maxSalary, bMax);
     });
 
     if (hasOverlap) {
@@ -120,6 +122,11 @@ export default function SalaryBandManagement() {
       setDeleteBandId(null);
     }
   };
+
+  // Resolve a band's range, tolerating legacy `min`/`max` field names written
+  // by the company seed alongside the current `minSalary`/`maxSalary`.
+  const bandMin = (b: SalaryBand) => b.minSalary ?? b.min ?? 0;
+  const bandMax = (b: SalaryBand) => b.maxSalary ?? b.max ?? 0;
 
   if (loading) {
     return (
@@ -196,7 +203,7 @@ export default function SalaryBandManagement() {
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-bold text-merit-navy truncate">{band.name}</h3>
                 <p className="text-slate-500 font-medium">
-                  {formatCurrency(band.minSalary)} — {formatCurrency(band.maxSalary)}
+                  {formatCurrency(bandMin(band))} — {formatCurrency(bandMax(band))}
                 </p>
               </div>
 
@@ -213,8 +220,8 @@ export default function SalaryBandManagement() {
                       setFormData({
                         name: band.name,
                         level: band.level,
-                        minSalary: band.minSalary,
-                        maxSalary: band.maxSalary,
+                        minSalary: band.minSalary ?? band.min ?? 0,
+                        maxSalary: band.maxSalary ?? band.max ?? 0,
                       });
                       setIsModalOpen(true);
                     }}

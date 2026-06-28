@@ -308,11 +308,11 @@ const AuditTrail: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Timestamp</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Actor</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Action</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Target</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.timestamp')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.actor')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.action')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.target')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.details')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -332,8 +332,8 @@ const AuditTrail: React.FC = () => {
         ) : logs.length === 0 ? (
           <div className="p-12 text-center">
             <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-            <p className="text-slate-400 font-medium mb-1">No audit logs found</p>
-            <p className="text-sm text-slate-400">Try adjusting your filters.</p>
+            <p className="text-slate-400 font-medium mb-1">{t('analytics.audit.noLogsFound')}</p>
+            <p className="text-sm text-slate-400">{t('analytics.audit.tryAdjusting')}</p>
           </div>
         ) : (
           <>
@@ -341,11 +341,11 @@ const AuditTrail: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Timestamp</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Actor</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Action</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Target</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.timestamp')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.actor')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.action')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.target')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.details')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -371,7 +371,7 @@ const AuditTrail: React.FC = () => {
                           <button
                             onClick={() => copyToClipboard(log.targetId)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-200 rounded"
-                            title="Copy ID"
+                            title={t('analytics.audit.copyId')}
                           >
                             <Copy className="w-3 h-3 text-slate-400" />
                           </button>
@@ -391,7 +391,7 @@ const AuditTrail: React.FC = () => {
                               onClick={() => setSelectedLog(log)}
                               className="text-xs text-emerald-600 hover:text-emerald-700 font-bold mt-1"
                             >
-                              View Details
+                              {t('analytics.audit.viewDetails')}
                             </button>
                           </div>
                         ) : (
@@ -412,7 +412,7 @@ const AuditTrail: React.FC = () => {
                   disabled={loading}
                   className="px-6 py-2 bg-slate-100 text-slate-900 text-sm font-bold rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'Loading...' : 'Load More Results'}
+                  {loading ? t('analytics.audit.loading') : t('analytics.audit.loadMore')}
                 </button>
               </div>
             )}
@@ -425,7 +425,7 @@ const AuditTrail: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-merit-navy">Details</h2>
+              <h2 className="text-lg font-bold text-merit-navy">{t('analytics.audit.detailsTitle')}</h2>
               <button
                 onClick={() => setSelectedLog(null)}
                 className="p-1 hover:bg-slate-100 rounded transition-colors"

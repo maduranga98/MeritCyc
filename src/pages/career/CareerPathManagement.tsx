@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../config/firebase';
 import {
@@ -136,6 +137,7 @@ function SortableLevelRow({
   onUpdateMilestone,
   onDeleteMilestone,
 }: SortableLevelRowProps) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: level.levelId,
   });
@@ -166,25 +168,25 @@ function SortableLevelRow({
 
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3">
           <div className="md:col-span-1">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Level</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1">{t('career.management.modal.level')}</label>
             <div className="px-2 py-2 bg-slate-50 rounded-lg text-sm font-bold text-slate-700 text-center">
               {level.levelNumber}
             </div>
           </div>
 
           <div className="md:col-span-3">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Title *</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1">{t('career.management.modal.titleLabel')}</label>
             <input
               type="text"
               value={level.title}
               onChange={(e) => onChange(index, { title: e.target.value })}
-              placeholder="e.g. Junior Engineer"
+              placeholder={t('career.management.modal.titlePlaceholder')}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
 
           <div className="md:col-span-3">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Salary Band *</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1">{t('career.management.modal.salaryBand')}</label>
             <select
               value={level.salaryBandId}
               onChange={(e) => {
@@ -196,7 +198,7 @@ function SortableLevelRow({
               }}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="">Select band</option>
+              <option value="">{t('career.management.modal.selectBand')}</option>
               {salaryBands.map((band) => (
                 <option key={band.id} value={band.id}>
                   {band.name}
@@ -206,7 +208,7 @@ function SortableLevelRow({
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Req. Score (0-100)</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1">{t('career.management.modal.reqScore')}</label>
             <input
               type="number"
               min={0}
@@ -218,7 +220,7 @@ function SortableLevelRow({
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Req. Cycles</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1">{t('career.management.modal.reqCycles')}</label>
             <input
               type="number"
               min={1}
@@ -246,7 +248,7 @@ function SortableLevelRow({
           type="text"
           value={level.description}
           onChange={(e) => onChange(index, { description: e.target.value })}
-          placeholder="Level description (optional)"
+          placeholder={t('career.management.modal.levelDescPlaceholder')}
           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
       </div>
@@ -259,7 +261,7 @@ function SortableLevelRow({
           className="flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700"
         >
           {milestonesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          Milestones ({level.milestones.length})
+          {t('career.management.modal.milestones')} ({level.milestones.length})
         </button>
 
         <AnimatePresence>
@@ -277,7 +279,7 @@ function SortableLevelRow({
                       type="text"
                       value={m.title}
                       onChange={(e) => onUpdateMilestone(index, mIdx, { title: e.target.value })}
-                      placeholder="Milestone title"
+                      placeholder={t('career.management.modal.milestoneTitlePlaceholder')}
                       className="flex-1 px-2 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <select
@@ -285,10 +287,10 @@ function SortableLevelRow({
                       onChange={(e) => onUpdateMilestone(index, mIdx, { type: e.target.value as Milestone['type'] })}
                       className="px-2 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
-                      <option value="cycle_count">Cycle Count</option>
-                      <option value="score_threshold">Score Threshold</option>
-                      <option value="tenure_months">Tenure (months)</option>
-                      <option value="manual">Manual</option>
+                      <option value="cycle_count">{t('career.management.modal.cycleCount')}</option>
+                      <option value="score_threshold">{t('career.management.modal.scoreThreshold')}</option>
+                      <option value="tenure_months">{t('career.management.modal.tenureMonths')}</option>
+                      <option value="manual">{t('career.management.modal.manual')}</option>
                     </select>
                     <input
                       type="number"
@@ -310,7 +312,7 @@ function SortableLevelRow({
                   onClick={() => onAddMilestone(index)}
                   className="text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
                 >
-                  <Plus className="w-4 h-4" /> Add Milestone
+                  <Plus className="w-4 h-4" /> {t('career.management.modal.addMilestone')}
                 </button>
               </div>
             </motion.div>
@@ -338,6 +340,7 @@ function PathModal({
   salaryBands: SalaryBand[];
   onSubmit: (data: PathFormData) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<PathFormData>(emptyPath());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -468,7 +471,7 @@ function PathModal({
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h2 className="text-xl font-bold text-slate-900">
-            {initialData ? 'Edit Career Path' : 'Create Career Path'}
+            {initialData ? t('career.management.modal.editTitle') : t('career.management.modal.createTitle')}
           </h2>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full">
             <X className="w-5 h-5" />
@@ -485,19 +488,19 @@ function PathModal({
 
           {/* Basic Info */}
           <div className="space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Basic Info</h3>
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">{t('career.management.modal.basicInfo')}</h3>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Path Name *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t('career.management.modal.pathName')}</label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Engineering Track"
+                placeholder={t('career.management.modal.pathNamePlaceholder')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t('career.management.modal.descriptionLabel')}</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
@@ -512,20 +515,20 @@ function PathModal({
                 onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))}
                 className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
               />
-              <span className="text-sm font-medium text-slate-700">Active</span>
+              <span className="text-sm font-medium text-slate-700">{t('career.management.modal.active')}</span>
             </label>
           </div>
 
           {/* Levels Builder */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Levels</h3>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">{t('career.management.modal.levelsSection')}</h3>
               <button
                 type="button"
                 onClick={addLevel}
                 className="text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
               >
-                <Plus className="w-4 h-4" /> Add Level
+                <Plus className="w-4 h-4" /> {t('career.management.modal.addLevel')}
               </button>
             </div>
 
@@ -558,7 +561,7 @@ function PathModal({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
           >
-            Cancel
+            {t('career.management.modal.cancel')}
           </button>
           <button
             type="submit"
@@ -567,7 +570,7 @@ function PathModal({
             className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            {submitting ? 'Saving...' : initialData ? 'Update Path' : 'Create Path'}
+            {submitting ? t('career.management.modal.saving') : initialData ? t('career.management.modal.updatePath') : t('career.management.modal.createPathBtn')}
           </button>
         </div>
       </motion.div>
@@ -590,6 +593,7 @@ function AssignModal({
   path: CareerPath | null;
   employees: Employee[];
 }) {
+  const { t } = useTranslation();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [selectedLevelId, setSelectedLevelId] = useState('');
   const [search, setSearch] = useState('');
@@ -644,7 +648,7 @@ function AssignModal({
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">Assign Career Path</h2>
+          <h2 className="text-lg font-bold text-slate-900">{t('career.management.assignModal.title')}</h2>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full">
             <X className="w-5 h-5" />
           </button>
@@ -652,27 +656,27 @@ function AssignModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Path</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('career.management.assignModal.path')}</label>
             <div className="px-3 py-2 bg-slate-50 rounded-lg text-sm font-medium text-slate-900">
               {path.name}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Employee *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('career.management.assignModal.employee')}</label>
             <div className="relative">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search employees..."
+                placeholder={t('career.management.assignModal.searchEmployees')}
                 className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div className="mt-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg">
               {filteredEmployees.length === 0 ? (
-                <div className="p-3 text-sm text-slate-500 text-center">No employees found.</div>
+                <div className="p-3 text-sm text-slate-500 text-center">{t('career.management.assignModal.noEmployeesFound')}</div>
               ) : (
                 filteredEmployees.map((emp) => (
                   <button
@@ -697,7 +701,7 @@ function AssignModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Starting Level *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('career.management.assignModal.startingLevel')}</label>
             <select
               value={selectedLevelId}
               onChange={(e) => setSelectedLevelId(e.target.value)}
@@ -717,7 +721,7 @@ function AssignModal({
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
             >
-              Done
+              {t('career.management.assignModal.done')}
             </button>
             <button
               type="submit"
@@ -725,7 +729,7 @@ function AssignModal({
               className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Assign
+              {t('career.management.assignModal.assign')}
             </button>
           </div>
         </form>
@@ -749,6 +753,7 @@ function AssignPathToEmployeeModal({
   employee: Employee | null;
   careerPaths: CareerPath[];
 }) {
+  const { t } = useTranslation();
   const [selectedPathId, setSelectedPathId] = useState(() =>
     careerPaths.length > 0 ? careerPaths[0].id : ''
   );
@@ -794,7 +799,7 @@ function AssignPathToEmployeeModal({
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">Assign Career Path</h2>
+          <h2 className="text-lg font-bold text-slate-900">{t('career.management.assignEmployeeModal.title')}</h2>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full">
             <X className="w-5 h-5" />
           </button>
@@ -802,17 +807,17 @@ function AssignPathToEmployeeModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Employee</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('career.management.assignEmployeeModal.employee')}</label>
             <div className="px-3 py-2 bg-slate-50 rounded-lg text-sm font-medium text-slate-900">
-              {employee.name} <span className="text-slate-500 font-normal">({employee.departmentName || 'No department'})</span>
+              {employee.name} <span className="text-slate-500 font-normal">({employee.departmentName || t('career.management.assignEmployeeModal.noDepartment')})</span>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Career Path *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('career.management.assignEmployeeModal.careerPath')}</label>
             {careerPaths.length === 0 ? (
               <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-                No career paths available. Create one first.
+                {t('career.management.assignEmployeeModal.noPathsAvailable')}
               </div>
             ) : (
               <select
@@ -820,7 +825,7 @@ function AssignPathToEmployeeModal({
                 onChange={(e) => setSelectedPathId(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
-                <option value="" disabled>Select a career path</option>
+                <option value="" disabled>{t('career.management.assignEmployeeModal.selectPath')}</option>
                 {careerPaths.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -831,14 +836,14 @@ function AssignPathToEmployeeModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Starting Level *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('career.management.assignEmployeeModal.startingLevel')}</label>
             <select
               value={selectedLevelId}
               onChange={(e) => setSelectedLevelId(e.target.value)}
               disabled={!selectedPath}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
             >
-              <option value="" disabled>Select a level</option>
+              <option value="" disabled>{t('career.management.assignEmployeeModal.selectLevel')}</option>
               {selectedPath?.levels.map((l) => (
                 <option key={l.levelId} value={l.levelId}>
                   Level {l.levelNumber}: {l.title}
@@ -853,7 +858,7 @@ function AssignPathToEmployeeModal({
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
             >
-              Cancel
+              {t('career.management.assignEmployeeModal.cancel')}
             </button>
             <button
               type="submit"
@@ -861,7 +866,7 @@ function AssignPathToEmployeeModal({
               className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Assign Path
+              {t('career.management.assignEmployeeModal.assignPath')}
             </button>
           </div>
         </form>
@@ -875,6 +880,7 @@ function AssignPathToEmployeeModal({
 // ---------------------------------------------------------------------------
 
 const CareerPathManagement: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [careerPaths, setCareerPaths] = useState<CareerPath[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -993,8 +999,8 @@ const CareerPathManagement: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Career Path Management</h1>
-          <p className="text-sm text-slate-500 mt-1">Define progression tracks and manage employee advancement.</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t('career.management.title')}</h1>
+          <p className="text-sm text-slate-500 mt-1">{t('career.management.subtitle')}</p>
         </div>
         <button
           onClick={() => {
@@ -1004,7 +1010,7 @@ const CareerPathManagement: React.FC = () => {
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors text-sm"
         >
           <Plus className="w-4 h-4" />
-          Create Career Path
+          {t('career.management.createPath')}
         </button>
       </div>
 
@@ -1012,8 +1018,8 @@ const CareerPathManagement: React.FC = () => {
       {careerPaths.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
           <TrendingUp className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-          <p className="text-lg font-medium text-slate-700">No career paths defined yet.</p>
-          <p className="text-sm text-slate-500 mt-1">Create your first career path to get started.</p>
+          <p className="text-lg font-medium text-slate-700">{t('career.management.noPaths.title')}</p>
+          <p className="text-sm text-slate-500 mt-1">{t('career.management.noPaths.subtitle')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1029,14 +1035,14 @@ const CareerPathManagement: React.FC = () => {
                     path.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
-                  {path.isActive ? 'Active' : 'Inactive'}
+                  {path.isActive ? t('career.management.active') : t('career.management.inactive')}
                 </span>
               </div>
-              <p className="text-sm text-slate-500 mb-4 line-clamp-2">{path.description || 'No description.'}</p>
+              <p className="text-sm text-slate-500 mb-4 line-clamp-2">{path.description || t('career.management.noDescription')}</p>
               <div className="flex items-center gap-4 text-sm text-slate-600 mb-4">
                 <span className="flex items-center gap-1.5">
                   <TrendingUp className="w-4 h-4" />
-                  {path.levels.length} levels
+                  {path.levels.length} {t('career.management.levels')}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -1047,13 +1053,13 @@ const CareerPathManagement: React.FC = () => {
                   }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
                 >
-                  <Edit3 className="w-3.5 h-3.5" /> Edit
+                  <Edit3 className="w-3.5 h-3.5" /> {t('career.management.edit')}
                 </button>
                 <button
                   onClick={() => setAssigningPath(path)}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100"
                 >
-                  <Users className="w-3.5 h-3.5" /> Assign
+                  <Users className="w-3.5 h-3.5" /> {t('career.management.assign')}
                 </button>
               </div>
             </div>
@@ -1064,19 +1070,19 @@ const CareerPathManagement: React.FC = () => {
       {/* Employee Overview Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">Employee Career Map Overview</h2>
+          <h2 className="text-lg font-bold text-slate-900">{t('career.management.employeeOverview')}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Employee</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Department</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Career Path</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Current Level</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Progress</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Next Level</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{t('career.management.table.employee')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{t('career.management.table.department')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{t('career.management.table.careerPath')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{t('career.management.table.currentLevel')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{t('career.management.table.progress')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{t('career.management.table.nextLevel')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{t('career.management.table.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1097,7 +1103,7 @@ const CareerPathManagement: React.FC = () => {
                         <span className="text-slate-700">{map.careerPathName}</span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
-                          No path assigned
+                          {t('career.management.noPathAssigned')}
                         </span>
                       )}
                     </td>
@@ -1126,7 +1132,7 @@ const CareerPathManagement: React.FC = () => {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            Assign Path
+                            {t('career.management.assignPath')}
                           </button>
                         )}
                         {canPromote && (
@@ -1144,7 +1150,7 @@ const CareerPathManagement: React.FC = () => {
                             ) : (
                               <ArrowUpCircle className="w-3.5 h-3.5" />
                             )}
-                            Promote
+                            {t('career.management.promote')}
                           </button>
                         )}
                       </div>
@@ -1155,7 +1161,7 @@ const CareerPathManagement: React.FC = () => {
               {activeEmployees.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
-                    No active employees found.
+                    {t('career.management.noActiveEmployees')}
                   </td>
                 </tr>
               )}

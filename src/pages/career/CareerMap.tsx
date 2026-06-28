@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import {
   getEmployeeCareerMap,
@@ -59,6 +60,7 @@ const MilestoneDot: React.FC<{
 // ---------------------------------------------------------------------------
 
 const CareerMapPage: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [careerMap, setCareerMap] = useState<EmployeeCareerMap | null>(null);
   const [careerPath, setCareerPath] = useState<CareerPath | null>(null);
@@ -237,9 +239,9 @@ const CareerMapPage: React.FC = () => {
           <div className="mx-auto mb-6 w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
             <MapPin className="w-8 h-8 text-slate-300" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">No Career Path Assigned</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">{t('career.map.noCareerPath.title')}</h2>
           <p className="text-sm text-slate-500 max-w-sm mx-auto">
-            Your career path hasn&apos;t been set up yet. Contact your HR team to get started.
+            {t('career.map.noCareerPath.desc')}
           </p>
           {listenerError && (
             <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg text-left">
@@ -272,18 +274,18 @@ const CareerMapPage: React.FC = () => {
         <div className="p-8 pl-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Your Current Level</p>
+              <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">{t('career.map.currentLevel')}</p>
               <h1 className="text-3xl font-black text-slate-900 mb-2">{careerMap.currentLevelTitle}</h1>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                  Level {careerMap.currentLevelNumber}
+                  {t('career.map.level')} {careerMap.currentLevelNumber}
                 </span>
                 <span className="text-sm text-slate-600 font-medium">{careerMap.currentSalaryBandName}</span>
               </div>
             </div>
             <div className="text-left md:text-right">
-              <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Target</p>
-              <p className="text-lg font-bold text-slate-700">{careerMap.nextLevelTitle || 'Top of track'}</p>
+              <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">{t('career.map.target')}</p>
+              <p className="text-lg font-bold text-slate-700">{careerMap.nextLevelTitle || t('career.map.topOfTrack')}</p>
               {nextLevel && (
                 <p className="text-xs text-slate-500 mt-1">
                   Requires score ≥ {nextLevel.requiredScore}% and {nextLevel.requiredCycles} cycles
@@ -294,7 +296,7 @@ const CareerMapPage: React.FC = () => {
           {timeAtLevel && (
             <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
               <Calendar className="w-4 h-4" />
-              {monthsAtLevel > 0 ? `${monthsAtLevel} month${monthsAtLevel > 1 ? 's' : ''} at this level` : 'Recently started at this level'}
+              {monthsAtLevel > 0 ? t('career.map.monthsAtLevel', { count: monthsAtLevel }) : 'Recently started at this level'}
             </div>
           )}
         </div>
@@ -303,7 +305,7 @@ const CareerMapPage: React.FC = () => {
       {/* Progress Section */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
         <div className="flex justify-between items-end mb-6">
-          <h2 className="text-xl font-bold text-slate-900">Progress Toward Next Level</h2>
+          <h2 className="text-xl font-bold text-slate-900">{t('career.map.progressTitle')}</h2>
           <span className="text-lg font-bold text-emerald-600">
             {careerMap.progressPercent >= 100 ? '100%' : `${evaluations.length < 2 ? 0 : animatedProgress}%`}
           </span>
@@ -321,15 +323,15 @@ const CareerMapPage: React.FC = () => {
         <div className="mt-4 text-center">
           {careerMap.progressPercent >= 100 ? (
             <p className="text-sm font-medium text-emerald-600">
-              Ready for promotion — awaiting HR review
+              {t('career.map.readyForPromotion')}
             </p>
           ) : evaluations.length < 2 ? (
             <p className="text-sm text-slate-500">
-              Complete more increment cycles to track your progress
+              {t('career.map.completeMoreCycles')}
             </p>
           ) : (
             <p className="text-sm text-slate-500">
-              {animatedProgress}% toward {careerMap.nextLevelTitle}
+              {t('career.map.percentToward', { percent: animatedProgress, level: careerMap.nextLevelTitle })}
             </p>
           )}
         </div>
@@ -338,7 +340,7 @@ const CareerMapPage: React.FC = () => {
       {/* Milestones Row */}
       {currentLevel && currentLevel.milestones.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Milestones</h3>
+          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">{t('career.map.milestones')}</h3>
           <div className="flex flex-wrap gap-6">
             {currentLevel.milestones.map((m) => {
               const achievement = careerMap.milestoneAchievements.find((ma) => ma.milestoneId === m.milestoneId);
@@ -378,10 +380,10 @@ const CareerMapPage: React.FC = () => {
           {activeCycle && isInActiveCycle && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">{activeCycle.name} — In Progress</h3>
+                <h3 className="text-lg font-bold text-slate-900">{activeCycle.name} — {t('career.map.cycleInProgress')}</h3>
                 {activeCycle.timeline?.endDate && (
                   <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-100">
-                    {Math.max(0, differenceInDays(activeCycle.timeline.endDate.toDate(), new Date()))} days remaining
+                    {t('career.map.daysRemaining', { count: Math.max(0, differenceInDays(activeCycle.timeline.endDate.toDate(), new Date())) })}
                   </span>
                 )}
               </div>
@@ -403,17 +405,17 @@ const CareerMapPage: React.FC = () => {
                         <span className="text-xs text-slate-600">{score.rawScore} / {c.maxValue || 100}</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-slate-400">No data yet</span>
+                      <span className="text-xs text-slate-400">{t('career.map.noDataYet')}</span>
                     );
                   } else if (c.dataSource === 'manager') {
                     progressContent = (
-                      <span className="text-xs text-amber-600 font-medium">Pending manager evaluation</span>
+                      <span className="text-xs text-amber-600 font-medium">{t('career.map.pendingManagerEval')}</span>
                     );
                   } else {
                     progressContent = score ? (
-                      <span className="text-xs text-slate-600">Submitted: {score.rawScore}</span>
+                      <span className="text-xs text-slate-600">{t('career.map.submitted', { score: score.rawScore })}</span>
                     ) : (
-                      <span className="text-xs text-slate-400">Not yet submitted</span>
+                      <span className="text-xs text-slate-400">{t('career.map.notSubmitted')}</span>
                     );
                   }
 
@@ -434,7 +436,7 @@ const CareerMapPage: React.FC = () => {
               {/* Estimated Score */}
               <div className="mt-4 pt-4 border-t border-slate-100">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-600">Estimated Score</span>
+                  <span className="text-sm font-medium text-slate-600">{t('career.map.estimatedScore')}</span>
                   <span className="text-lg font-bold text-slate-900">
                     {activeCycle.criteria.reduce((sum, c) => {
                       const evalDoc = evaluations.find((e) => e.cycleId === activeCycle.id);
@@ -450,11 +452,11 @@ const CareerMapPage: React.FC = () => {
 
           {/* Increment History */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">My Increment History</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">{t('career.map.incrementHistory')}</h3>
             {incrementStories.length === 0 ? (
               <div className="text-center py-8 text-slate-500">
                 <FileText className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-                <p className="text-sm">Your increment history will appear here after your first cycle is completed.</p>
+                <p className="text-sm">{t('career.map.historyEmpty')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -485,7 +487,7 @@ const CareerMapPage: React.FC = () => {
                         to={`/increments/${story.cycleId}`}
                         className="text-xs font-medium text-slate-500 hover:text-slate-900 flex items-center gap-0.5"
                       >
-                        View Story <ChevronRight className="w-3 h-3" />
+                        {t('career.map.viewStory')} <ChevronRight className="w-3 h-3" />
                       </Link>
                     </div>
                   </div>
@@ -497,7 +499,7 @@ const CareerMapPage: React.FC = () => {
           {/* Improvement Recommendations */}
           {recommendations && recommendations.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">How to Improve</h3>
+              <h3 className="text-lg font-bold text-slate-900 mb-4">{t('career.map.howToImprove')}</h3>
               <div className="space-y-3">
                 {recommendations.slice(0, 3).map((rec, idx) => (
                   <div key={idx} className="p-4 bg-slate-50 rounded-lg border border-slate-100">
@@ -516,7 +518,7 @@ const CareerMapPage: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 mb-1">
-                      Current: {rec.currentScore.toFixed(1)} vs Target: {rec.targetScore.toFixed(1)}
+                      {t('career.map.currentVsTarget', { current: rec.currentScore.toFixed(1), target: rec.targetScore.toFixed(1) })}
                     </p>
                     <p className="text-sm text-slate-700">{rec.suggestion}</p>
                   </div>
@@ -526,16 +528,16 @@ const CareerMapPage: React.FC = () => {
           )}
           {recommendations && recommendations.length === 0 && incrementStories.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-2">How to Improve</h3>
-              <p className="text-sm text-slate-500">Great work! No improvement areas identified from your last cycle.</p>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">{t('career.map.howToImprove')}</h3>
+              <p className="text-sm text-slate-500">{t('career.map.noImprovementAreas')}</p>
             </div>
           )}
 
           {/* Career Journey Timeline */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-6">My Career Journey</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-6">{t('career.map.careerJourney')}</h3>
             {careerMap.levelHistory.length === 0 ? (
-              <p className="text-sm text-slate-500">No career history recorded yet.</p>
+              <p className="text-sm text-slate-500">{t('career.map.noHistory')}</p>
             ) : (
               <div className="relative border-l-2 border-slate-100 ml-3 space-y-6">
                 {careerMap.levelHistory.map((entry, idx) => (
@@ -545,16 +547,16 @@ const CareerMapPage: React.FC = () => {
                       {format(entry.startedAt.toDate(), 'MMM yyyy')}
                     </p>
                     <p className="text-sm font-bold text-slate-800">
-                      {entry.promotedAt ? 'Promoted to' : 'Started at'} {entry.levelTitle} ({entry.salaryBandName})
+                      {entry.promotedAt ? t('career.map.promotedTo') : t('career.map.startedAt')} {entry.levelTitle} ({entry.salaryBandName})
                     </p>
                   </div>
                 ))}
                 {careerMap.levelHistory.length === 1 && (
                   <div className="relative pl-6">
                     <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-100 border-2 border-slate-300" />
-                    <p className="text-xs font-bold text-slate-400 mb-1">Future</p>
+                    <p className="text-xs font-bold text-slate-400 mb-1">{t('career.map.futurePlaceholder')}</p>
                     <p className="text-sm text-slate-500">
-                      Keep going — your next promotion is on the horizon
+                      {t('career.map.nextPromotion')}
                     </p>
                   </div>
                 )}
@@ -565,7 +567,7 @@ const CareerMapPage: React.FC = () => {
 
         {/* Band Ladder Sidebar */}
         <div className="space-y-4">
-          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Career Track</h3>
+          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">{t('career.map.careerTrack')}</h3>
           <div className="space-y-3">
             {careerPath?.levels.map((level) => {
               const isCurrent = level.levelId === careerMap.currentLevelId;
@@ -602,7 +604,7 @@ const CareerMapPage: React.FC = () => {
                     </div>
                     {isCurrent && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white uppercase">
-                        Current
+                        {t('career.map.current')}
                       </span>
                     )}
                     {isAbove && (
@@ -651,17 +653,17 @@ const CareerMapPage: React.FC = () => {
               {/* Progress / Target info */}
               <div className="bg-slate-50 rounded-lg p-4 mb-4 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider">Target</span>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">{t('career.map.milestone.target')}</span>
                   <span className="text-sm font-bold text-slate-900">
-                    {selectedMilestone.targetValue} {selectedMilestone.type === 'tenure_months' ? 'months' : selectedMilestone.type === 'cycle_count' ? 'cycles' : 'points'}
+                    {selectedMilestone.targetValue} {selectedMilestone.type === 'tenure_months' ? t('career.map.milestone.months') : selectedMilestone.type === 'cycle_count' ? t('career.map.milestone.cycles') : t('career.map.milestone.points')}
                   </span>
                 </div>
                 {!selectedMilestone.achieved && selectedMilestone.currentValue !== undefined && (
                   <>
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500 uppercase tracking-wider">Current</span>
+                      <span className="text-xs text-slate-500 uppercase tracking-wider">{t('career.map.milestone.current')}</span>
                       <span className="text-sm font-bold text-slate-900">
-                        {selectedMilestone.currentValue.toFixed?.(1) || selectedMilestone.currentValue} {selectedMilestone.type === 'tenure_months' ? 'months' : selectedMilestone.type === 'cycle_count' ? 'cycles' : 'points'}
+                        {selectedMilestone.currentValue.toFixed?.(1) || selectedMilestone.currentValue} {selectedMilestone.type === 'tenure_months' ? t('career.map.milestone.months') : selectedMilestone.type === 'cycle_count' ? t('career.map.milestone.cycles') : t('career.map.milestone.points')}
                       </span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
@@ -673,14 +675,14 @@ const CareerMapPage: React.FC = () => {
                       />
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
-                      {Math.max(0, selectedMilestone.targetValue - selectedMilestone.currentValue).toFixed?.(1) || Math.max(0, selectedMilestone.targetValue - selectedMilestone.currentValue)} more to go
+                      {t('career.map.milestone.moreToGo', { count: Math.max(0, selectedMilestone.targetValue - selectedMilestone.currentValue) })}
                     </p>
                   </>
                 )}
                 {selectedMilestone.achieved && selectedMilestone.achievedAt && (
                   <div className="flex items-center gap-2 text-xs text-emerald-600">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Achieved on {format(selectedMilestone.achievedAt, 'MMM d, yyyy')}</span>
+                    <span>{t('career.map.milestone.achievedOn', { date: format(selectedMilestone.achievedAt, 'MMM d, yyyy') })}</span>
                   </div>
                 )}
               </div>
@@ -691,21 +693,21 @@ const CareerMapPage: React.FC = () => {
                     selectedMilestone.achieved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                   }`}
                 >
-                  {selectedMilestone.achieved ? 'Achieved' : 'In Progress'}
+                  {selectedMilestone.achieved ? t('career.map.milestone.achieved') : t('career.map.milestone.inProgress')}
                 </span>
               </div>
 
               {!selectedMilestone.achieved && (
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
-                  <p className="text-xs text-blue-700 font-medium">Next step</p>
+                  <p className="text-xs text-blue-700 font-medium">{t('career.map.milestone.nextStep')}</p>
                   <p className="text-xs text-blue-600 mt-0.5">
                     {selectedMilestone.type === 'cycle_count'
-                      ? 'Complete more evaluation cycles to reach this milestone.'
+                      ? t('career.map.milestone.nextSteps.cycleCount')
                       : selectedMilestone.type === 'score_threshold'
-                      ? 'Focus on improving your evaluation scores across all criteria.'
+                      ? t('career.map.milestone.nextSteps.scoreThreshold')
                       : selectedMilestone.type === 'tenure_months'
-                      ? 'Continue performing well at your current level.'
-                      : 'Work with your manager to fulfill this requirement.'}
+                      ? t('career.map.milestone.nextSteps.tenure')
+                      : t('career.map.milestone.nextSteps.manual')}
                   </p>
                 </div>
               )}
@@ -714,7 +716,7 @@ const CareerMapPage: React.FC = () => {
                 onClick={() => setSelectedMilestone(null)}
                 className="w-full py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
               >
-                Close
+                {t('career.map.close')}
               </button>
             </motion.div>
           </motion.div>
@@ -743,16 +745,16 @@ const CareerMapPage: React.FC = () => {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between py-2 border-b border-slate-50">
-                  <span className="text-sm text-slate-500">Required Score</span>
+                  <span className="text-sm text-slate-500">{t('career.map.requiredScore')}</span>
                   <span className="text-sm font-bold text-slate-900">{selectedLevel.requiredScore}%</span>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-50">
-                  <span className="text-sm text-slate-500">Required Cycles</span>
+                  <span className="text-sm text-slate-500">{t('career.map.requiredCycles')}</span>
                   <span className="text-sm font-bold text-slate-900">{selectedLevel.requiredCycles}</span>
                 </div>
                 {selectedLevel.description && (
                   <div className="py-2">
-                    <span className="text-sm text-slate-500">Description</span>
+                    <span className="text-sm text-slate-500">{t('career.map.description')}</span>
                     <p className="text-sm text-slate-700 mt-1">{selectedLevel.description}</p>
                   </div>
                 )}
@@ -762,7 +764,7 @@ const CareerMapPage: React.FC = () => {
                 onClick={() => setSelectedLevel(null)}
                 className="mt-4 w-full py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
               >
-                Close
+                {t('career.map.close')}
               </button>
             </motion.div>
           </motion.div>

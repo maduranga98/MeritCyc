@@ -39,11 +39,21 @@ jobs:
       - name: Handle already-active version
         if: steps.firebase_deploy.outcome == 'failure'
         run: |
-          echo "Deploy step reported failure — checking if it is the benign 'already active version' error..."
-          # Re-run deploy capturing output; treat "current active version" as success
-          OUTPUT=$(npx firebase-tools hosting:channel:deploy "pr-${{ github.event.pull_request.number }}" \
+          echo "Deploy step failed — checking if it is the benign 'already active version' error..."
+
+          # Write service account JSON to a temp file so firebase-tools can authenticate
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_MERITCYC_7A683 }}' > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+
+          CHANNEL_ID="pr${{ github.event.pull_request.number }}"
+
+          OUTPUT=$(npx firebase-tools@latest hosting:channel:deploy "$CHANNEL_ID" \
+            --expires 7d \
             --project meritcyc-7a683 \
             --json 2>&1) || true
+
+          # Always remove credentials from disk
+          rm -f /tmp/sa.json
 
           echo "$OUTPUT"
 
@@ -54,5 +64,3 @@ jobs:
 
           echo "❌ Deployment failed for an unexpected reason."
           exit 1
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MERITCYC_7A683 }}

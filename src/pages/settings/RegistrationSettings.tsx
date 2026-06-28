@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import QRCodeManager from "../../components/shared/QRCodeManager";
 import { Link } from "react-router-dom";
 import { Users, Loader2 } from "lucide-react";
@@ -10,6 +11,7 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "../../config/firebase";
 
 export default function RegistrationSettings() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -66,23 +68,23 @@ export default function RegistrationSettings() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-bold text-slate-900">Registration Settings</h1>
+      <h1 className="text-2xl font-bold text-slate-900">{t('settings.registration.title')}</h1>
 
       {/* SECTION 1 - QR Code Management */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Registration Code</h2>
+        <h2 className="text-base font-bold text-slate-900 mb-4">{t('settings.registration.registrationCode')}</h2>
         <QRCodeManager />
       </div>
 
       {/* SECTION 2 - Registration Rules */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-6">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Registration Rules</h2>
+        <h2 className="text-base font-bold text-slate-900 mb-4">{t('settings.registration.registrationRules')}</h2>
 
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-sm font-bold text-slate-900">Self-Registration</h3>
-                    <p className="text-sm text-slate-500">Allow employees to register themselves using the company code.</p>
+                    <h3 className="text-sm font-bold text-slate-900">{t('settings.registration.selfRegistration')}</h3>
+                    <p className="text-sm text-slate-500">{t('settings.registration.selfRegistrationDesc')}</p>
                 </div>
                 <button
                    onClick={handleToggleQR}

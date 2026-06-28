@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from 'react-i18next';
 import { useAuth } from "../../context/AuthContext";
 import { analyticsService } from "../../services/analyticsService";
 import { type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYMetricsPoint } from "../../types/analytics";
@@ -39,6 +40,7 @@ import {
 } from "recharts";
 
 export default function ExecutiveDashboard() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [kpis, setKpis] = useState<CompanyKPIs | null>(null);
@@ -153,23 +155,23 @@ export default function ExecutiveDashboard() {
     <div className="space-y-6 pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200">
-        <h1 className="text-2xl font-bold text-slate-900">Analytics Dashboard</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t('analytics.title')}</h1>
         <div className="flex flex-col sm:flex-row gap-3">
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
             className="border-slate-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
           >
-            <option value="12m">Last 12 months</option>
-            <option value="6m">Last 6 months</option>
-            <option value="ytd">This year</option>
+            <option value="12m">{t('analytics.dateRange.12m')}</option>
+            <option value="6m">{t('analytics.dateRange.6m')}</option>
+            <option value="ytd">{t('analytics.dateRange.ytd')}</option>
           </select>
           <button
             onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
           >
             <Download className="w-4 h-4" />
-            Export Report
+            {t('analytics.exportReport')}
           </button>
         </div>
       </div>
@@ -190,7 +192,7 @@ export default function ExecutiveDashboard() {
               )}
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Total Employees</p>
+              <p className="text-sm font-medium text-slate-500 mb-1">{t('analytics.kpi.totalEmployees')}</p>
               <h3 className="text-2xl font-bold text-slate-900">{kpis.totalEmployees}</h3>
             </div>
           </div>
@@ -202,7 +204,7 @@ export default function ExecutiveDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Active Cycles</p>
+              <p className="text-sm font-medium text-slate-500 mb-1">{t('analytics.kpi.activeCycles')}</p>
               <h3 className="text-2xl font-bold text-slate-900">{kpis.activeCycles}</h3>
             </div>
           </div>
@@ -220,7 +222,7 @@ export default function ExecutiveDashboard() {
               )}
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Completed Cycles</p>
+              <p className="text-sm font-medium text-slate-500 mb-1">{t('analytics.kpi.completedCycles')}</p>
               <h3 className="text-2xl font-bold text-slate-900">{kpis.completedCycles}</h3>
             </div>
           </div>
@@ -232,7 +234,7 @@ export default function ExecutiveDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Total Increments Awarded</p>
+              <p className="text-sm font-medium text-slate-500 mb-1">{t('analytics.kpi.totalIncrementsAwarded')}</p>
               <h3 className="text-2xl font-bold text-emerald-600">
                 {kpis.currency} {kpis.totalSalaryIncrementsAwarded.toLocaleString()}
               </h3>
@@ -246,7 +248,7 @@ export default function ExecutiveDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Average Increment</p>
+              <p className="text-sm font-medium text-slate-500 mb-1">{t('analytics.kpi.averageIncrement')}</p>
               <h3 className="text-2xl font-bold text-blue-600">{kpis.averageIncrementPercent}%</h3>
             </div>
           </div>
@@ -259,7 +261,7 @@ export default function ExecutiveDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 mb-1 flex items-center justify-between">
-                Company Fairness Score
+                {t('analytics.kpi.fairnessScore')}
                 <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500" />
               </p>
               <h3 className={`text-2xl font-bold ${kpis.fairnessScore >= 75 ? 'text-emerald-600' : kpis.fairnessScore >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
@@ -272,7 +274,7 @@ export default function ExecutiveDashboard() {
 
       {/* SECTION 2 - Increment Trends */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="text-lg font-bold text-slate-900 mb-6">Increment Trends Over Time</h2>
+        <h2 className="text-lg font-bold text-slate-900 mb-6">{t('analytics.sections.incrementTrends')}</h2>
         <div className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={trends} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -292,8 +294,8 @@ export default function ExecutiveDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* SECTION 3 - Department Radar */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-2">Department Performance</h2>
-          <p className="text-sm text-slate-500 mb-6">Click on a department to view details</p>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">{t('analytics.sections.departmentPerformance')}</h2>
+          <p className="text-sm text-slate-500 mb-6">{t('analytics.sections.clickToViewDept')}</p>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={deptData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>

@@ -7,12 +7,18 @@ permissions:
   checks: write
   contents: read
   pull-requests: write
+
+concurrency:
+  group: firebase-preview-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build_and_preview:
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - run: npm ci && npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
@@ -21,8 +27,32 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
       - uses: FirebaseExtended/action-hosting-deploy@v0
+        id: firebase_deploy
+        continue-on-error: true
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MERITCYC_7A683 }}
           projectId: meritcyc-7a683
+
+      - name: Handle already-active version
+        if: steps.firebase_deploy.outcome == 'failure'
+        run: |
+          echo "Deploy step reported failure — checking if it is the benign 'already active version' error..."
+          # Re-run deploy capturing output; treat "current active version" as success
+          OUTPUT=$(npx firebase-tools hosting:channel:deploy "pr-${{ github.event.pull_request.number }}" \
+            --project meritcyc-7a683 \
+            --json 2>&1) || true
+
+          echo "$OUTPUT"
+
+          if echo "$OUTPUT" | grep -qi "current active version"; then
+            echo "✅ Version already deployed to channel — treating as success."
+            exit 0
+          fi
+
+          echo "❌ Deployment failed for an unexpected reason."
+          exit 1
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MERITCYC_7A683 }}

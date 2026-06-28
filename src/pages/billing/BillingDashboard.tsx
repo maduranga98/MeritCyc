@@ -1,20 +1,22 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CreditCard, Users, RefreshCw, Zap, ArrowRight } from 'lucide-react';
 import { useBilling } from '../../hooks/useBilling';
 import { PLAN_CONFIGS } from '../../lib/planConfig';
 import { type GatedFeature } from '../../types/billing';
 
-const FEATURE_ROWS: Array<{ key: GatedFeature; label: string }> = [
-  { key: 'hasAuditTrail',          label: 'Audit Trail' },
-  { key: 'hasSimulations',         label: 'Run Simulations' },
-  { key: 'hasFairnessDashboard',   label: 'Fairness Dashboard' },
-  { key: 'hasAdvancedAnalytics',   label: 'Advanced Analytics' },
-  { key: 'hasCareerPaths',         label: 'Career Paths' },
-];
-
 export default function BillingDashboard() {
+  const { t } = useTranslation();
   const billing = useBilling();
   const navigate = useNavigate();
+
+  const FEATURE_ROWS: Array<{ key: GatedFeature; label: string }> = [
+    { key: 'hasAuditTrail',          label: t('billing.features.hasAuditTrail') },
+    { key: 'hasSimulations',         label: t('billing.features.hasSimulations') },
+    { key: 'hasFairnessDashboard',   label: t('billing.features.hasFairnessDashboard') },
+    { key: 'hasAdvancedAnalytics',   label: t('billing.features.hasAdvancedAnalytics') },
+    { key: 'hasCareerPaths',         label: t('billing.features.hasCareerPaths') },
+  ];
 
   if (!billing) {
     return (
@@ -30,12 +32,12 @@ export default function BillingDashboard() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Billing</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t('billing.title')}</h1>
         <button
           onClick={() => navigate('/pricing')}
           className="flex items-center gap-1.5 text-sm text-emerald-600 font-medium hover:text-emerald-700"
         >
-          View all plans <ArrowRight className="w-4 h-4" />
+          {t('billing.viewAllPlans')} <ArrowRight className="w-4 h-4" />
         </button>
       </div>
 
@@ -45,10 +47,10 @@ export default function BillingDashboard() {
           <Zap className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-amber-900">
-              Trial ends in {billing.daysLeftInTrial} day{billing.daysLeftInTrial === 1 ? '' : 's'}
+              {t('billing.trialEnds', { count: billing.daysLeftInTrial })}
             </p>
             <p className="text-sm text-amber-700 mt-1">
-              You have access to all Growth plan features. No credit card required during trial.
+              {t('billing.trialDesc')}
             </p>
           </div>
         </div>
@@ -58,21 +60,21 @@ export default function BillingDashboard() {
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Current Plan</p>
+            <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">{t('billing.currentPlan')}</p>
             <h2 className="text-xl font-bold text-slate-900 mt-1">{plan.name}</h2>
             <p className="text-sm text-slate-500 mt-1">{plan.tagline}</p>
           </div>
           {!isEnterprise && billing.plan !== 'trial' && billing.monthlyTotal !== null && (
             <div className="text-right flex-shrink-0">
               <p className="text-2xl font-bold text-slate-900">${billing.monthlyTotal.toLocaleString()}</p>
-              <p className="text-xs text-slate-400">/ month</p>
+              <p className="text-xs text-slate-400">{t('billing.perMonth')}</p>
             </div>
           )}
         </div>
 
         {!isEnterprise && billing.plan !== 'trial' && plan.pricePerEmployee !== null && (
           <div className="pt-4 border-t border-slate-100">
-            <p className="text-xs text-slate-500 mb-1">Billing breakdown</p>
+            <p className="text-xs text-slate-500 mb-1">{t('billing.billingBreakdown')}</p>
             <p className="text-sm text-slate-700">
               {billing.employeeCount} employees × ${plan.pricePerEmployee}/mo ={' '}
               <strong>${billing.monthlyTotal?.toLocaleString()}</strong>/mo
@@ -82,7 +84,7 @@ export default function BillingDashboard() {
 
         {isEnterprise && (
           <div className="pt-4 border-t border-slate-100">
-            <p className="text-sm text-slate-600">Contact your account manager for billing details.</p>
+            <p className="text-sm text-slate-600">{t('billing.contactManager')}</p>
           </div>
         )}
       </div>
@@ -94,11 +96,11 @@ export default function BillingDashboard() {
             <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
               <Users className="w-5 h-5 text-emerald-600" />
             </div>
-            <p className="text-sm font-medium text-slate-700">Employees</p>
+            <p className="text-sm font-medium text-slate-700">{t('billing.employees')}</p>
           </div>
           <p className="text-2xl font-bold text-slate-900">{billing.employeeCount}</p>
           <p className="text-xs text-slate-500 mt-1">
-            {billing.limits.maxEmployees ? `of ${billing.limits.maxEmployees} allowed` : 'unlimited'}
+            {billing.limits.maxEmployees ? t('billing.ofAllowed', { max: billing.limits.maxEmployees }) : t('billing.unlimited')}
           </p>
           {billing.limits.maxEmployees && (
             <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -117,13 +119,13 @@ export default function BillingDashboard() {
             <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
               <RefreshCw className="w-5 h-5 text-blue-600" />
             </div>
-            <p className="text-sm font-medium text-slate-700">Cycle Limit</p>
+            <p className="text-sm font-medium text-slate-700">{t('billing.cycleLimit')}</p>
           </div>
           <p className="text-2xl font-bold text-slate-900">
             {billing.limits.maxActiveCycles ?? '∞'}
           </p>
           <p className="text-xs text-slate-500 mt-1">
-            {billing.limits.maxActiveCycles ? 'active cycles maximum' : 'unlimited cycles'}
+            {billing.limits.maxActiveCycles ? t('billing.activeCyclesMax') : t('billing.unlimitedCycles')}
           </p>
         </div>
       </div>
@@ -133,12 +135,12 @@ export default function BillingDashboard() {
         <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-6 flex items-center justify-between gap-4">
           <div>
             <p className="font-bold text-white">
-              {billing.plan === 'growth' ? 'Need more capacity?' : 'Unlock the full MeritCyc experience'}
+              {billing.plan === 'growth' ? t('billing.needMoreCapacity') : t('billing.unlockFull')}
             </p>
             <p className="text-sm text-slate-400 mt-1">
               {billing.plan === 'growth'
-                ? 'Contact us for Enterprise — unlimited employees and dedicated support.'
-                : 'Upgrade to Growth for simulations, audit trail, and advanced analytics.'}
+                ? t('billing.contactSalesDesc')
+                : t('billing.upgradeDesc')}
             </p>
           </div>
           <button
@@ -148,7 +150,7 @@ export default function BillingDashboard() {
             }
             className="flex-shrink-0 px-4 py-2 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-400 transition-colors text-sm whitespace-nowrap"
           >
-            {billing.plan === 'growth' ? 'Contact Sales' : 'Upgrade Plan'}
+            {billing.plan === 'growth' ? t('billing.contactSales') : t('billing.upgradePlan')}
           </button>
         </div>
       )}
@@ -157,7 +159,7 @@ export default function BillingDashboard() {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
           <CreditCard className="w-4 h-4 text-slate-600" />
-          Feature Access
+          {t('billing.featureAccess')}
         </h2>
         <div className="space-y-0">
           {FEATURE_ROWS.map(({ key, label }) => (
@@ -168,11 +170,11 @@ export default function BillingDashboard() {
               <span className="text-sm text-slate-700">{label}</span>
               {billing.limits[key] ? (
                 <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                  Enabled
+                  {t('billing.enabled')}
                 </span>
               ) : (
                 <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                  Not available
+                  {t('billing.notAvailable')}
                 </span>
               )}
             </div>

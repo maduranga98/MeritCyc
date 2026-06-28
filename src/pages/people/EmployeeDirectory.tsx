@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { employeeService } from "../../services/employeeService";
 import { departmentService } from "../../services/departmentService";
@@ -23,6 +24,7 @@ import { format } from "date-fns";
 
 export default function EmployeeDirectory() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [salaryBands, setSalaryBands] = useState<SalaryBand[]>([]);
@@ -96,11 +98,11 @@ export default function EmployeeDirectory() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">Active</span>;
+        return <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">{t('people.status.active')}</span>;
       case "inactive":
-        return <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">Inactive</span>;
+        return <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">{t('people.status.inactive')}</span>;
       case "pending":
-        return <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-800">Pending</span>;
+        return <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-800">{t('people.status.pending')}</span>;
       default:
         return <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-800">{status}</span>;
     }
@@ -135,7 +137,7 @@ export default function EmployeeDirectory() {
 
   const columns = [
     columnHelper.accessor("name", {
-      header: "Employee",
+      header: t("people.table.employee"),
       cell: (info) => {
         const emp = info.row.original;
         return (
@@ -152,11 +154,11 @@ export default function EmployeeDirectory() {
       },
     }),
     columnHelper.accessor("departmentName", {
-      header: "Department",
-      cell: (info) => info.getValue() || <span className="text-slate-400 italic">Unassigned</span>,
+      header: t("people.table.department"),
+      cell: (info) => info.getValue() || <span className="text-slate-400 italic">{t('people.table.unassigned')}</span>,
     }),
     columnHelper.accessor("role", {
-      header: "Role",
+      header: t("people.table.role"),
       cell: (info) => {
         const role = info.getValue();
         return (
@@ -167,7 +169,7 @@ export default function EmployeeDirectory() {
       },
     }),
     columnHelper.accessor("salaryBandName", {
-      header: "Band",
+      header: t("people.table.band"),
       cell: (info) => {
         const emp = info.row.original;
         const bandName = info.getValue() || (emp.salaryBandId ? salaryBandNameById[emp.salaryBandId] : "");
@@ -175,11 +177,11 @@ export default function EmployeeDirectory() {
       },
     }),
     columnHelper.accessor("status", {
-      header: "Status",
+      header: t("people.table.status"),
       cell: (info) => getStatusBadge(info.getValue()),
     }),
     columnHelper.accessor("createdAt", {
-      header: "Joined",
+      header: t("people.table.joined"),
       cell: (info) => {
         const val = info.getValue();
         if (!val) return "-";
@@ -189,7 +191,7 @@ export default function EmployeeDirectory() {
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
+      header: t("people.table.actions"),
       cell: (info) => (
         <button
           onClick={() => {
@@ -205,7 +207,7 @@ export default function EmployeeDirectory() {
           }}
           className="text-emerald-600 hover:text-emerald-700 font-medium text-sm transition-colors"
         >
-          View
+          {t('people.table.view')}
         </button>
       ),
     }),
@@ -297,27 +299,27 @@ export default function EmployeeDirectory() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-merit-navy">Employee Directory</h1>
-        <p className="text-slate-500">Manage all staff members across the organization.</p>
+        <h1 className="text-2xl font-bold text-merit-navy">{t('people.title')}</h1>
+        <p className="text-slate-500">{t('people.subtitle')}</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <p className="text-sm text-slate-500 mb-1">Total Employees</p>
+          <p className="text-sm text-slate-500 mb-1">{t('people.stats.totalEmployees')}</p>
           <p className="text-2xl font-bold text-merit-navy">{employees.length}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <p className="text-sm text-slate-500 mb-1">Active</p>
+          <p className="text-sm text-slate-500 mb-1">{t('people.stats.active')}</p>
           <p className="text-2xl font-bold text-green-600">{activeCount}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <p className="text-sm text-slate-500 mb-1">Inactive</p>
+          <p className="text-sm text-slate-500 mb-1">{t('people.stats.inactive')}</p>
           <p className="text-2xl font-bold text-red-600">{inactiveCount}</p>
         </div>
         <Link to="/hr/people/approvals" className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 block hover:border-amber-300 transition-colors">
           <p className="text-sm text-slate-500 mb-1 flex justify-between items-center">
-            Pending <ChevronRight className="w-4 h-4" />
+            {t('people.stats.pending')} <ChevronRight className="w-4 h-4" />
           </p>
           <p className="text-2xl font-bold text-amber-500">{pendingCount}</p>
         </Link>
@@ -329,7 +331,7 @@ export default function EmployeeDirectory() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search name or email..."
+            placeholder={t('people.search.placeholder')}
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
@@ -342,7 +344,7 @@ export default function EmployeeDirectory() {
             onChange={(e) => setDeptFilter(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white min-w-[140px]"
           >
-            <option value="">All Departments</option>
+            <option value="">{t('people.search.allDepartments')}</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
@@ -353,11 +355,11 @@ export default function EmployeeDirectory() {
             onChange={(e) => setRoleFilter(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white min-w-[140px]"
           >
-            <option value="">All Roles</option>
-            <option value="super_admin">Super Admin</option>
-            <option value="hr_admin">HR Admin</option>
-            <option value="manager">Manager</option>
-            <option value="employee">Employee</option>
+            <option value="">{t('people.search.allRoles')}</option>
+            <option value="super_admin">{t('people.roles.super_admin')}</option>
+            <option value="hr_admin">{t('people.roles.hr_admin')}</option>
+            <option value="manager">{t('people.roles.manager')}</option>
+            <option value="employee">{t('people.roles.employee')}</option>
           </select>
 
           <select
@@ -365,16 +367,16 @@ export default function EmployeeDirectory() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white min-w-[140px]"
           >
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="pending">Pending</option>
+            <option value="">{t('people.search.allStatuses')}</option>
+            <option value="active">{t('people.status.active')}</option>
+            <option value="inactive">{t('people.status.inactive')}</option>
+            <option value="pending">{t('people.status.pending')}</option>
           </select>
 
           <button
             onClick={clearFilters}
             className="p-2 border border-slate-300 text-slate-500 hover:bg-slate-50 rounded-lg flex-shrink-0"
-            title="Clear filters"
+            title={t('people.search.clearFilters')}
           >
             <Filter className="w-4 h-4" />
           </button>
@@ -412,8 +414,8 @@ export default function EmployeeDirectory() {
                   <td colSpan={columns.length} className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center">
                       <Users className="w-10 h-10 text-slate-300 mb-3" />
-                      <p className="text-lg font-medium text-slate-600">No employees found</p>
-                      <p className="text-sm">Try adjusting your filters.</p>
+                      <p className="text-lg font-medium text-slate-600">{t('people.table.noEmployeesFound')}</p>
+                      <p className="text-sm">{t('people.table.adjustFilters')}</p>
                     </div>
                   </td>
                 </tr>
@@ -425,8 +427,8 @@ export default function EmployeeDirectory() {
         {/* Pagination */}
         <div className="border-t border-slate-200 p-4 flex items-center justify-between bg-slate-50 mt-auto">
           <div className="text-sm text-slate-500">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
-            {" "} ({table.getFilteredRowModel().rows.length} total rows)
+            {t('people.table.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() || 1 })}
+            {" "}{t('people.table.totalRows', { count: table.getFilteredRowModel().rows.length })}
           </div>
           <div className="flex gap-2">
             <button
@@ -466,7 +468,7 @@ export default function EmployeeDirectory() {
               className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col"
             >
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                <h2 className="text-xl font-bold text-merit-navy">Employee Profile</h2>
+                <h2 className="text-xl font-bold text-merit-navy">{t('people.panel.title')}</h2>
                 <button
                   onClick={() => setIsPanelOpen(false)}
                   className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
@@ -496,7 +498,7 @@ export default function EmployeeDirectory() {
 
                 <div className="p-6 space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Job Title</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">{t('people.panel.jobTitle')}</label>
                     <input
                       type="text"
                       value={formData.jobTitle}
@@ -506,13 +508,13 @@ export default function EmployeeDirectory() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Department</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">{t('people.panel.department')}</label>
                     <select
                       value={formData.departmentId}
                       onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
                       className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
                     >
-                      <option value="">None Assigned</option>
+                      <option value="">{t('people.panel.noneAssigned')}</option>
                       {departments.map((d) => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
@@ -520,13 +522,13 @@ export default function EmployeeDirectory() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Salary Band</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">{t('people.panel.salaryBand')}</label>
                     <select
                       value={formData.salaryBandId}
                       onChange={(e) => setFormData({ ...formData, salaryBandId: e.target.value })}
                       className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
                     >
-                      <option value="">None Assigned</option>
+                      <option value="">{t('people.panel.noneAssigned')}</option>
                       {salaryBands.map((b) => (
                         <option key={b.id} value={b.id}>{b.name} (L{b.level})</option>
                       ))}
@@ -537,19 +539,19 @@ export default function EmployeeDirectory() {
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
                       <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                          <ShieldAlert className="w-4 h-4 text-amber-500" />
-                         System Role
+                         {t('people.panel.systemRole')}
                       </label>
                       <select
                         value={formData.role}
                         onChange={(e) => setFormData({ ...formData, role: e.target.value as RoleCode })}
                         className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white mb-2"
                       >
-                        <option value="super_admin">Super Admin</option>
-                        <option value="hr_admin">HR Admin</option>
-                        <option value="manager">Manager</option>
-                        <option value="employee">Employee</option>
+                        <option value="super_admin">{t('people.roles.super_admin')}</option>
+                        <option value="hr_admin">{t('people.roles.hr_admin')}</option>
+                        <option value="manager">{t('people.roles.manager')}</option>
+                        <option value="employee">{t('people.roles.employee')}</option>
                       </select>
-                      <p className="text-xs text-amber-600">Changing role updates system access immediately.</p>
+                      <p className="text-xs text-amber-600">{t('people.panel.roleChangeWarning')}</p>
                     </div>
                   )}
 
@@ -560,7 +562,7 @@ export default function EmployeeDirectory() {
                       className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                       {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                      Save Changes
+                      {t('people.panel.saveChanges')}
                     </button>
                   </div>
                 </div>
@@ -570,17 +572,17 @@ export default function EmployeeDirectory() {
                     <div className="mt-4 mx-6 mb-6">
                         <div className="border border-red-200 rounded-lg overflow-hidden">
                             <div className="bg-red-50 px-4 py-3 border-b border-red-200">
-                                <h4 className="font-bold text-red-800 text-sm">Danger Zone</h4>
+                                <h4 className="font-bold text-red-800 text-sm">{t('people.panel.dangerZone')}</h4>
                             </div>
                             <div className="p-4 bg-white flex items-center justify-between">
                                 <div>
                                     <p className="text-sm font-medium text-slate-800">
-                                        {selectedEmp.status === 'active' ? 'Deactivate Account' : 'Reactivate Account'}
+                                        {selectedEmp.status === 'active' ? t('people.panel.deactivateAccount') : t('people.panel.reactivateAccount')}
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1 max-w-[200px]">
                                         {selectedEmp.status === 'active'
-                                            ? 'Revokes access to the platform immediately.'
-                                            : 'Restores platform access for this user.'}
+                                            ? t('people.panel.deactivateDescription')
+                                            : t('people.panel.reactivateDescription')}
                                     </p>
                                 </div>
                                 <button
@@ -592,7 +594,7 @@ export default function EmployeeDirectory() {
                                     }`}
                                 >
                                     {selectedEmp.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                                    {selectedEmp.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                                    {selectedEmp.status === 'active' ? t('people.panel.deactivate') : t('people.panel.reactivate')}
                                 </button>
                             </div>
                         </div>
@@ -610,20 +612,21 @@ export default function EmployeeDirectory() {
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setActionModal(null)} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <h3 className="text-xl font-bold text-merit-navy mb-4">
-                {actionModal === 'deactivate' ? 'Deactivate Employee' : 'Reactivate Employee'}
+                {actionModal === 'deactivate' ? t('people.modal.deactivateTitle') : t('people.modal.reactivateTitle')}
             </h3>
-            <p className="text-slate-600 mb-6">
-                Are you sure you want to {actionModal} <strong>{selectedEmp.name}</strong>?
-                {actionModal === 'deactivate'
-                    ? " They will immediately lose access to the platform."
-                    : " They will be able to log in again."}
-            </p>
+            <p className="text-slate-600 mb-6"
+              dangerouslySetInnerHTML={{
+                __html: actionModal === 'deactivate'
+                  ? t('people.modal.deactivateConfirm', { name: selectedEmp.name })
+                  : t('people.modal.reactivateConfirm', { name: selectedEmp.name })
+              }}
+            />
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setActionModal(null)}
                 className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg font-medium transition-colors"
               >
-                Cancel
+                {t('people.modal.cancel')}
               </button>
               <button
                 onClick={() => handleStatusChange(actionModal)}
@@ -631,7 +634,7 @@ export default function EmployeeDirectory() {
                     actionModal === 'deactivate' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
                 }`}
               >
-                Confirm {actionModal}
+                {actionModal === 'deactivate' ? t('people.modal.confirmDeactivate') : t('people.modal.confirmReactivate')}
               </button>
             </div>
           </div>

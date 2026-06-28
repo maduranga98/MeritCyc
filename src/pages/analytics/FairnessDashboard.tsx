@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { fairnessService } from "../../services/fairnessService";
@@ -36,6 +37,7 @@ import {
 import { toast } from "sonner";
 
 export default function FairnessDashboard() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [report, setReport] = useState<FairnessReport | null>(null);
@@ -159,9 +161,9 @@ export default function FairnessDashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Fairness & Compliance</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('analytics.fairness.title')}</h1>
           <p className="text-slate-500">
-            {report ? `Last generated: ${new Date(report.generatedAt?.toMillis() || Date.now()).toLocaleString()}` : "No report generated yet"}
+            {report ? t('analytics.fairness.lastGenerated', { date: new Date(report.generatedAt?.toMillis() || Date.now()).toLocaleString() }) : t('analytics.fairness.noReportYet')}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -170,7 +172,7 @@ export default function FairnessDashboard() {
             onChange={(e) => setSelectedCycle(e.target.value)}
             className="border-slate-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
           >
-            <option value="all">All Cycles</option>
+            <option value="all">{t('analytics.fairness.allCycles')}</option>
             {cycles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <button
@@ -179,7 +181,7 @@ export default function FairnessDashboard() {
             className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
           >
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-            Generate Report
+            {t('analytics.fairness.generateReport')}
           </button>
           <button
             onClick={handleExportPdf}
@@ -187,7 +189,7 @@ export default function FairnessDashboard() {
             className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
-            Export PDF
+            {t('analytics.fairness.exportPdf')}
           </button>
         </div>
       </div>
@@ -195,21 +197,21 @@ export default function FairnessDashboard() {
       {!report ? (
         <div className="bg-white p-12 rounded-xl border border-slate-200 text-center">
           <Scale className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-700 mb-2">No Fairness Report Found</h2>
-          <p className="text-slate-500 mb-6">Generate your first fairness report to analyze pay equity and scoring consistency.</p>
+          <h2 className="text-xl font-bold text-slate-700 mb-2">{t('analytics.fairness.noFairnessReport')}</h2>
+          <p className="text-slate-500 mb-6">{t('analytics.fairness.noFairnessReportDesc')}</p>
           <button
             onClick={handleGenerateReport}
             disabled={generating}
             className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
           >
-             {generating ? "Generating..." : "Generate Report"}
+             {generating ? t('analytics.fairness.generating') : t('analytics.fairness.generateReport')}
           </button>
         </div>
       ) : (
         <>
           {/* SECTION 1 - Overall Score */}
           <div className="bg-white rounded-xl border border-slate-200 p-8 flex flex-col items-center justify-center text-center">
-            <h2 className="text-xl font-bold text-slate-900 mb-6">Company Fairness Score</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-6">{t('analytics.fairness.overallScore')}</h2>
             <div className="w-64 h-64 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <RadialBarChart
@@ -233,19 +235,19 @@ export default function FairnessDashboard() {
               </div>
             </div>
             <p className="mt-4 text-lg font-medium text-slate-700">
-              {report.overallFairnessScore >= 75 && "Your increment process meets fairness standards"}
-              {report.overallFairnessScore >= 60 && report.overallFairnessScore < 75 && "Some areas need attention"}
-              {report.overallFairnessScore < 60 && "Significant fairness issues detected — action required"}
+              {report.overallFairnessScore >= 75 && t('analytics.fairness.meetsFairness')}
+              {report.overallFairnessScore >= 60 && report.overallFairnessScore < 75 && t('analytics.fairness.someAreasNeedAttention')}
+              {report.overallFairnessScore < 60 && t('analytics.fairness.significantIssues')}
             </p>
           </div>
 
           {/* SECTION 2 - Alerts */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Fairness Alerts</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-4">{t('analytics.fairness.alerts')}</h2>
             {report.alerts.length === 0 ? (
               <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-lg flex items-center gap-3">
                 <CheckCircle className="w-5 h-5" />
-                <span className="font-medium">No fairness issues detected ✓</span>
+                <span className="font-medium">{t('analytics.fairness.noAlertsDetected')}</span>
               </div>
             ) : (
               <div className="space-y-3">
@@ -282,7 +284,7 @@ export default function FairnessDashboard() {
 
           {/* SECTION 3 - Department Disparity */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
-             <h2 className="text-lg font-bold text-slate-900 mb-6">Increment Distribution by Department</h2>
+             <h2 className="text-lg font-bold text-slate-900 mb-6">{t('analytics.fairness.deptDistribution')}</h2>
              <div className="h-[300px] mb-8">
                <ResponsiveContainer width="100%" height="100%">
                  <BarChart data={report.metrics.departmentDisparity} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -310,21 +312,21 @@ export default function FairnessDashboard() {
                <table className="w-full text-sm text-left">
                  <thead className="text-xs text-slate-500 bg-slate-50 uppercase">
                    <tr>
-                     <th className="px-4 py-3 rounded-tl-lg">Department</th>
-                     <th className="px-4 py-3">Employees</th>
-                     <th className="px-4 py-3">Avg Score</th>
-                     <th className="px-4 py-3">Avg Increment</th>
-                     <th className="px-4 py-3">Deviation</th>
-                     <th className="px-4 py-3 rounded-tr-lg">Status</th>
+                     <th className="px-4 py-3 rounded-tl-lg">{t('analytics.fairness.table.department')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.table.employees')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.table.avgScore')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.table.avgIncrement')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.table.deviation')}</th>
+                     <th className="px-4 py-3 rounded-tr-lg">{t('analytics.fairness.table.status')}</th>
                    </tr>
                  </thead>
                  <tbody>
                    {report.metrics.departmentDisparity.map((dept, idx) => {
                       const deviation = Math.abs(dept.disparity);
-                      let status = "Healthy";
+                      let status = t('analytics.fairness.statusLabels.healthy');
                       let statusColor = "text-emerald-600 bg-emerald-50";
-                      if (deviation > 15) { status = "Critical"; statusColor = "text-red-600 bg-red-50"; }
-                      else if (deviation > 5) { status = "Warning"; statusColor = "text-amber-600 bg-amber-50"; }
+                      if (deviation > 15) { status = t('analytics.fairness.statusLabels.critical'); statusColor = "text-red-600 bg-red-50"; }
+                      else if (deviation > 5) { status = t('analytics.fairness.statusLabels.warning'); statusColor = "text-amber-600 bg-amber-50"; }
 
                       return (
                        <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
@@ -349,20 +351,20 @@ export default function FairnessDashboard() {
           {/* SECTION 4 - Manager Consistency Analysis */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <div className="mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Manager Scoring Consistency</h2>
-              <p className="text-sm text-slate-500">Measures how consistently each manager applies scoring criteria</p>
+              <h2 className="text-lg font-bold text-slate-900">{t('analytics.fairness.managerConsistency')}</h2>
+              <p className="text-sm text-slate-500">{t('analytics.fairness.managerConsistencyDesc')}</p>
             </div>
 
             <div className="overflow-x-auto mb-8">
                <table className="w-full text-sm text-left">
                  <thead className="text-xs text-slate-500 bg-slate-50 uppercase">
                    <tr>
-                     <th className="px-4 py-3 rounded-tl-lg">Manager</th>
-                     <th className="px-4 py-3">Employees Evaluated</th>
-                     <th className="px-4 py-3">Avg Score</th>
-                     <th className="px-4 py-3">Score Variance</th>
-                     <th className="px-4 py-3">Outliers</th>
-                     <th className="px-4 py-3 rounded-tr-lg">Consistency Score</th>
+                     <th className="px-4 py-3 rounded-tl-lg">{t('analytics.fairness.managerTable.manager')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.managerTable.employeesEvaluated')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.managerTable.avgScore')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.managerTable.scoreVariance')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.managerTable.outliers')}</th>
+                     <th className="px-4 py-3 rounded-tr-lg">{t('analytics.fairness.managerTable.consistencyScore')}</th>
                    </tr>
                  </thead>
                  <tbody>
@@ -395,7 +397,7 @@ export default function FairnessDashboard() {
                    {report.metrics.managerConsistency.filter(m => m.employeesEvaluated >= 3).length === 0 && (
                        <tr>
                            <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                               Not enough data. Managers must evaluate at least 3 employees to appear here.
+                               {t('analytics.fairness.insufficientData')}
                            </td>
                        </tr>
                    )}
@@ -424,7 +426,7 @@ export default function FairnessDashboard() {
 
           {/* SECTION 5 - Band Distribution */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-6">Performance by Salary Band</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-6">{t('analytics.fairness.bandDistribution')}</h2>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={report.metrics.bandDistribution} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -444,21 +446,21 @@ export default function FairnessDashboard() {
           {/* SECTION 6 - Criteria Stability */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row items-center gap-8">
              <div className="flex-1">
-                 <h2 className="text-lg font-bold text-slate-900 mb-2">Criteria Lock Compliance</h2>
-                 <p className="text-sm text-slate-500 mb-4">Stable evaluation criteria are essential for long-term fairness and tracking.</p>
+                 <h2 className="text-lg font-bold text-slate-900 mb-2">{t('analytics.fairness.criteriaLock')}</h2>
+                 <p className="text-sm text-slate-500 mb-4">{t('analytics.fairness.criteriaLockDesc')}</p>
                  <div className="space-y-3">
                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                         <span className="text-slate-600 text-sm">Cycles with locked criteria</span>
+                         <span className="text-slate-600 text-sm">{t('analytics.fairness.cyclesWithLocked')}</span>
                          <span className="font-bold text-slate-900">{report.metrics.criteriaStability.cyclesWithLockedCriteria}</span>
                      </div>
                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                         <span className="text-slate-600 text-sm">Cycles with changes</span>
+                         <span className="text-slate-600 text-sm">{t('analytics.fairness.cyclesWithChanges')}</span>
                          <span className="font-bold text-slate-900">{report.metrics.criteriaStability.cyclesWithChanges}</span>
                      </div>
                      <div className="flex justify-between items-center py-2">
-                         <span className="text-slate-600 text-sm">Last criteria change</span>
+                         <span className="text-slate-600 text-sm">{t('analytics.fairness.lastCriteriaChange')}</span>
                          <span className="font-medium text-slate-900 text-sm">
-                             {report.metrics.criteriaStability.lastCriteriaChange ? new Date(report.metrics.criteriaStability.lastCriteriaChange.toMillis()).toLocaleDateString() : "No changes detected"}
+                             {report.metrics.criteriaStability.lastCriteriaChange ? new Date(report.metrics.criteriaStability.lastCriteriaChange.toMillis()).toLocaleDateString() : t('analytics.fairness.noChangesDetected')}
                          </span>
                      </div>
                  </div>
@@ -471,7 +473,7 @@ export default function FairnessDashboard() {
                  </ResponsiveContainer>
                  <div className="absolute inset-0 flex flex-col items-center justify-center mt-6">
                      <span className="text-3xl font-bold text-blue-600">{report.metrics.criteriaStability.stabilityScore}</span>
-                     <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">Stability</span>
+                     <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">{t('analytics.fairness.stability')}</span>
                  </div>
              </div>
           </div>
@@ -479,18 +481,18 @@ export default function FairnessDashboard() {
           {/* SECTION 7 - Audit Trail */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
              <div className="flex justify-between items-center mb-6">
-                 <h2 className="text-lg font-bold text-slate-900">Recent Actions</h2>
-                 <button onClick={handleExportAuditLog} className="text-sm text-emerald-600 font-medium hover:text-emerald-700">Export Audit Log</button>
+                 <h2 className="text-lg font-bold text-slate-900">{t('analytics.fairness.recentActions')}</h2>
+                 <button onClick={handleExportAuditLog} className="text-sm text-emerald-600 font-medium hover:text-emerald-700">{t('analytics.fairness.exportAuditLog')}</button>
              </div>
              <div className="overflow-x-auto">
                <table className="w-full text-sm text-left">
                  <thead className="text-xs text-slate-500 bg-slate-50 uppercase">
                    <tr>
-                     <th className="px-4 py-3 rounded-tl-lg">Timestamp</th>
-                     <th className="px-4 py-3">Actor</th>
-                     <th className="px-4 py-3">Action</th>
-                     <th className="px-4 py-3">Target</th>
-                     <th className="px-4 py-3 rounded-tr-lg">Details</th>
+                     <th className="px-4 py-3 rounded-tl-lg">{t('analytics.fairness.auditTable.timestamp')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.auditTable.actor')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.auditTable.action')}</th>
+                     <th className="px-4 py-3">{t('analytics.fairness.auditTable.target')}</th>
+                     <th className="px-4 py-3 rounded-tr-lg">{t('analytics.fairness.auditTable.details')}</th>
                    </tr>
                  </thead>
                  <tbody>
@@ -513,7 +515,7 @@ export default function FairnessDashboard() {
                          <div className="text-xs text-slate-400 truncate w-32">{log.targetId}</div>
                        </td>
                        <td className="px-4 py-3 text-slate-600">
-                         <button onClick={() => navigate('/audit-trail')} className="text-emerald-600 hover:underline">View details</button>
+                         <button onClick={() => navigate('/audit-trail')} className="text-emerald-600 hover:underline">{t('analytics.fairness.viewDetails')}</button>
                        </td>
                      </tr>
                    ))}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { settingsService } from "../../services/settingsService";
 import { dataExportService } from "../../services/dataExportService";
@@ -9,6 +10,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../config/firebase";
 
 export default function GeneralSettings() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [settings, setSettings] = useState<Partial<CompanySettings>>({
     name: "",
@@ -158,13 +160,13 @@ export default function GeneralSettings() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-900">General Settings</h1>
-        {isDirty && <span className="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-1 rounded-full">Unsaved changes</span>}
+        <h1 className="text-2xl font-bold text-slate-900">{t('settings.general.title')}</h1>
+        {isDirty && <span className="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-1 rounded-full">{t('settings.unsavedChanges')}</span>}
       </div>
 
       {/* SECTION 1 - Company Identity */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Company Identity</h2>
+        <h2 className="text-base font-bold text-slate-900 mb-4">{t('settings.general.companyIdentity')}</h2>
 
         <div className="flex items-center gap-6 pb-6 border-b border-slate-100">
             <div className="relative">
@@ -180,20 +182,20 @@ export default function GeneralSettings() {
                 <div className="flex items-center gap-3">
                     <label className="cursor-pointer px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
                         {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                        Upload Logo
+                        {t('settings.general.uploadLogo')}
                         <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
                     </label>
                     {settings.logoUrl && (
-                        <button onClick={handleRemoveLogo} className="text-sm text-red-600 hover:underline">Remove</button>
+                        <button onClick={handleRemoveLogo} className="text-sm text-red-600 hover:underline">{t('settings.general.remove')}</button>
                     )}
                 </div>
-                <p className="text-xs text-slate-500 mt-2">Max 2MB, JPG or PNG only.</p>
+                <p className="text-xs text-slate-500 mt-2">{t('settings.general.logoHint')}</p>
             </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.companyName')}</label>
                 <input
                     type="text"
                     value={settings.name || ""}
@@ -202,35 +204,35 @@ export default function GeneralSettings() {
                 />
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.industry')}</label>
                 <select
                     value={settings.industry || ""}
                     onChange={e => { setSettings(s => ({...s, industry: e.target.value})); setIsDirty(true); }}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                 >
-                    <option value="">Select Industry</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Healthcare">Healthcare</option>
-                    <option value="Other">Other</option>
+                    <option value="">{t('settings.general.selectIndustry')}</option>
+                    <option value="Technology">{t('settings.general.industries.technology')}</option>
+                    <option value="Finance">{t('settings.general.industries.finance')}</option>
+                    <option value="Healthcare">{t('settings.general.industries.healthcare')}</option>
+                    <option value="Other">{t('settings.general.industries.other')}</option>
                 </select>
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Company Size</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.companySize')}</label>
                 <select
                     value={settings.size || ""}
                     onChange={e => { setSettings(s => ({...s, size: e.target.value})); setIsDirty(true); }}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                 >
-                    <option value="">Select Size</option>
-                    <option value="1-50">1-50 employees</option>
-                    <option value="51-200">51-200 employees</option>
-                    <option value="201-500">201-500 employees</option>
-                    <option value="500+">500+ employees</option>
+                    <option value="">{t('settings.general.selectSize')}</option>
+                    <option value="1-50">{t('settings.general.sizes.small')}</option>
+                    <option value="51-200">{t('settings.general.sizes.medSmall')}</option>
+                    <option value="201-500">{t('settings.general.sizes.medium')}</option>
+                    <option value="500+">{t('settings.general.sizes.large')}</option>
                 </select>
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mobile Number</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.mobileNumber')}</label>
                 <input
                     type="tel"
                     value={settings.mobileNumber || ""}
@@ -239,7 +241,7 @@ export default function GeneralSettings() {
                 />
             </div>
             <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.address')}</label>
                 <textarea
                     value={settings.address || ""}
                     onChange={e => { setSettings(s => ({...s, address: e.target.value})); setIsDirty(true); }}
@@ -252,11 +254,11 @@ export default function GeneralSettings() {
 
       {/* SECTION 2 - Regional Settings */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Regional Settings</h2>
+        <h2 className="text-base font-bold text-slate-900 mb-4">{t('settings.general.regionalSettings')}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Timezone</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.timezone')}</label>
                 <select
                     value={settings.timezone || "UTC"}
                     onChange={e => { setSettings(s => ({...s, timezone: e.target.value})); setIsDirty(true); }}
@@ -269,7 +271,7 @@ export default function GeneralSettings() {
                 </select>
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Default Currency</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.defaultCurrency')}</label>
                 <select
                     value={settings.currency || "USD"}
                     onChange={e => { setSettings(s => ({...s, currency: e.target.value})); setIsDirty(true); }}
@@ -282,7 +284,7 @@ export default function GeneralSettings() {
                 </select>
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Date Format</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.dateFormat')}</label>
                 <select
                     value={settings.dateFormat || "DD/MM/YYYY"}
                     onChange={e => { setSettings(s => ({...s, dateFormat: e.target.value as any})); setIsDirty(true); }}
@@ -301,19 +303,19 @@ export default function GeneralSettings() {
                 disabled={saving || !isDirty}
                 className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 font-medium"
             >
-                {saving ? "Saving..." : "Save Changes"}
+                {saving ? t('settings.saving') : t('settings.saveChanges')}
             </button>
         </div>
       </div>
 
       {/* SECTION 3 - Data Export */}
       <div className="border-2 border-emerald-200 bg-emerald-50/30 rounded-xl p-6 space-y-4">
-        <h2 className="text-base font-bold text-emerald-700 mb-4">Data Export</h2>
+        <h2 className="text-base font-bold text-emerald-700 mb-4">{t('settings.general.dataExport')}</h2>
 
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h3 className="font-bold text-slate-900">Download Company Data</h3>
-                <p className="text-emerald-600 text-sm max-w-md">Export all your company's data including cycles, evaluations, employees, and audit logs as a ZIP file.</p>
+                <h3 className="font-bold text-slate-900">{t('settings.general.downloadCompanyData')}</h3>
+                <p className="text-emerald-600 text-sm max-w-md">{t('settings.general.downloadDesc')}</p>
             </div>
 
             <button
@@ -324,12 +326,12 @@ export default function GeneralSettings() {
                 {exporting ? (
                     <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Exporting...
+                        {t('settings.general.exporting')}
                     </>
                 ) : (
                     <>
                         <Download className="w-4 h-4" />
-                        Export Data
+                        {t('settings.general.exportData')}
                     </>
                 )}
             </button>
@@ -338,27 +340,27 @@ export default function GeneralSettings() {
 
       {/* SECTION 4 - Danger Zone */}
       <div className="border-2 border-red-200 bg-red-50/30 rounded-xl p-6 space-y-4">
-        <h2 className="text-base font-bold text-red-700 mb-4">Danger Zone</h2>
+        <h2 className="text-base font-bold text-red-700 mb-4">{t('settings.general.dangerZone')}</h2>
 
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h3 className="font-bold text-slate-900">Delete Company</h3>
-                <p className="text-red-600 text-sm max-w-md">Permanently delete your company account and all associated data. This action cannot be undone.</p>
+                <h3 className="font-bold text-slate-900">{t('settings.general.deleteCompany')}</h3>
+                <p className="text-red-600 text-sm max-w-md">{t('settings.general.deleteDesc')}</p>
             </div>
 
             {scheduledDeletionDate ? (
                  <div className="bg-red-100 border border-red-200 p-4 rounded-lg flex flex-col items-end gap-3 w-full md:w-auto">
                      <div className="flex items-center gap-2 text-red-800 font-medium text-sm">
                          <AlertTriangle className="w-5 h-5" />
-                         Account scheduled for deletion on {new Date(scheduledDeletionDate).toLocaleDateString()}
+                         {t('settings.general.scheduledForDeletion', { date: new Date(scheduledDeletionDate).toLocaleDateString() })}
                      </div>
                      <button onClick={cancelDeletion} className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700">
-                         Cancel Deletion
+                         {t('settings.general.cancelDeletion')}
                      </button>
                  </div>
             ) : (
                 <button onClick={scheduleDeletion} className="px-4 py-2 bg-white border-2 border-red-200 text-red-700 font-bold rounded-lg hover:bg-red-50 transition-colors whitespace-nowrap">
-                    Schedule Deletion
+                    {t('settings.general.scheduleDeletion')}
                 </button>
             )}
         </div>

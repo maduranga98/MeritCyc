@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { auditService, type AuditFilters } from '../../services/auditService';
 import type { AuditLogEntry } from '../../types/audit';
 import { Download, Filter, X, Copy, FileText } from 'lucide-react';
 
 const AuditTrail: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,16 +118,16 @@ const AuditTrail: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-merit-navy mb-1">Audit Trail</h1>
+          <h1 className="text-3xl font-bold text-merit-navy mb-1">{t('analytics.audit.title')}</h1>
           <p className="text-slate-600">
-            Track all system actions and changes across your company
+            {t('analytics.audit.subtitle')}
           </p>
         </div>
         <button
           onClick={handleExportCSV}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700 transition-colors"
         >
-          <Download className="w-4 h-4" /> Export CSV
+          <Download className="w-4 h-4" /> {t('analytics.audit.exportCSV')}
         </button>
       </div>
 
@@ -136,7 +138,7 @@ const AuditTrail: React.FC = () => {
           className="flex items-center gap-2 text-sm font-bold text-merit-navy hover:text-merit-emerald"
         >
           <Filter className="w-4 h-4" />
-          {showFilters ? 'Hide Filters' : 'Show Filters'}
+          {showFilters ? t('analytics.audit.hideFilters') : t('analytics.audit.showFilters')}
           {hasActiveFilters && (
             <span className="ml-2 px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-bold">
               {Object.keys(filters).length} active
@@ -149,7 +151,7 @@ const AuditTrail: React.FC = () => {
             {/* Date Range */}
             <div>
               <label className="text-xs font-bold text-slate-600 uppercase">
-                Start Date
+                {t('analytics.audit.filters.startDate')}
               </label>
               <input
                 type="date"
@@ -170,7 +172,7 @@ const AuditTrail: React.FC = () => {
 
             <div>
               <label className="text-xs font-bold text-slate-600 uppercase">
-                End Date
+                {t('analytics.audit.filters.endDate')}
               </label>
               <input
                 type="date"
@@ -192,7 +194,7 @@ const AuditTrail: React.FC = () => {
             {/* Action Type */}
             <div>
               <label className="text-xs font-bold text-slate-600 uppercase">
-                Action Type
+                {t('analytics.audit.filters.actionType')}
               </label>
               <select
                 value={filters.actionType || ''}
@@ -201,26 +203,26 @@ const AuditTrail: React.FC = () => {
                 }
                 className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
               >
-                <option value="">All Actions</option>
-                <optgroup label="User Lifecycle">
+                <option value="">{t('analytics.audit.filters.allActions')}</option>
+                <optgroup label={t('analytics.audit.actionGroups.userLifecycle')}>
                   <option value="user_approved">User Approved</option>
                   <option value="user_rejected">User Rejected</option>
                   <option value="user_deactivated">User Deactivated</option>
                   <option value="user_reactivated">User Reactivated</option>
                   <option value="role_changed">Role Changed</option>
                 </optgroup>
-                <optgroup label="Cycle Lifecycle">
+                <optgroup label={t('analytics.audit.actionGroups.cycleLifecycle')}>
                   <option value="cycle_created">Cycle Created</option>
                   <option value="cycle_published">Cycle Published</option>
                   <option value="cycle_cancelled">Cycle Cancelled</option>
                   <option value="cycle_finalized">Cycle Finalized</option>
                 </optgroup>
-                <optgroup label="Evaluations">
+                <optgroup label={t('analytics.audit.actionGroups.evaluations')}>
                   <option value="evaluation_submitted">Evaluation Submitted</option>
                   <option value="evaluation_draft_saved">Evaluation Draft Saved</option>
                   <option value="score_overridden">Score Overridden</option>
                 </optgroup>
-                <optgroup label="Settings">
+                <optgroup label={t('analytics.audit.actionGroups.settings')}>
                   <option value="company_settings_updated">Company Settings Updated</option>
                   <option value="qr_code_regenerated">QR Code Regenerated</option>
                   <option value="registration_toggled">Registration Toggled</option>
@@ -231,7 +233,7 @@ const AuditTrail: React.FC = () => {
             {/* Actor Email */}
             <div>
               <label className="text-xs font-bold text-slate-600 uppercase">
-                Actor
+                {t('analytics.audit.filters.actor')}
               </label>
               <select
                 value={filters.actorEmail || ''}
@@ -240,7 +242,7 @@ const AuditTrail: React.FC = () => {
                 }
                 className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
               >
-                <option value="">All Actors</option>
+                <option value="">{t('analytics.audit.filters.allActors')}</option>
                 {actorEmails.map((email) => (
                   <option key={email} value={email}>
                     {email}
@@ -252,7 +254,7 @@ const AuditTrail: React.FC = () => {
             {/* Target Type */}
             <div>
               <label className="text-xs font-bold text-slate-600 uppercase">
-                Target Type
+                {t('analytics.audit.filters.targetType')}
               </label>
               <select
                 value={filters.targetType || ''}
@@ -261,7 +263,7 @@ const AuditTrail: React.FC = () => {
                 }
                 className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
               >
-                <option value="">All Types</option>
+                <option value="">{t('analytics.audit.filters.allTypes')}</option>
                 <option value="user">User</option>
                 <option value="company">Company</option>
                 <option value="cycle">Cycle</option>
@@ -277,7 +279,7 @@ const AuditTrail: React.FC = () => {
                   onClick={clearFilters}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition-colors"
                 >
-                  <X className="w-4 h-4" /> Clear All
+                  <X className="w-4 h-4" /> {t('analytics.audit.filters.clearAll')}
                 </button>
               </div>
             )}
@@ -288,12 +290,12 @@ const AuditTrail: React.FC = () => {
       {/* Results Count & 500-Doc Cap Warning */}
       <div className="space-y-3">
         <div className="text-sm text-slate-600">
-          Showing <span className="font-bold">{logs.length}</span> audit logs
-          {hasNextPage && ' (more available)'}
+          {t('analytics.audit.showing')} <span className="font-bold">{logs.length}</span> {t('analytics.audit.auditLogs')}
+          {hasNextPage && ` ${t('analytics.audit.moreAvailable')}`}
         </div>
         {logs.length >= 500 && (
           <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm p-3 rounded-lg">
-            Showing the most recent 500 entries. Use date filters to narrow results.
+            {t('analytics.audit.cap500')}
           </div>
         )}
       </div>
@@ -306,11 +308,11 @@ const AuditTrail: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Timestamp</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Actor</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Action</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Target</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.timestamp')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.actor')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.action')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.target')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.details')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -330,8 +332,8 @@ const AuditTrail: React.FC = () => {
         ) : logs.length === 0 ? (
           <div className="p-12 text-center">
             <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-            <p className="text-slate-400 font-medium mb-1">No audit logs found</p>
-            <p className="text-sm text-slate-400">Try adjusting your filters.</p>
+            <p className="text-slate-400 font-medium mb-1">{t('analytics.audit.noLogsFound')}</p>
+            <p className="text-sm text-slate-400">{t('analytics.audit.tryAdjusting')}</p>
           </div>
         ) : (
           <>
@@ -339,11 +341,11 @@ const AuditTrail: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Timestamp</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Actor</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Action</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Target</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.timestamp')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.actor')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.action')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.target')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">{t('analytics.audit.table.details')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -369,7 +371,7 @@ const AuditTrail: React.FC = () => {
                           <button
                             onClick={() => copyToClipboard(log.targetId)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-200 rounded"
-                            title="Copy ID"
+                            title={t('analytics.audit.copyId')}
                           >
                             <Copy className="w-3 h-3 text-slate-400" />
                           </button>
@@ -389,7 +391,7 @@ const AuditTrail: React.FC = () => {
                               onClick={() => setSelectedLog(log)}
                               className="text-xs text-emerald-600 hover:text-emerald-700 font-bold mt-1"
                             >
-                              View Details
+                              {t('analytics.audit.viewDetails')}
                             </button>
                           </div>
                         ) : (
@@ -410,7 +412,7 @@ const AuditTrail: React.FC = () => {
                   disabled={loading}
                   className="px-6 py-2 bg-slate-100 text-slate-900 text-sm font-bold rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'Loading...' : 'Load More Results'}
+                  {loading ? t('analytics.audit.loading') : t('analytics.audit.loadMore')}
                 </button>
               </div>
             )}
@@ -423,7 +425,7 @@ const AuditTrail: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-merit-navy">Details</h2>
+              <h2 className="text-lg font-bold text-merit-navy">{t('analytics.audit.detailsTitle')}</h2>
               <button
                 onClick={() => setSelectedLog(null)}
                 className="p-1 hover:bg-slate-100 rounded transition-colors"

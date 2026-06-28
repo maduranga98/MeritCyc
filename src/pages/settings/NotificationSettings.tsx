@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { settingsService } from "../../services/settingsService";
 import { type NotificationSettings } from "../../types/settings";
@@ -6,6 +7,7 @@ import { toast } from "sonner";
 import { Loader2, Info } from "lucide-react";
 
 export default function NotificationSettingsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [settings, setSettings] = useState<Partial<NotificationSettings>>({
     pendingApprovalThresholdHours: 48,
@@ -70,17 +72,17 @@ export default function NotificationSettingsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-900">Notification Settings</h1>
-        {isDirty && <span className="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-1 rounded-full">Unsaved changes</span>}
+        <h1 className="text-2xl font-bold text-slate-900">{t('settings.notifications.title')}</h1>
+        {isDirty && <span className="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-1 rounded-full">{t('settings.unsavedChanges')}</span>}
       </div>
 
       {/* SECTION 1 - Approval Thresholds */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Pending Approval Reminders</h2>
+        <h2 className="text-base font-bold text-slate-900 mb-4">{t('settings.notifications.pendingApprovalReminders')}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Send reminder when pending for:</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.notifications.sendReminderWhen')}</label>
                 <div className="flex items-center gap-2">
                     <input
                         type="number"
@@ -90,19 +92,19 @@ export default function NotificationSettingsPage() {
                         onChange={e => { setSettings(s => ({...s, pendingApprovalThresholdHours: parseInt(e.target.value)})); setIsDirty(true); }}
                         className="w-24 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                     />
-                    <span className="text-sm text-slate-600">hours</span>
+                    <span className="text-sm text-slate-600">{t('settings.notifications.hours')}</span>
                 </div>
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Reminder frequency:</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.notifications.reminderFrequency')}</label>
                 <select
                     value={settings.pendingApprovalReminderFrequencyHours || 24}
                     onChange={e => { setSettings(s => ({...s, pendingApprovalReminderFrequencyHours: parseInt(e.target.value)})); setIsDirty(true); }}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                 >
-                    <option value={12}>Every 12 hours</option>
-                    <option value={24}>Every 24 hours</option>
-                    <option value={48}>Every 48 hours</option>
+                    <option value={12}>{t('settings.notifications.every12h')}</option>
+                    <option value={24}>{t('settings.notifications.every24h')}</option>
+                    <option value={48}>{t('settings.notifications.every48h')}</option>
                 </select>
             </div>
         </div>
@@ -110,15 +112,15 @@ export default function NotificationSettingsPage() {
 
       {/* SECTION 2 - Budget Alert Thresholds */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Budget Alert Thresholds</h2>
+        <h2 className="text-base font-bold text-slate-900 mb-4">{t('settings.notifications.budgetAlertThresholds')}</h2>
 
         <div className="space-y-6">
             <div>
                 <div className="flex justify-between items-center mb-1">
-                    <label className="text-sm font-medium text-slate-700">Warning alert at:</label>
+                    <label className="text-sm font-medium text-slate-700">{t('settings.notifications.warningAt')}</label>
                     <span className="text-sm font-bold text-amber-600">{settings.budgetWarningThreshold || 80}%</span>
                 </div>
-                <p className="text-xs text-slate-500 mb-2">Send warning when budget reaches this percentage.</p>
+                <p className="text-xs text-slate-500 mb-2">{t('settings.notifications.sendWarningWhen')}</p>
                 <input
                     type="range"
                     min="50"
@@ -130,10 +132,10 @@ export default function NotificationSettingsPage() {
             </div>
             <div>
                 <div className="flex justify-between items-center mb-1">
-                    <label className="text-sm font-medium text-slate-700">Critical alert at:</label>
+                    <label className="text-sm font-medium text-slate-700">{t('settings.notifications.criticalAt')}</label>
                     <span className="text-sm font-bold text-red-600">{settings.budgetCriticalThreshold || 95}%</span>
                 </div>
-                <p className="text-xs text-slate-500 mb-2">Send critical alert when budget reaches this percentage.</p>
+                <p className="text-xs text-slate-500 mb-2">{t('settings.notifications.sendCriticalWhen')}</p>
                 <input
                     type="range"
                     min="80"
@@ -159,17 +161,17 @@ export default function NotificationSettingsPage() {
 
       {/* SECTION 3 - Evaluation Reminders */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Evaluation Deadline Reminders</h2>
+        <h2 className="text-base font-bold text-slate-900 mb-4">{t('settings.notifications.evaluationReminders')}</h2>
 
         <div className="space-y-4">
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Send reminders:</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">{t('settings.notifications.sendReminders')}</label>
                 <div className="flex flex-wrap gap-4">
                     {[
-                        { label: '7 days before deadline', value: 7 },
-                        { label: '3 days before deadline', value: 3 },
-                        { label: '1 day before deadline', value: 1 },
-                        { label: 'Day of deadline', value: 0 }
+                        { label: t('settings.notifications.7daysBefore'), value: 7 },
+                        { label: t('settings.notifications.3daysBefore'), value: 3 },
+                        { label: t('settings.notifications.1dayBefore'), value: 1 },
+                        { label: t('settings.notifications.dayOf'), value: 0 }
                     ].map(opt => (
                         <label key={opt.value} className="flex items-center gap-2">
                             <input
@@ -189,15 +191,15 @@ export default function NotificationSettingsPage() {
                 </div>
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Reminder recipient:</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.notifications.reminderRecipient')}</label>
                 <select
                     value={settings.reminderRecipient || 'manager'}
                     onChange={e => { setSettings(s => ({...s, reminderRecipient: e.target.value as any})); setIsDirty(true); }}
                     className="w-full md:w-1/2 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                 >
-                    <option value="manager">Manager only</option>
-                    <option value="manager_hr">Manager + HR</option>
-                    <option value="all">All</option>
+                    <option value="manager">{t('settings.notifications.managerOnly')}</option>
+                    <option value="manager_hr">{t('settings.notifications.managerHR')}</option>
+                    <option value="all">{t('settings.notifications.all')}</option>
                 </select>
             </div>
         </div>
@@ -208,19 +210,19 @@ export default function NotificationSettingsPage() {
         <div className="flex items-start gap-3 mb-4">
             <Info className="w-5 h-5 text-blue-500 mt-0.5" />
             <div>
-                <h2 className="text-base font-bold text-slate-900">Email Notification Templates</h2>
-                <p className="text-sm text-slate-500">Email notifications are sent via Brevo. The following events trigger emails:</p>
+                <h2 className="text-base font-bold text-slate-900">{t('settings.notifications.emailTemplates')}</h2>
+                <p className="text-sm text-slate-500">{t('settings.notifications.emailDesc')}</p>
             </div>
         </div>
 
         <div className="space-y-3 pl-8 border-l-2 border-slate-100 ml-2">
             {[
-                { key: 'new_registration', label: 'New registration request', role: '(HR)' },
-                { key: 'registration_approved', label: 'Registration approved', role: '(Employee)' },
-                { key: 'registration_rejected', label: 'Registration rejected', role: '(Employee)' },
-                { key: 'invite_accepted', label: 'Invite accepted', role: '(HR)' },
-                { key: 'evaluation_submitted', label: 'Evaluation submitted', role: '(Employee)' },
-                { key: 'cycle_finalized', label: 'Cycle finalized - increment story ready', role: '(Employee)' },
+                { key: 'new_registration', label: t('settings.notifications.events.newRegistration'), role: '(HR)' },
+                { key: 'registration_approved', label: t('settings.notifications.events.registrationApproved'), role: '(Employee)' },
+                { key: 'registration_rejected', label: t('settings.notifications.events.registrationRejected'), role: '(Employee)' },
+                { key: 'invite_accepted', label: t('settings.notifications.events.inviteAccepted'), role: '(HR)' },
+                { key: 'evaluation_submitted', label: t('settings.notifications.events.evaluationSubmitted'), role: '(Employee)' },
+                { key: 'cycle_finalized', label: t('settings.notifications.events.cycleFinalized'), role: '(Employee)' },
             ].map(event => (
                 <div key={event.key} className="flex items-center justify-between">
                     <div>
@@ -246,14 +248,14 @@ export default function NotificationSettingsPage() {
             ))}
             <div className="flex items-center justify-between opacity-50 pt-2">
                 <div>
-                    <span className="text-sm font-medium text-slate-700">Security events</span>
+                    <span className="text-sm font-medium text-slate-700">{t('settings.notifications.events.securityEvents')}</span>
                     <span className="text-xs text-slate-400 ml-2">(All)</span>
                 </div>
                 <button disabled className="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-300">
                     <span className="inline-block h-3 w-3 transform translate-x-5 rounded-full bg-white" />
                 </button>
             </div>
-            <p className="text-xs text-slate-400 italic">Security events cannot be disabled.</p>
+            <p className="text-xs text-slate-400 italic">{t('settings.notifications.securityEventsNote')}</p>
         </div>
 
         <div className="pt-6 flex justify-end">
@@ -262,7 +264,7 @@ export default function NotificationSettingsPage() {
                 disabled={saving || !isDirty}
                 className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 font-medium"
             >
-                {saving ? "Saving..." : "Save Notification Settings"}
+                {saving ? t('settings.saving') : t('settings.notifications.saveBtn')}
             </button>
         </div>
       </div>

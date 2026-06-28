@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { settingsService } from "../../services/settingsService";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ function ConfirmExportModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/50" onClick={onCancel} />
@@ -20,21 +22,19 @@ function ConfirmExportModal({
             <div className="p-2 bg-amber-100 rounded-lg">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
             </div>
-            <h2 className="text-base font-bold text-slate-900">Export Company Data</h2>
+            <h2 className="text-base font-bold text-slate-900">{t('settings.dataPrivacy.exportModal.title')}</h2>
           </div>
           <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
           </button>
         </div>
         <p className="text-sm text-slate-600">
-          This will export all company data including employee records, cycle data, and evaluation
-          scores. The export may take a minute for large companies.
+          {t('settings.dataPrivacy.exportModal.desc')}
         </p>
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700 font-medium">
-            Sensitive employee data is included. Store this file securely and do not share it
-            publicly.
+            {t('settings.dataPrivacy.exportModal.warning')}
           </p>
         </div>
         <div className="flex gap-3 justify-end pt-2">
@@ -42,13 +42,13 @@ function ConfirmExportModal({
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-50 transition-colors border border-slate-200"
           >
-            Cancel
+            {t('settings.dataPrivacy.exportModal.cancel')}
           </button>
           <button
             onClick={onConfirm}
             className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
           >
-            Export
+            {t('settings.dataPrivacy.exportModal.export')}
           </button>
         </div>
       </div>
@@ -57,6 +57,7 @@ function ConfirmExportModal({
 }
 
 export default function DataPrivacySettings() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [exporting, setExporting] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -103,26 +104,24 @@ export default function DataPrivacySettings() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-bold text-slate-900">Data & Privacy Settings</h1>
+      <h1 className="text-2xl font-bold text-slate-900">{t('settings.dataPrivacy.title')}</h1>
 
       {/* SECTION 1 - Data Export — super_admin only */}
       {isSuperAdmin && (
         <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
           <h2 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
             <Database className="w-5 h-5 text-slate-700" />
-            Export Company Data
+            {t('settings.dataPrivacy.exportData')}
           </h2>
 
           <p className="text-sm text-slate-600 mb-4">
-            Download a complete export of all your company data including employees, cycles,
-            evaluations, and increment stories. The export is prepared server-side and downloaded as
-            a ZIP archive.
+            {t('settings.dataPrivacy.exportDesc')}
           </p>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
             <div>
-              <p className="text-sm font-medium text-slate-900">Last exported: Never exported</p>
-              <p className="text-xs text-slate-500 mt-1">You can export once per hour.</p>
+              <p className="text-sm font-medium text-slate-900">{t('settings.dataPrivacy.lastExported')}</p>
+              <p className="text-xs text-slate-500 mt-1">{t('settings.dataPrivacy.exportOncePerHour')}</p>
             </div>
 
             {!downloadUrl ? (
@@ -136,7 +135,7 @@ export default function DataPrivacySettings() {
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
-                {exporting ? "Preparing export..." : "Export All Data"}
+                {exporting ? t('settings.dataPrivacy.preparingExport') : t('settings.dataPrivacy.exportAllData')}
               </button>
             ) : (
               <button
@@ -144,7 +143,7 @@ export default function DataPrivacySettings() {
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
               >
                 <Download className="w-4 h-4" />
-                Download Export
+                {t('settings.dataPrivacy.downloadExport')}
               </button>
             )}
           </div>
@@ -152,8 +151,7 @@ export default function DataPrivacySettings() {
           <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-700">
-              <span className="font-semibold">Sensitive employee data is included.</span> Store this
-              file securely and restrict access to authorised personnel only.
+              {t('settings.dataPrivacy.authorisedPersonnel')}
             </p>
           </div>
         </div>
@@ -163,11 +161,11 @@ export default function DataPrivacySettings() {
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
         <h2 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
           <Clock className="w-5 h-5 text-slate-700" />
-          Data Retention Policy
+          {t('settings.dataPrivacy.dataRetention')}
         </h2>
 
         <p className="text-sm font-medium text-slate-800 mb-4">
-          MeritCyc retains your data for as long as your account is active.
+          {t('settings.dataPrivacy.dataRetentionDesc')}
         </p>
 
         <ul className="space-y-3">
@@ -190,11 +188,11 @@ export default function DataPrivacySettings() {
       <div className="bg-slate-50 rounded-xl border border-slate-200 p-6 space-y-4">
         <h2 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
           <Shield className="w-5 h-5 text-emerald-600" />
-          Privacy & Compliance Commitment
+          {t('settings.dataPrivacy.privacyCommitment')}
         </h2>
 
         <p className="text-sm text-slate-600 mb-4">
-          MeritCyc is designed with data privacy in mind to help you meet compliance requirements:
+          {t('settings.dataPrivacy.privacyDesc')}
         </p>
 
         <ul className="space-y-3">

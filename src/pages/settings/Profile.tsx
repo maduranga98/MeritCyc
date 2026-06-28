@@ -5,6 +5,7 @@
 // =============================================================================
 
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   updateProfile,
   updatePassword,
@@ -91,6 +92,7 @@ interface UserProfileData {
 }
 
 const ProfilePage: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const firebaseUser = useAuthStore((s) => s.firebaseUser);
   const setUser = useAuthStore((s) => s.setUser);
@@ -354,13 +356,13 @@ const ProfilePage: React.FC = () => {
           {(profileData.departmentId || profileData.salaryBandId) && (
             <div className="grid grid-cols-2 gap-4 mt-5 pt-5 border-t border-gray-100">
               {profileData.departmentId && (
-                <InfoField label="Department" value={departments.find(d => d.id === profileData.departmentId)?.name || profileData.departmentId} />
+                <InfoField label={t('settings.profile.department')} value={departments.find(d => d.id === profileData.departmentId)?.name || profileData.departmentId} />
               )}
               {profileData.salaryBandId && (() => {
                 const band = salaryBands.find(b => b.id === profileData.salaryBandId);
                 return (
                   <InfoField
-                    label="Salary Band"
+                    label={t('settings.profile.salaryBand')}
                     value={band?.name || profileData.salaryBandId}
                     subtitle={band ? `${band.currency} ${band.minSalary.toLocaleString()} – ${band.maxSalary.toLocaleString()}` : undefined}
                   />
@@ -373,11 +375,11 @@ const ProfilePage: React.FC = () => {
         {/* ------------------------------------------------------------------ */}
         {/* Edit display name                                                   */}
         {/* ------------------------------------------------------------------ */}
-        <SectionCard title="Display Name">
+        <SectionCard title={t('settings.profile.displayName')}>
           <form onSubmit={handleName(onSaveName)} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase text-merit-slate mb-2 tracking-wider">
-                Full Name
+                {t('settings.profile.fullName')}
               </label>
               <input
                 type="text"
@@ -393,7 +395,7 @@ const ProfilePage: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <p className="text-xs text-merit-slate">
-                Email address cannot be changed here.
+                {t('settings.profile.emailCannotChange')}
               </p>
               <button
                 type="submit"
@@ -403,10 +405,10 @@ const ProfilePage: React.FC = () => {
                 {isNameLoading ? (
                   <>
                     <div className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    Saving…
+                    {t('settings.profile.saving')}
                   </>
                 ) : (
-                  "Save Changes"
+                  t('settings.profile.saveChanges')
                 )}
               </button>
             </div>
@@ -417,11 +419,11 @@ const ProfilePage: React.FC = () => {
         {/* Change password — only for email/password users                    */}
         {/* ------------------------------------------------------------------ */}
         {canChangePassword && (
-          <SectionCard title="Change Password">
+          <SectionCard title={t('settings.profile.changePassword')}>
             <form onSubmit={handlePw(onChangePassword)} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase text-merit-slate mb-2 tracking-wider">
-                  Current Password
+                  {t('settings.profile.currentPassword')}
                 </label>
                 <div className="relative">
                   <input
@@ -449,7 +451,7 @@ const ProfilePage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase text-merit-slate mb-2 tracking-wider">
-                  New Password
+                  {t('settings.profile.newPassword')}
                 </label>
                 <div className="relative">
                   <input
@@ -477,7 +479,7 @@ const ProfilePage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase text-merit-slate mb-2 tracking-wider">
-                  Confirm New Password
+                  {t('settings.profile.confirmPassword')}
                 </label>
                 <input
                   type="password"
@@ -503,10 +505,10 @@ const ProfilePage: React.FC = () => {
                   {isPasswordLoading ? (
                     <>
                       <div className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      Updating…
+                      {t('settings.profile.updating')}
                     </>
                   ) : (
-                    "Update Password"
+                    t('settings.profile.updatePassword')
                   )}
                 </button>
               </div>
@@ -516,10 +518,9 @@ const ProfilePage: React.FC = () => {
 
         {/* Note for SSO users */}
         {!canChangePassword && (
-          <SectionCard title="Password">
+          <SectionCard title={t('settings.profile.password')}>
             <p className="text-sm text-merit-slate">
-              You signed in with Google. Password management is handled through
-              your Google account.
+              {t('settings.profile.ssoNote')}
             </p>
           </SectionCard>
         )}

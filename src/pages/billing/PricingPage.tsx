@@ -1,5 +1,6 @@
 import { type ElementType } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Check, Zap, Building2, Rocket, Star } from 'lucide-react';
 import { PLAN_CONFIGS } from '../../lib/planConfig';
 import { type PlanTier } from '../../types/billing';
@@ -12,24 +13,25 @@ const PLAN_ICONS: Record<PlanTier, ElementType> = {
   enterprise: Building2,
 };
 
-const COMPARISON_ROWS: Array<{ label: string; trial: boolean | string; starter: boolean | string; growth: boolean | string; enterprise: boolean | string }> = [
-  { label: 'Max Employees',      trial: '10',        starter: '50',       growth: '500',       enterprise: 'Unlimited' },
-  { label: 'Active Cycles',      trial: '1',         starter: '3',        growth: 'Unlimited', enterprise: 'Unlimited' },
-  { label: 'Career Paths',       trial: true,        starter: true,       growth: true,        enterprise: true },
-  { label: 'Increment Stories',  trial: true,        starter: true,       growth: true,        enterprise: true },
-  { label: 'Simulations',        trial: true,        starter: false,      growth: true,        enterprise: true },
-  { label: 'Fairness Dashboard', trial: true,        starter: false,      growth: true,        enterprise: true },
-  { label: 'Advanced Analytics', trial: true,        starter: false,      growth: true,        enterprise: true },
-  { label: 'Audit Trail',        trial: true,        starter: false,      growth: true,        enterprise: true },
-  { label: 'Dedicated Support',  trial: false,       starter: false,      growth: false,       enterprise: true },
-];
-
 const ORDERED_PLANS: PlanTier[] = ['trial', 'starter', 'growth', 'enterprise'];
 
 export default function PricingPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const billing = useBilling();
   const currentPlan = billing?.plan;
+
+  const COMPARISON_ROWS: Array<{ label: string; trial: boolean | string; starter: boolean | string; growth: boolean | string; enterprise: boolean | string }> = [
+    { label: t('billing.pricing.comparisonRows.maxEmployees'),      trial: '10',        starter: '50',       growth: '500',       enterprise: 'Unlimited' },
+    { label: t('billing.pricing.comparisonRows.activeCycles'),      trial: '1',         starter: '3',        growth: 'Unlimited', enterprise: 'Unlimited' },
+    { label: t('billing.pricing.comparisonRows.careerPaths'),       trial: true,        starter: true,       growth: true,        enterprise: true },
+    { label: t('billing.pricing.comparisonRows.incrementStories'),  trial: true,        starter: true,       growth: true,        enterprise: true },
+    { label: t('billing.pricing.comparisonRows.simulations'),       trial: true,        starter: false,      growth: true,        enterprise: true },
+    { label: t('billing.pricing.comparisonRows.fairnessDashboard'), trial: true,        starter: false,      growth: true,        enterprise: true },
+    { label: t('billing.pricing.comparisonRows.advancedAnalytics'), trial: true,        starter: false,      growth: true,        enterprise: true },
+    { label: t('billing.pricing.comparisonRows.auditTrail'),        trial: true,        starter: false,      growth: true,        enterprise: true },
+    { label: t('billing.pricing.comparisonRows.dedicatedSupport'),  trial: false,       starter: false,      growth: false,       enterprise: true },
+  ];
 
   const handleUpgrade = (plan: PlanTier) => {
     if (plan === 'enterprise') {
@@ -42,8 +44,8 @@ export default function PricingPage() {
   return (
     <div className="space-y-8 max-w-6xl">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Plans & Pricing</h1>
-        <p className="text-sm text-slate-500 mt-1">Simple per-employee pricing. No hidden fees.</p>
+        <h1 className="text-2xl font-bold text-slate-900">{t('billing.pricing.title')}</h1>
+        <p className="text-sm text-slate-500 mt-1">{t('billing.pricing.subtitle')}</p>
       </div>
 
       {/* Plan Cards */}
@@ -63,12 +65,12 @@ export default function PricingPage() {
             >
               {isPopular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
-                  Most Popular
+                  {t('billing.pricing.mostPopular')}
                 </div>
               )}
               {isCurrent && !isPopular && (
                 <div className="absolute -top-3 right-4 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
-                  Current Plan
+                  {t('billing.pricing.currentPlan')}
                 </div>
               )}
 
@@ -79,13 +81,13 @@ export default function PricingPage() {
 
               <div className="mb-3">
                 {config.pricePerEmployee === null ? (
-                  <p className="text-2xl font-bold text-slate-900">Custom</p>
+                  <p className="text-2xl font-bold text-slate-900">{t('billing.pricing.custom')}</p>
                 ) : config.pricePerEmployee === 0 ? (
-                  <p className="text-2xl font-bold text-slate-900">Free</p>
+                  <p className="text-2xl font-bold text-slate-900">{t('billing.pricing.free')}</p>
                 ) : (
                   <>
                     <p className="text-2xl font-bold text-slate-900">${config.pricePerEmployee}</p>
-                    <p className="text-xs text-slate-500">per employee / month</p>
+                    <p className="text-xs text-slate-500">{t('billing.pricing.perEmployee')}</p>
                   </>
                 )}
               </div>
@@ -112,7 +114,7 @@ export default function PricingPage() {
                     : 'bg-slate-900 text-white hover:bg-slate-800'
                 }`}
               >
-                {isCurrent ? 'Current Plan' : planId === 'enterprise' ? 'Contact Sales' : 'Upgrade'}
+                {isCurrent ? t('billing.pricing.currentPlan') : planId === 'enterprise' ? t('billing.pricing.contactSales') : t('billing.pricing.upgrade')}
               </button>
             </div>
           );
@@ -122,17 +124,17 @@ export default function PricingPage() {
       {/* Feature Comparison Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-900">Feature Comparison</h2>
+          <h2 className="text-base font-bold text-slate-900">{t('billing.pricing.featureComparison')}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left p-4 text-slate-600 font-medium w-1/3">Feature</th>
+                <th className="text-left p-4 text-slate-600 font-medium w-1/3">{t('billing.pricing.feature')}</th>
                 {ORDERED_PLANS.map((p) => (
                   <th key={p} className={`text-center p-4 font-medium ${p === currentPlan ? 'text-emerald-600' : 'text-slate-600'}`}>
                     {PLAN_CONFIGS[p].name}
-                    {p === currentPlan && <span className="block text-xs font-normal text-emerald-500">current</span>}
+                    {p === currentPlan && <span className="block text-xs font-normal text-emerald-500">{t('billing.pricing.current')}</span>}
                   </th>
                 ))}
               </tr>

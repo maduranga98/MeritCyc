@@ -1,0 +1,300 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "people": "Personnes",
+    "employeeDirectory": "Répertoire des employés",
+    "departments": "Départements",
+    "salaryBands": "Grilles salariales",
+    "pendingApprovals": "Approbations en attente",
+    "inviteTracker": "Suivi des invitations",
+    "cycles": "Cycles",
+    "allCycles": "Tous les cycles",
+    "scoreReview": "Révision des scores",
+    "careerPaths": "Parcours de carrière",
+    "analytics": "Analyses",
+    "executiveDashboard": "Tableau de bord exécutif",
+    "reports": "Rapports",
+    "fairness": "Équité",
+    "auditTrail": "Piste d'audit",
+    "notifications": "Notifications",
+    "billing": "Facturation",
+    "settings": "Paramètres",
+    "helpInstructions": "Aide & Instructions",
+    "myCareer": "Ma carrière",
+    "myIncrements": "Mes augmentations",
+    "evaluations": "Évaluations",
+    "signOut": "Se déconnecter"
+  },
+  "topNav": {
+    "notifications": "Notifications",
+    "markAllRead": "Tout marquer comme lu",
+    "markRead": "Marquer comme lu",
+    "viewAllNotifications": "Voir toutes les notifications",
+    "noNotificationsYet": "Aucune notification pour l'instant",
+    "pageTitles": {
+      "superAdminDashboard": "Tableau de bord Super Admin",
+      "hrAdminDashboard": "Tableau de bord Admin RH",
+      "managerDashboard": "Tableau de bord Manager",
+      "employeeDashboard": "Tableau de bord Employé",
+      "inviteTracker": "Suivi des invitations",
+      "pendingApprovals": "Approbations en attente",
+      "generalSettings": "Paramètres généraux",
+      "registrationSettings": "Paramètres d'inscription",
+      "notificationSettings": "Paramètres de notification",
+      "securitySettings": "Paramètres de sécurité",
+      "dataPrivacy": "Données & Confidentialité",
+      "profileSettings": "Paramètres du profil",
+      "settings": "Paramètres",
+      "employeeDirectory": "Répertoire des employés",
+      "departments": "Départements",
+      "salaryBands": "Grilles salariales",
+      "people": "Personnes",
+      "cycles": "Cycles",
+      "reports": "Rapports",
+      "analytics": "Analyses",
+      "fairnessDashboard": "Tableau de bord Équité",
+      "scoreReview": "Révision des scores",
+      "evaluations": "Évaluations",
+      "notifications": "Notifications",
+      "myCareer": "Ma carrière",
+      "myIncrements": "Mes augmentations",
+      "dashboard": "Tableau de bord"
+    }
+  },
+  "help": {
+    "pageTitle": "Aide & Instructions MeritCyc",
+    "pageSubtitle": "Apprenez à utiliser les fonctionnalités d'administration de MeritCyc pour gérer les cycles de mérite, les évaluations et les décisions de paie.",
+    "howToUse": "Comment utiliser :",
+    "quickTips": "Conseils pour réussir",
+    "notFound": "Vous ne trouvez pas ce que vous cherchez ? Contactez votre administrateur système ou l'équipe d'assistance.",
+    "features": {
+      "cycles": {
+        "title": "Gérer les cycles d'augmentation",
+        "description": "Créez et gérez des cycles d'augmentation de mérite avec des budgets et des critères d'évaluation.",
+        "steps": [
+          "Accédez à « Cycles » dans le menu principal",
+          "Cliquez sur le bouton « Créer un nouveau cycle »",
+          "Remplissez les informations de base du cycle (nom, exercice fiscal, dates)",
+          "Définissez le périmètre (départements, grilles salariales)",
+          "Définissez l'allocation budgétaire et les contraintes",
+          "Configurez les critères d'évaluation et les modèles de notation",
+          "Examinez et finalisez le cycle",
+          "Les managers peuvent désormais évaluer les employés dans ce cycle"
+        ]
+      },
+      "evaluations": {
+        "title": "Gérer les évaluations & la notation",
+        "description": "Examinez et finalisez les évaluations des managers avec des remplacements de scores et des pistes d'audit.",
+        "steps": [
+          "Allez dans « Évaluations » > « Réviser les scores »",
+          "Sélectionnez un cycle à examiner",
+          "Consultez les évaluations et scores soumis par les managers",
+          "Utilisez le panneau « Remplacer le score » pour ajuster les scores avec justification si nécessaire",
+          "Ajoutez des notes d'audit expliquant les modifications",
+          "Examinez toutes les évaluations pour la cohérence",
+          "Une fois terminé, cliquez sur « Finaliser le cycle » pour verrouiller les évaluations",
+          "Générez des rapports pour l'intégration à la paie"
+        ]
+      },
+      "budget": {
+        "title": "Simulation et planification budgétaire",
+        "description": "Exécutez des scénarios hypothétiques pour modéliser l'impact budgétaire avant de finaliser les augmentations.",
+        "steps": [
+          "Ouvrez un cycle et accédez à « Simuler le budget »",
+          "Consultez la distribution actuelle des évaluations",
+          "Ajustez les curseurs pour modéliser différents scénarios :",
+          "  - Seuil de score (score minimum pour recevoir une augmentation)",
+          "  - Plafond budgétaire (pourcentage d'augmentation maximum)",
+          "  - Remplacements par département",
+          "Consultez l'impact en temps réel sur la distribution des employés et les dépenses totales",
+          "Appliquez le scénario approuvé au cycle",
+          "Comparez les scénarios côte à côte pour l'analyse"
+        ]
+      },
+      "people": {
+        "title": "Gérer les personnes & l'organisation",
+        "description": "Gérez les dossiers des employés, les départements, les grilles salariales et les attributions de rôles.",
+        "steps": [
+          "Accédez au menu « Personnes » pour gérer :",
+          "  - Répertoire des employés : Voir tous les employés, ajouter de nouveaux employés",
+          "  - Départements : Créer et configurer des départements",
+          "  - Grilles salariales : Définir les niveaux et plages de rémunération",
+          "  - Invitations : Envoyer des liens d'inscription aux nouveaux admins/managers",
+          "Pour chaque employé, consultez :",
+          "  - Onglet Aperçu : Informations de base et rôle actuel",
+          "  - Historique des augmentations : Cycles passés et résultats",
+          "  - Activité : Modifications et événements récents",
+          "Utilisez les filtres pour trouver des employés ou groupes spécifiques",
+          "Exportez les données des employés pour les systèmes externes"
+        ]
+      },
+      "analytics": {
+        "title": "Analyses & rapports d'équité",
+        "description": "Analysez l'équité salariale, les tendances de distribution et les performances par département.",
+        "steps": [
+          "Accédez à « Analyses » pour des informations complètes :",
+          "  - Tableau de bord exécutif : Indicateurs et tendances de haut niveau",
+          "  - Analyses par département : Performance par département",
+          "  - Comparaison année après année : Analyse des tendances sur les cycles",
+          "Accédez à « Équité » pour examiner l'équité salariale :",
+          "  - Analyse de l'écart salarial entre hommes et femmes",
+          "  - Comparaison par département",
+          "  - Scores de cohérence des managers",
+          "  - Exporter des rapports PDF pour la gouvernance",
+          "Utilisez la « Piste d'audit » pour suivre toutes les modifications du système",
+          "Filtrez par date, type d'action et utilisateur pour la conformité"
+        ]
+      },
+      "settings": {
+        "title": "Configurer les paramètres",
+        "description": "Gérez les paramètres de l'entreprise, l'inscription, les notifications et la sécurité.",
+        "steps": [
+          "Allez dans « Paramètres » pour configurer :",
+          "  - Général : Nom de l'entreprise, fuseau horaire, règles métier",
+          "  - Inscription : Options d'auto-inscription pour les employés",
+          "  - Notifications : Modèles d'e-mail et règles de notification",
+          "  - Sécurité : Politiques de mot de passe, délais d'expiration de session",
+          "  - Confidentialité des données : Conservation et paramètres d'export des données",
+          "Générez un export de données (ZIP) pour la sauvegarde ou la conformité",
+          "Gérez les destinataires de notifications et les plannings",
+          "Configurez des règles métier personnalisées pour votre organisation"
+        ]
+      },
+      "approvals": {
+        "title": "Approuver les nouvelles inscriptions",
+        "description": "Examinez et approuvez les inscriptions en attente des employés et managers.",
+        "steps": [
+          "Allez dans « Approbations RH » pour voir les inscriptions en attente",
+          "Examinez les informations du candidat :",
+          "  - Nom, e-mail, département",
+          "  - Rôle demandé et attribution du manager",
+          "  - Détails de l'inscription",
+          "Pour chaque candidat :",
+          "  - Cliquez sur « Approuver » pour confirmer l'inscription",
+          "  - Ou « Demander des infos » pour demander plus de détails",
+          "  - Ou « Rejeter » si non autorisé",
+          "Actions groupées : Sélectionnez plusieurs pour approuver/rejeter en une fois",
+          "Suivez l'historique et le calendrier des approbations"
+        ]
+      }
+    },
+    "tips": {
+      "planAhead": "<strong>Planifiez à l'avance :</strong> Créez des cycles avec suffisamment de temps pour que les managers puissent compléter les évaluations.",
+      "useSimulations": "<strong>Utilisez les simulations :</strong> Exécutez toujours des scénarios budgétaires avant de finaliser pour comprendre l'impact financier.",
+      "reviewFairness": "<strong>Vérifiez l'équité :</strong> Consultez les rapports d'équité salariale avant la paie pour assurer la conformité.",
+      "trackAuditTrail": "<strong>Suivez la piste d'audit :</strong> Utilisez les journaux d'audit pour la conformité et pour comprendre les décisions historiques.",
+      "communicateClearly": "<strong>Communiquez clairement :</strong> Assurez-vous que les managers comprennent les critères d'évaluation avant le début du cycle."
+    }
+  },
+  "cycles": {
+    "title": "Cycles d'augmentation",
+    "subtitle": "Gérez les cycles d'évaluation des augmentations salariales",
+    "newCycle": "Nouveau cycle",
+    "stats": {
+      "activeCycles": "Cycles actifs",
+      "draftCycles": "Cycles brouillon",
+      "completedCycles": "Cycles terminés",
+      "employeesCovered": "Employés couverts"
+    },
+    "tabs": {
+      "all": "Tous",
+      "draft": "Brouillon",
+      "active": "Actif",
+      "locked": "Verrouillé",
+      "completed": "Terminé",
+      "cancelled": "Annulé"
+    },
+    "card": {
+      "employeesInScope": "employés dans le périmètre",
+      "fixedPool": "Enveloppe fixe",
+      "percentageBased": "Basé sur un pourcentage",
+      "criteria": "critères",
+      "criteriaWeight": "Pondération des critères"
+    },
+    "empty": {
+      "noCyclesYet": "Aucun cycle pour l'instant",
+      "noCyclesWithStatus": "Aucun cycle {{status}}",
+      "createFirstCycle": "Créez votre premier cycle d'augmentation pour commencer.",
+      "noStatusCycles": "Aucun cycle avec le statut « {{status}} » trouvé.",
+      "createFirstButton": "Créez votre premier cycle d'augmentation"
+    },
+    "error": {
+      "unableToLoad": "Impossible de charger les cycles",
+      "permissionError": "Vous n'avez pas la permission de voir les cycles. Votre compte est peut-être encore en cours de synchronisation — essayez de vous déconnecter et de vous reconnecter. Si le problème persiste, contactez votre administrateur.",
+      "failedToLoad": "Échec du chargement des cycles. Veuillez réessayer."
+    }
+  },
+  "people": {
+    "title": "Répertoire des employés",
+    "subtitle": "Gérez tous les membres du personnel de l'organisation.",
+    "stats": {
+      "totalEmployees": "Total des employés",
+      "active": "Actifs",
+      "inactive": "Inactifs",
+      "pending": "En attente"
+    },
+    "search": {
+      "placeholder": "Rechercher par nom ou e-mail...",
+      "allDepartments": "Tous les départements",
+      "allRoles": "Tous les rôles",
+      "allStatuses": "Tous les statuts",
+      "clearFilters": "Effacer les filtres"
+    },
+    "table": {
+      "employee": "Employé",
+      "department": "Département",
+      "role": "Rôle",
+      "band": "Grille",
+      "status": "Statut",
+      "joined": "Rejoint",
+      "actions": "Actions",
+      "unassigned": "Non assigné",
+      "view": "Voir",
+      "noEmployeesFound": "Aucun employé trouvé",
+      "adjustFilters": "Essayez d'ajuster vos filtres.",
+      "pageOf": "Page {{page}} sur {{total}}",
+      "totalRows": "({{count}} lignes au total)"
+    },
+    "roles": {
+      "super_admin": "Super Administrateur",
+      "hr_admin": "Admin RH",
+      "manager": "Manager",
+      "employee": "Employé"
+    },
+    "status": {
+      "active": "Actif",
+      "inactive": "Inactif",
+      "pending": "En attente"
+    },
+    "panel": {
+      "title": "Profil de l'employé",
+      "jobTitle": "Intitulé du poste",
+      "department": "Département",
+      "salaryBand": "Grille salariale",
+      "systemRole": "Rôle système",
+      "noneAssigned": "Non assigné",
+      "roleChangeWarning": "La modification du rôle met à jour l'accès système immédiatement.",
+      "saveChanges": "Enregistrer les modifications",
+      "dangerZone": "Zone dangereuse",
+      "deactivateAccount": "Désactiver le compte",
+      "reactivateAccount": "Réactiver le compte",
+      "deactivateDescription": "Révoque immédiatement l'accès à la plateforme.",
+      "reactivateDescription": "Restaure l'accès à la plateforme pour cet utilisateur.",
+      "deactivate": "Désactiver",
+      "reactivate": "Réactiver"
+    },
+    "modal": {
+      "deactivateTitle": "Désactiver l'employé",
+      "reactivateTitle": "Réactiver l'employé",
+      "deactivateConfirm": "Êtes-vous sûr de vouloir désactiver <strong>{{name}}</strong> ? Ils perdront immédiatement l'accès à la plateforme.",
+      "reactivateConfirm": "Êtes-vous sûr de vouloir réactiver <strong>{{name}}</strong> ? Ils pourront se connecter à nouveau.",
+      "cancel": "Annuler",
+      "confirmDeactivate": "Confirmer la désactivation",
+      "confirmReactivate": "Confirmer la réactivation"
+    }
+  },
+  "common": {
+    "loading": "Chargement...",
+    "viewArrow": "Voir →"
+  }
+}

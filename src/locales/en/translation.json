@@ -1,0 +1,300 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "people": "People",
+    "employeeDirectory": "Employee Directory",
+    "departments": "Departments",
+    "salaryBands": "Salary Bands",
+    "pendingApprovals": "Pending Approvals",
+    "inviteTracker": "Invite Tracker",
+    "cycles": "Cycles",
+    "allCycles": "All Cycles",
+    "scoreReview": "Score Review",
+    "careerPaths": "Career Paths",
+    "analytics": "Analytics",
+    "executiveDashboard": "Executive Dashboard",
+    "reports": "Reports",
+    "fairness": "Fairness",
+    "auditTrail": "Audit Trail",
+    "notifications": "Notifications",
+    "billing": "Billing",
+    "settings": "Settings",
+    "helpInstructions": "Help & Instructions",
+    "myCareer": "My Career",
+    "myIncrements": "My Increments",
+    "evaluations": "Evaluations",
+    "signOut": "Sign Out"
+  },
+  "topNav": {
+    "notifications": "Notifications",
+    "markAllRead": "Mark All Read",
+    "markRead": "Mark Read",
+    "viewAllNotifications": "View All Notifications",
+    "noNotificationsYet": "No notifications yet",
+    "pageTitles": {
+      "superAdminDashboard": "Super Admin Dashboard",
+      "hrAdminDashboard": "HR Admin Dashboard",
+      "managerDashboard": "Manager Dashboard",
+      "employeeDashboard": "Employee Dashboard",
+      "inviteTracker": "Invite Tracker",
+      "pendingApprovals": "Pending Approvals",
+      "generalSettings": "General Settings",
+      "registrationSettings": "Registration Settings",
+      "notificationSettings": "Notification Settings",
+      "securitySettings": "Security Settings",
+      "dataPrivacy": "Data & Privacy",
+      "profileSettings": "Profile Settings",
+      "settings": "Settings",
+      "employeeDirectory": "Employee Directory",
+      "departments": "Departments",
+      "salaryBands": "Salary Bands",
+      "people": "People",
+      "cycles": "Cycles",
+      "reports": "Reports",
+      "analytics": "Analytics",
+      "fairnessDashboard": "Fairness Dashboard",
+      "scoreReview": "Score Review",
+      "evaluations": "Evaluations",
+      "notifications": "Notifications",
+      "myCareer": "My Career",
+      "myIncrements": "My Increments",
+      "dashboard": "Dashboard"
+    }
+  },
+  "help": {
+    "pageTitle": "MeritCyc Help & Instructions",
+    "pageSubtitle": "Learn how to use MeritCyc's admin features to manage merit cycles, evaluations, and payroll decisions.",
+    "howToUse": "How to use:",
+    "quickTips": "Quick Tips for Success",
+    "notFound": "Can't find what you're looking for? Contact your system administrator or support team.",
+    "features": {
+      "cycles": {
+        "title": "Manage Increment Cycles",
+        "description": "Create and manage merit increment cycles with budgets and evaluation criteria.",
+        "steps": [
+          "Navigate to \"Cycles\" in the main menu",
+          "Click \"Create New Cycle\" button",
+          "Fill in basic cycle information (name, fiscal year, dates)",
+          "Define the scope (departments, salary bands)",
+          "Set budget allocation and constraints",
+          "Configure evaluation criteria and scoring templates",
+          "Review and finalize the cycle",
+          "Managers can now evaluate employees within this cycle"
+        ]
+      },
+      "evaluations": {
+        "title": "Manage Evaluations & Scoring",
+        "description": "Review and finalize manager evaluations with score overrides and audit trails.",
+        "steps": [
+          "Go to \"Evaluations\" > \"Review Scores\"",
+          "Select a cycle to review",
+          "View manager-submitted evaluations and scores",
+          "Use the \"Override Score\" panel to adjust scores with justification if needed",
+          "Add audit notes explaining any changes",
+          "Review all evaluations for consistency",
+          "Once complete, click \"Finalize Cycle\" to lock evaluations",
+          "Generate reports for payroll integration"
+        ]
+      },
+      "budget": {
+        "title": "Budget Simulation & Planning",
+        "description": "Run what-if scenarios to model budget impact before finalizing increments.",
+        "steps": [
+          "Open a cycle and navigate to \"Simulate Budget\"",
+          "View current evaluation distribution",
+          "Adjust sliders to model different scenarios:",
+          "  - Score threshold (minimum score to receive increment)",
+          "  - Budget cap (max percentage increase)",
+          "  - Department overrides",
+          "View real-time impact on employee distribution and total spend",
+          "Apply approved scenario to the cycle",
+          "Compare scenarios side-by-side for analysis"
+        ]
+      },
+      "people": {
+        "title": "Manage People & Organization",
+        "description": "Maintain employee records, departments, salary bands, and role assignments.",
+        "steps": [
+          "Access \"People\" menu to manage:",
+          "  - Employee Directory: View all employees, add new hires",
+          "  - Departments: Create and configure departments",
+          "  - Salary Bands: Define pay grades and ranges",
+          "  - Invites: Send registration links to new admins/managers",
+          "For each employee, view:",
+          "  - Overview tab: Basic info and current role",
+          "  - Increment History: Past cycles and outcomes",
+          "  - Activity: Recent changes and events",
+          "Use filters to find specific employees or groups",
+          "Export employee data for external systems"
+        ]
+      },
+      "analytics": {
+        "title": "Analytics & Fairness Reports",
+        "description": "Analyze pay equity, distribution trends, and department performance.",
+        "steps": [
+          "Navigate to \"Analytics\" for comprehensive insights:",
+          "  - Executive Dashboard: High-level metrics and trends",
+          "  - Department Analytics: Performance by department",
+          "  - Year-over-Year Comparison: Trend analysis across cycles",
+          "Access \"Fairness\" to review pay equity:",
+          "  - Gender pay gap analysis",
+          "  - Department comparison",
+          "  - Manager consistency scores",
+          "  - Export PDF reports for governance",
+          "Use \"Audit Trail\" to track all system changes",
+          "Filter by date, action type, and user for compliance"
+        ]
+      },
+      "settings": {
+        "title": "Configure Settings",
+        "description": "Manage company settings, registration, notifications, and security.",
+        "steps": [
+          "Go to \"Settings\" to configure:",
+          "  - General: Company name, timezone, business rules",
+          "  - Registration: Self-registration options for employees",
+          "  - Notifications: Email templates and notification rules",
+          "  - Security: Password policies, session timeouts",
+          "  - Data Privacy: Data retention and export settings",
+          "Generate data export (ZIP) for backup or compliance",
+          "Manage notification recipients and schedules",
+          "Configure custom business rules for your organization"
+        ]
+      },
+      "approvals": {
+        "title": "Approve New Registrations",
+        "description": "Review and approve pending employee and manager registrations.",
+        "steps": [
+          "Go to \"HR Approvals\" to see pending registrations",
+          "Review applicant information:",
+          "  - Name, email, department",
+          "  - Requested role and manager assignment",
+          "  - Registration details",
+          "For each applicant:",
+          "  - Click \"Approve\" to confirm registration",
+          "  - Or \"Request Info\" to ask for more details",
+          "  - Or \"Reject\" if not authorized",
+          "Bulk actions: Select multiple to approve/reject at once",
+          "Track approval history and timeline"
+        ]
+      }
+    },
+    "tips": {
+      "planAhead": "<strong>Plan ahead:</strong> Create cycles with sufficient lead time for managers to complete evaluations.",
+      "useSimulations": "<strong>Use simulations:</strong> Always run budget scenarios before finalizing to understand financial impact.",
+      "reviewFairness": "<strong>Review fairness:</strong> Check pay equity reports before payroll to ensure compliance.",
+      "trackAuditTrail": "<strong>Track audit trail:</strong> Use audit logs for compliance and to understand historical decisions.",
+      "communicateClearly": "<strong>Communicate clearly:</strong> Ensure managers understand evaluation criteria before the cycle starts."
+    }
+  },
+  "cycles": {
+    "title": "Increment Cycles",
+    "subtitle": "Manage salary increment evaluation cycles",
+    "newCycle": "New Cycle",
+    "stats": {
+      "activeCycles": "Active Cycles",
+      "draftCycles": "Draft Cycles",
+      "completedCycles": "Completed Cycles",
+      "employeesCovered": "Employees Covered"
+    },
+    "tabs": {
+      "all": "All",
+      "draft": "Draft",
+      "active": "Active",
+      "locked": "Locked",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "card": {
+      "employeesInScope": "employees in scope",
+      "fixedPool": "Fixed Pool",
+      "percentageBased": "Percentage Based",
+      "criteria": "criteria",
+      "criteriaWeight": "Criteria weight"
+    },
+    "empty": {
+      "noCyclesYet": "No cycles yet",
+      "noCyclesWithStatus": "No {{status}} cycles",
+      "createFirstCycle": "Create your first increment cycle to get started.",
+      "noStatusCycles": "No cycles with status \"{{status}}\" found.",
+      "createFirstButton": "Create your first increment cycle"
+    },
+    "error": {
+      "unableToLoad": "Unable to load cycles",
+      "permissionError": "You don't have permission to view cycles. Your account may still be syncing — try signing out and back in. If this persists, contact your administrator.",
+      "failedToLoad": "Failed to load cycles. Please try again."
+    }
+  },
+  "people": {
+    "title": "Employee Directory",
+    "subtitle": "Manage all staff members across the organization.",
+    "stats": {
+      "totalEmployees": "Total Employees",
+      "active": "Active",
+      "inactive": "Inactive",
+      "pending": "Pending"
+    },
+    "search": {
+      "placeholder": "Search name or email...",
+      "allDepartments": "All Departments",
+      "allRoles": "All Roles",
+      "allStatuses": "All Statuses",
+      "clearFilters": "Clear filters"
+    },
+    "table": {
+      "employee": "Employee",
+      "department": "Department",
+      "role": "Role",
+      "band": "Band",
+      "status": "Status",
+      "joined": "Joined",
+      "actions": "Actions",
+      "unassigned": "Unassigned",
+      "view": "View",
+      "noEmployeesFound": "No employees found",
+      "adjustFilters": "Try adjusting your filters.",
+      "pageOf": "Page {{page}} of {{total}}",
+      "totalRows": "({{count}} total rows)"
+    },
+    "roles": {
+      "super_admin": "Super Admin",
+      "hr_admin": "HR Admin",
+      "manager": "Manager",
+      "employee": "Employee"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "pending": "Pending"
+    },
+    "panel": {
+      "title": "Employee Profile",
+      "jobTitle": "Job Title",
+      "department": "Department",
+      "salaryBand": "Salary Band",
+      "systemRole": "System Role",
+      "noneAssigned": "None Assigned",
+      "roleChangeWarning": "Changing role updates system access immediately.",
+      "saveChanges": "Save Changes",
+      "dangerZone": "Danger Zone",
+      "deactivateAccount": "Deactivate Account",
+      "reactivateAccount": "Reactivate Account",
+      "deactivateDescription": "Revokes access to the platform immediately.",
+      "reactivateDescription": "Restores platform access for this user.",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate"
+    },
+    "modal": {
+      "deactivateTitle": "Deactivate Employee",
+      "reactivateTitle": "Reactivate Employee",
+      "deactivateConfirm": "Are you sure you want to deactivate <strong>{{name}}</strong>? They will immediately lose access to the platform.",
+      "reactivateConfirm": "Are you sure you want to reactivate <strong>{{name}}</strong>? They will be able to log in again.",
+      "cancel": "Cancel",
+      "confirmDeactivate": "Confirm deactivate",
+      "confirmReactivate": "Confirm reactivate"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "viewArrow": "View →"
+  }
+}

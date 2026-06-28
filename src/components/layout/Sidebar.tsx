@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { db } from "../../config/firebase";
 import { collection, query, where, onSnapshot, doc } from "firebase/firestore";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Users,
@@ -44,7 +45,7 @@ const SidebarLogo: React.FC = () => {
 
 // --- Navigation Config ---
 interface NavItem {
-  name: string;
+  nameKey: string;
   href: string;
   icon: React.ElementType;
   exact?: boolean;
@@ -62,99 +63,99 @@ const getNavItems = (role?: RoleCode): NavItem[] => {
   switch (role) {
     case "super_admin":
       return [
-        { name: "Dashboard", href: "/dashboard/super-admin", icon: LayoutDashboard },
+        { nameKey: "nav.dashboard", href: "/dashboard/super-admin", icon: LayoutDashboard },
         {
-          name: "People",
+          nameKey: "nav.people",
           href: "/people",
           icon: Users,
           subItems: [
-            { name: "Employee Directory", href: "/people/directory", icon: Users },
-            { name: "Departments", href: "/people/departments", icon: Users },
-            { name: "Salary Bands", href: "/people/salary-bands", icon: Users },
-            { name: "Pending Approvals", href: "/hr/people/approvals", icon: Users, isBadge: true },
-            { name: "Invite Tracker", href: "/invites", icon: Users },
+            { nameKey: "nav.employeeDirectory", href: "/people/directory", icon: Users },
+            { nameKey: "nav.departments", href: "/people/departments", icon: Users },
+            { nameKey: "nav.salaryBands", href: "/people/salary-bands", icon: Users },
+            { nameKey: "nav.pendingApprovals", href: "/hr/people/approvals", icon: Users, isBadge: true },
+            { nameKey: "nav.inviteTracker", href: "/invites", icon: Users },
           ],
         },
         {
-          name: "Cycles",
+          nameKey: "nav.cycles",
           href: "/cycles",
           icon: RefreshCw,
           subItems: [
-            { name: "All Cycles", href: "/cycles", icon: RefreshCw, exact: true },
-            { name: "Score Review", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
+            { nameKey: "nav.allCycles", href: "/cycles", icon: RefreshCw, exact: true },
+            { nameKey: "nav.scoreReview", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
           ]
         },
-        { name: "Career Paths", href: "/career-paths", icon: TrendingUp },
+        { nameKey: "nav.careerPaths", href: "/career-paths", icon: TrendingUp },
         {
-          name: "Analytics",
+          nameKey: "nav.analytics",
           href: "/analytics",
           icon: BarChart2,
           subItems: [
-            { name: "Executive Dashboard", href: "/analytics", icon: BarChart2, exact: true },
-            { name: "Reports", href: "/analytics/reports", icon: BarChart2 },
-            { name: "Fairness", href: "/fairness", icon: Scale, isFairnessBadge: true },
-            { name: "Audit Trail", href: "/audit-trail", icon: ShieldCheck },
+            { nameKey: "nav.executiveDashboard", href: "/analytics", icon: BarChart2, exact: true },
+            { nameKey: "nav.reports", href: "/analytics/reports", icon: BarChart2 },
+            { nameKey: "nav.fairness", href: "/fairness", icon: Scale, isFairnessBadge: true },
+            { nameKey: "nav.auditTrail", href: "/audit-trail", icon: ShieldCheck },
           ],
         },
-        { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
-        { name: "Billing", href: "/billing", icon: CreditCard },
-        { name: "Settings", href: "/settings/general", icon: Settings },
-        { name: "Help & Instructions", href: "/help/instructions", icon: BookOpen },
+        { nameKey: "nav.notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
+        { nameKey: "nav.billing", href: "/billing", icon: CreditCard },
+        { nameKey: "nav.settings", href: "/settings/general", icon: Settings },
+        { nameKey: "nav.helpInstructions", href: "/help/instructions", icon: BookOpen },
       ];
     case "hr_admin":
       return [
-        { name: "Dashboard", href: "/dashboard/hr-admin", icon: LayoutDashboard },
+        { nameKey: "nav.dashboard", href: "/dashboard/hr-admin", icon: LayoutDashboard },
         {
-          name: "People",
+          nameKey: "nav.people",
           href: "/people",
           icon: Users,
           subItems: [
-            { name: "Employee Directory", href: "/people/directory", icon: Users },
-            { name: "Departments", href: "/people/departments", icon: Users },
-            { name: "Salary Bands", href: "/people/salary-bands", icon: Users },
-            { name: "Pending Approvals", href: "/hr/people/approvals", icon: Users, isBadge: true },
-            { name: "Invite Tracker", href: "/invites", icon: Users },
+            { nameKey: "nav.employeeDirectory", href: "/people/directory", icon: Users },
+            { nameKey: "nav.departments", href: "/people/departments", icon: Users },
+            { nameKey: "nav.salaryBands", href: "/people/salary-bands", icon: Users },
+            { nameKey: "nav.pendingApprovals", href: "/hr/people/approvals", icon: Users, isBadge: true },
+            { nameKey: "nav.inviteTracker", href: "/invites", icon: Users },
           ],
         },
         {
-          name: "Cycles",
+          nameKey: "nav.cycles",
           href: "/cycles",
           icon: RefreshCw,
           subItems: [
-            { name: "All Cycles", href: "/cycles", icon: RefreshCw, exact: true },
-            { name: "Score Review", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
+            { nameKey: "nav.allCycles", href: "/cycles", icon: RefreshCw, exact: true },
+            { nameKey: "nav.scoreReview", href: "/evaluations/review", icon: CheckSquare, isReviewBadge: true },
           ]
         },
-        { name: "Career Paths", href: "/career-paths", icon: TrendingUp },
+        { nameKey: "nav.careerPaths", href: "/career-paths", icon: TrendingUp },
         {
-          name: "Analytics",
+          nameKey: "nav.analytics",
           href: "/analytics",
           icon: BarChart2,
           subItems: [
-            { name: "Executive Dashboard", href: "/analytics", icon: BarChart2, exact: true },
-            { name: "Reports", href: "/analytics/reports", icon: BarChart2 },
-            { name: "Fairness", href: "/fairness", icon: Scale, isFairnessBadge: true },
-            { name: "Audit Trail", href: "/audit-trail", icon: ShieldCheck },
+            { nameKey: "nav.executiveDashboard", href: "/analytics", icon: BarChart2, exact: true },
+            { nameKey: "nav.reports", href: "/analytics/reports", icon: BarChart2 },
+            { nameKey: "nav.fairness", href: "/fairness", icon: Scale, isFairnessBadge: true },
+            { nameKey: "nav.auditTrail", href: "/audit-trail", icon: ShieldCheck },
           ],
         },
-        { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
-        { name: "Settings", href: "/settings/notifications", icon: Settings },
-        { name: "Help & Instructions", href: "/help/instructions", icon: BookOpen },
+        { nameKey: "nav.notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
+        { nameKey: "nav.settings", href: "/settings/notifications", icon: Settings },
+        { nameKey: "nav.helpInstructions", href: "/help/instructions", icon: BookOpen },
       ];
     case "manager":
       return [
-        { name: "Dashboard", href: "/dashboard/manager", icon: LayoutDashboard },
-        { name: "Evaluations", href: "/evaluations", icon: ClipboardList, isEvalBadge: true },
-        { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
-        { name: "Settings", href: "/settings/profile", icon: Settings },
+        { nameKey: "nav.dashboard", href: "/dashboard/manager", icon: LayoutDashboard },
+        { nameKey: "nav.evaluations", href: "/evaluations", icon: ClipboardList, isEvalBadge: true },
+        { nameKey: "nav.notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
+        { nameKey: "nav.settings", href: "/settings/profile", icon: Settings },
       ];
     case "employee":
       return [
-        { name: "Dashboard", href: "/dashboard/employee", icon: LayoutDashboard },
-        { name: "My Career", href: "/career", icon: TrendingUp },
-        { name: "My Increments", href: "/increments", icon: DollarSign },
-        { name: "Notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
-        { name: "Settings", href: "/settings/profile", icon: Settings },
+        { nameKey: "nav.dashboard", href: "/dashboard/employee", icon: LayoutDashboard },
+        { nameKey: "nav.myCareer", href: "/career", icon: TrendingUp },
+        { nameKey: "nav.myIncrements", href: "/increments", icon: DollarSign },
+        { nameKey: "nav.notifications", href: "/notifications", icon: Bell, isNotificationBadge: true },
+        { nameKey: "nav.settings", href: "/settings/profile", icon: Settings },
       ];
     default:
       return [];
@@ -170,6 +171,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const { t } = useTranslation();
   const navItems = getNavItems(user?.role);
   const [pendingCount, setPendingCount] = useState(0);
   const [evalCount, setEvalCount] = useState(0);
@@ -263,7 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       <Link
         key={item.href}
         to={item.href}
-        onClick={() => setIsOpen(false)} // Close on mobile after click
+        onClick={() => setIsOpen(false)}
         className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${
           isSubItem ? "pl-11 text-sm" : "rounded-lg"
         } ${
@@ -273,7 +275,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
         }`}
       >
         {!isSubItem && <Icon className="w-5 h-5" />}
-        <span className="flex-1">{item.name}</span>
+        <span className="flex-1">{t(item.nameKey)}</span>
         {item.isBadge && pendingCount > 0 && (
           <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
             {pendingCount}
@@ -322,7 +324,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       {/* Navigation Links */}
       <nav className="flex-1 px-4 space-y-1">
         {navItems.map((item) => (
-          <div key={item.name}>
+          <div key={item.nameKey}>
             {renderNavItem(item)}
             {item.subItems && (
               <div className="mt-1 space-y-1">
@@ -353,7 +355,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Sign Out
+          {t("nav.signOut")}
         </button>
       </div>
     </div>

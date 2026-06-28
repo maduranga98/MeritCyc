@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import "./index.css";
+import "./i18n";
 import App from "./App.tsx";
 import { AuthProvider } from "./context/AuthContext";
 import ErrorBoundary from "./components/shared/ErrorBoundary";

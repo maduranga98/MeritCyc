@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { cycleService } from '../../services/cycleService';
 import { type Cycle, type CycleStatus } from '../../types/cycle';
+import { useTranslation } from 'react-i18next';
 import {
   Plus,
   Users,
@@ -19,6 +20,7 @@ import CreateCycleWizard from '../../components/cycles/CreateCycleWizard';
 // ---------------------------------------------------------------------------
 
 function StatusBadge({ status }: { status: CycleStatus }) {
+  const { t } = useTranslation();
   const map: Record<CycleStatus, string> = {
     draft: 'bg-slate-100 text-slate-600',
     active: 'bg-blue-100 text-blue-700',
@@ -29,7 +31,7 @@ function StatusBadge({ status }: { status: CycleStatus }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${map[status]}`}>
       {status === 'locked' && <Lock className="w-3 h-3" />}
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {t(`cycles.tabs.${status}`)}
     </span>
   );
 }
@@ -39,6 +41,7 @@ function StatusBadge({ status }: { status: CycleStatus }) {
 // ---------------------------------------------------------------------------
 
 function CycleCard({ cycle, onClick }: { cycle: Cycle; onClick: () => void }) {
+  const { t } = useTranslation();
   const criteriaCount = cycle.criteria?.length ?? 0;
   const totalWeight = cycle.totalWeight ?? 0;
   const criteriaComplete = criteriaCount > 0 && Math.round(totalWeight) === 100;
@@ -78,18 +81,18 @@ function CycleCard({ cycle, onClick }: { cycle: Cycle; onClick: () => void }) {
         </span>
         <span className="flex items-center gap-1.5">
           <Users className="w-4 h-4 text-slate-400" />
-          {cycle.employeeCount} employees in scope
+          {cycle.employeeCount} {t('cycles.card.employeesInScope')}
         </span>
       </div>
 
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
           <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
-            {cycle.budget?.type === 'fixed_pool' ? 'Fixed Pool' : 'Percentage Based'}
+            {cycle.budget?.type === 'fixed_pool' ? t('cycles.card.fixedPool') : t('cycles.card.percentageBased')}
           </span>
           {criteriaCount > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
-              {criteriaCount} criteria
+              {criteriaCount} {t('cycles.card.criteria')}
             </span>
           )}
         </div>
@@ -100,7 +103,7 @@ function CycleCard({ cycle, onClick }: { cycle: Cycle; onClick: () => void }) {
       {(cycle.status === 'active' || cycle.status === 'locked') && (
         <div className="mt-4 pt-4 border-t border-slate-100">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
-            <span>Criteria weight</span>
+            <span>{t('cycles.card.criteriaWeight')}</span>
             <span className={criteriaComplete ? 'text-emerald-600 font-semibold' : 'text-red-500'}>
               {totalWeight}%
             </span>
@@ -121,7 +124,7 @@ function CycleCard({ cycle, onClick }: { cycle: Cycle; onClick: () => void }) {
 // Stats Card
 // ---------------------------------------------------------------------------
 
-function StatCard({ label, value, color = 'slate' }: { label: string; value: number; color?: string }) {
+function StatCard({ label, value, color = 'slate' }: { label: string; value: number; color?: string; }) {
   const colorMap: Record<string, string> = {
     slate: 'text-slate-900',
     blue: 'text-blue-600',
@@ -145,6 +148,7 @@ const STATUS_TABS: (CycleStatus | 'all')[] = ['all', 'draft', 'active', 'locked'
 export default function CyclesList() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,8 +175,8 @@ export default function CyclesList() {
         const isPermission = err.message?.includes('permission');
         setError(
           isPermission
-            ? "You don't have permission to view cycles. Your account may still be syncing — try signing out and back in. If this persists, contact your administrator."
-            : 'Failed to load cycles. Please try again.'
+            ? t('cycles.error.permissionError')
+            : t('cycles.error.failedToLoad')
         );
         setLoading(false);
       }
@@ -196,24 +200,24 @@ export default function CyclesList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Increment Cycles</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Manage salary increment evaluation cycles</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t('cycles.title')}</h1>
+          <p className="text-slate-500 text-sm mt-0.5">{t('cycles.subtitle')}</p>
         </div>
         <button
           onClick={() => setShowWizard(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
         >
           <Plus className="w-4 h-4" />
-          New Cycle
+          {t('cycles.newCycle')}
         </button>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Active Cycles" value={activeLocked} color="blue" />
-        <StatCard label="Draft Cycles" value={drafts} color="slate" />
-        <StatCard label="Completed Cycles" value={completed} color="gray" />
-        <StatCard label="Employees Covered" value={totalEmployees} color="emerald" />
+        <StatCard label={t('cycles.stats.activeCycles')} value={activeLocked} color="blue" />
+        <StatCard label={t('cycles.stats.draftCycles')} value={drafts} color="slate" />
+        <StatCard label={t('cycles.stats.completedCycles')} value={completed} color="gray" />
+        <StatCard label={t('cycles.stats.employeesCovered')} value={totalEmployees} color="emerald" />
       </div>
 
       {/* Status filter tabs */}
@@ -228,7 +232,7 @@ export default function CyclesList() {
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            {tab === 'all' ? 'All' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {t(`cycles.tabs.${tab}`)}
             <span className={`ml-1.5 text-xs ${activeTab === tab ? 'opacity-70' : 'text-slate-400'}`}>
               {tab === 'all' ? cycles.length : cycles.filter((c) => c.status === tab).length}
             </span>
@@ -239,7 +243,7 @@ export default function CyclesList() {
       {/* Error */}
       {!loading && error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-          <p className="text-sm font-semibold text-red-700 mb-1">Unable to load cycles</p>
+          <p className="text-sm font-semibold text-red-700 mb-1">{t('cycles.error.unableToLoad')}</p>
           <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
@@ -258,12 +262,12 @@ export default function CyclesList() {
             <ClipboardList className="w-7 h-7 text-slate-400" />
           </div>
           <h3 className="text-lg font-semibold text-slate-900 mb-2">
-            {activeTab === 'all' ? 'No cycles yet' : `No ${activeTab} cycles`}
+            {activeTab === 'all' ? t('cycles.empty.noCyclesYet') : t('cycles.empty.noCyclesWithStatus', { status: t(`cycles.tabs.${activeTab}`) })}
           </h3>
           <p className="text-slate-500 text-sm mb-6">
             {activeTab === 'all'
-              ? 'Create your first increment cycle to get started.'
-              : `No cycles with status "${activeTab}" found.`}
+              ? t('cycles.empty.createFirstCycle')
+              : t('cycles.empty.noStatusCycles', { status: t(`cycles.tabs.${activeTab}`) })}
           </p>
           {activeTab === 'all' && (
             <button
@@ -271,7 +275,7 @@ export default function CyclesList() {
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Create your first increment cycle
+              {t('cycles.empty.createFirstButton')}
             </button>
           )}
         </div>

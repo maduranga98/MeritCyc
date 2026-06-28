@@ -1,18 +1,18 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Menu, Bell, UserCheck, AlertCircle, Clock, Lock, ClipboardList, CheckCircle2, Star } from "lucide-react";
+import { Menu, Bell, UserCheck, AlertCircle, Clock, Lock, ClipboardList, CheckCircle2, Star, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNotificationStore } from "../../stores/notificationStore";
 import { markNotificationRead, markAllNotificationsRead } from "../../services/notificationService";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { type NotificationType } from "../../types/incrementStory";
+import { useTranslation } from "react-i18next";
 
 interface TopNavProps {
   setSidebarOpen: (isOpen: boolean) => void;
 }
 
-// Simple helper to convert paths to readable titles
 const getNotificationIcon = (type: NotificationType) => {
   switch (type) {
     case 'cycle_locked': return <Lock className="w-5 h-5 text-emerald-500" />;
@@ -27,51 +27,56 @@ const getNotificationIcon = (type: NotificationType) => {
   }
 };
 
-const getPageTitle = (pathname: string): string => {
-  if (pathname.startsWith("/dashboard/super-admin")) return "Super Admin Dashboard";
-  if (pathname.startsWith("/dashboard/hr-admin")) return "HR Admin Dashboard";
-  if (pathname.startsWith("/dashboard/manager")) return "Manager Dashboard";
-  if (pathname.startsWith("/dashboard/employee")) return "Employee Dashboard";
-  if (pathname.startsWith("/invites")) return "Invite Tracker";
-  if (pathname.startsWith("/hr/people/approvals")) return "Pending Approvals";
-  if (pathname.startsWith("/settings/general")) return "General Settings";
-  if (pathname.startsWith("/settings/registration")) return "Registration Settings";
-  if (pathname.startsWith("/settings/notifications")) return "Notification Settings";
-  if (pathname.startsWith("/settings/security")) return "Security Settings";
-  if (pathname.startsWith("/settings/data")) return "Data & Privacy";
-  if (pathname.startsWith("/settings/profile")) return "Profile Settings";
-  if (pathname.startsWith("/settings")) return "Settings";
-  if (pathname.startsWith("/people/directory")) return "Employee Directory";
-  if (pathname.startsWith("/people/departments")) return "Departments";
-  if (pathname.startsWith("/people/salary-bands")) return "Salary Bands";
-  if (pathname.startsWith("/people")) return "People";
-  if (pathname.startsWith("/cycles")) return "Cycles";
-  if (pathname.startsWith("/analytics/reports")) return "Reports";
-  if (pathname.startsWith("/analytics")) return "Analytics";
-  if (pathname.startsWith("/fairness")) return "Fairness Dashboard";
-  if (pathname.startsWith("/evaluations/review")) return "Score Review";
-  if (pathname.startsWith("/evaluations")) return "Evaluations";
-  if (pathname.startsWith("/notifications")) return "Notifications";
-  if (pathname.startsWith("/career")) return "My Career";
-  if (pathname.startsWith("/increments")) return "My Increments";
-
-  return "Dashboard";
-};
-
 export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
   const location = useLocation();
   const { user } = useAuth();
+  const { t, i18n } = useTranslation();
+
+  const getPageTitle = (pathname: string): string => {
+    if (pathname.startsWith("/dashboard/super-admin")) return t("topNav.pageTitles.superAdminDashboard");
+    if (pathname.startsWith("/dashboard/hr-admin")) return t("topNav.pageTitles.hrAdminDashboard");
+    if (pathname.startsWith("/dashboard/manager")) return t("topNav.pageTitles.managerDashboard");
+    if (pathname.startsWith("/dashboard/employee")) return t("topNav.pageTitles.employeeDashboard");
+    if (pathname.startsWith("/invites")) return t("topNav.pageTitles.inviteTracker");
+    if (pathname.startsWith("/hr/people/approvals")) return t("topNav.pageTitles.pendingApprovals");
+    if (pathname.startsWith("/settings/general")) return t("topNav.pageTitles.generalSettings");
+    if (pathname.startsWith("/settings/registration")) return t("topNav.pageTitles.registrationSettings");
+    if (pathname.startsWith("/settings/notifications")) return t("topNav.pageTitles.notificationSettings");
+    if (pathname.startsWith("/settings/security")) return t("topNav.pageTitles.securitySettings");
+    if (pathname.startsWith("/settings/data")) return t("topNav.pageTitles.dataPrivacy");
+    if (pathname.startsWith("/settings/profile")) return t("topNav.pageTitles.profileSettings");
+    if (pathname.startsWith("/settings")) return t("topNav.pageTitles.settings");
+    if (pathname.startsWith("/people/directory")) return t("topNav.pageTitles.employeeDirectory");
+    if (pathname.startsWith("/people/departments")) return t("topNav.pageTitles.departments");
+    if (pathname.startsWith("/people/salary-bands")) return t("topNav.pageTitles.salaryBands");
+    if (pathname.startsWith("/people")) return t("topNav.pageTitles.people");
+    if (pathname.startsWith("/cycles")) return t("topNav.pageTitles.cycles");
+    if (pathname.startsWith("/analytics/reports")) return t("topNav.pageTitles.reports");
+    if (pathname.startsWith("/analytics")) return t("topNav.pageTitles.analytics");
+    if (pathname.startsWith("/fairness")) return t("topNav.pageTitles.fairnessDashboard");
+    if (pathname.startsWith("/evaluations/review")) return t("topNav.pageTitles.scoreReview");
+    if (pathname.startsWith("/evaluations")) return t("topNav.pageTitles.evaluations");
+    if (pathname.startsWith("/notifications")) return t("topNav.pageTitles.notifications");
+    if (pathname.startsWith("/career")) return t("topNav.pageTitles.myCareer");
+    if (pathname.startsWith("/increments")) return t("topNav.pageTitles.myIncrements");
+    return t("topNav.pageTitles.dashboard");
+  };
+
   const pageTitle = getPageTitle(location.pathname);
 
   const { notifications, unreadCount } = useNotificationStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const langMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (langMenuRef.current && !langMenuRef.current.contains(event.target as Node)) {
+        setLangMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -87,6 +92,14 @@ export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
   const handleMarkAllRead = async () => {
     await markAllNotificationsRead();
   };
+
+  const changeLanguage = (lang: string) => {
+    i18n.changeLanguage(lang);
+    localStorage.setItem('meritcyc-lang', lang);
+    setLangMenuOpen(false);
+  };
+
+  const currentLang = i18n.language === 'fr' ? 'FR' : 'EN';
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30">
@@ -105,6 +118,45 @@ export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Language Switcher */}
+        <div className="relative" ref={langMenuRef}>
+          <button
+            onClick={() => setLangMenuOpen(!langMenuOpen)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
+          >
+            <Globe className="w-4 h-4" />
+            {currentLang}
+          </button>
+          <AnimatePresence>
+            {langMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 mt-1 w-28 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden z-50"
+              >
+                {[
+                  { code: 'en', label: 'English' },
+                  { code: 'fr', label: 'Français' },
+                ].map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => changeLanguage(lang.code)}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                      i18n.language === lang.code
+                        ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {lang.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Notifications */}
         <div className="relative" ref={dropdownRef}>
           <button
@@ -138,13 +190,13 @@ export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
                 className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-50"
               >
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                  <h3 className="font-bold text-merit-navy">Notifications</h3>
+                  <h3 className="font-bold text-merit-navy">{t("topNav.notifications")}</h3>
                   {unreadCount > 0 && (
                     <button
                       onClick={handleMarkAllRead}
                       className="text-xs text-merit-emerald font-semibold hover:underline"
                     >
-                      Mark All Read
+                      {t("topNav.markAllRead")}
                     </button>
                   )}
                 </div>
@@ -153,7 +205,7 @@ export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
                   {notifications.length === 0 ? (
                     <div className="p-6 text-center text-slate-500 text-sm">
                       <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                      No notifications yet
+                      {t("topNav.noNotificationsYet")}
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100">
@@ -187,7 +239,7 @@ export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
                                     onClick={() => setDropdownOpen(false)}
                                     className="text-xs text-merit-emerald font-medium hover:underline"
                                   >
-                                    View →
+                                    {t("common.viewArrow")}
                                   </Link>
                                 )}
                                 {!notif.isRead && (
@@ -195,7 +247,7 @@ export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
                                     onClick={(e) => handleMarkRead(e, notif.id)}
                                     className="text-[10px] text-slate-400 hover:text-slate-600 ml-auto"
                                   >
-                                    Mark Read
+                                    {t("topNav.markRead")}
                                   </button>
                                 )}
                               </div>
@@ -216,7 +268,7 @@ export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
                     onClick={() => setDropdownOpen(false)}
                     className="text-sm text-merit-emerald font-medium hover:underline block"
                   >
-                    View All Notifications
+                    {t("topNav.viewAllNotifications")}
                   </Link>
                 </div>
               </motion.div>

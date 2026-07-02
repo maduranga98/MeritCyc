@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { auditService, type AuditFilters } from '../../services/auditService';
 import type { AuditLogEntry } from '../../types/audit';
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { Download, Filter, X, Copy, FileText } from 'lucide-react';
 
 const AuditTrail: React.FC = () => {
@@ -13,7 +14,7 @@ const AuditTrail: React.FC = () => {
   const [filters, setFilters] = useState<AuditFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [actorEmails, setActorEmails] = useState<string[]>([]);
-  const [pageParam, setPageParam] = useState<any>(null);
+  const [pageParam, setPageParam] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [allLogs, setAllLogs] = useState<AuditLogEntry[]>([]);
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
@@ -76,13 +77,14 @@ const AuditTrail: React.FC = () => {
     }
   };
 
-  const handleFilterChange = (key: keyof AuditFilters, value: any) => {
+  const handleFilterChange = (key: keyof AuditFilters, value: string | Date | null) => {
     setFilters((prev) => {
       if (value === null || value === '') {
-        const { [key]: _, ...rest } = prev;
+        const rest = { ...prev };
+        delete rest[key];
         return rest;
       }
-      return { ...prev, [key]: value };
+      return { ...prev, [key]: value } as AuditFilters;
     });
   };
 

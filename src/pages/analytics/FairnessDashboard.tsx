@@ -1,10 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { fairnessService } from "../../services/fairnessService";
 import { type FairnessReport } from "../../types/fairness";
-import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, getDocs, Timestamp } from "firebase/firestore";
+
+interface FairnessAuditLog {
+  id: string;
+  timestamp?: Timestamp | number;
+  actorEmail?: string;
+  actorRole?: string;
+  action?: string;
+  targetType?: string;
+  targetId?: string;
+}
+
+const auditLogMillis = (ts: Timestamp | number): number =>
+  typeof ts === "number" ? ts : ts.toMillis();
 import { db } from "../../config/firebase";
 import {
   RadialBarChart,
@@ -46,16 +59,11 @@ export default function FairnessDashboard() {
   const [showPayEquityModal, setShowPayEquityModal] = useState(false);
   const [selectedCycle, setSelectedCycle] = useState<string>("all");
   const [cycles, setCycles] = useState<{ id: string; name: string }[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<FairnessAuditLog[]>([]);
   const [companyName, setCompanyName] = useState<string>("Company");
 
-  useEffect(() => {
-    if (user?.companyId) {
-      fetchData();
-    }
-  }, [user]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       if (!user?.companyId) return;
@@ -73,7 +81,7 @@ export default function FairnessDashboard() {
       const logsSnap = await getDocs(
         query(collection(db, "auditLogs"), where("companyId", "==", user.companyId), orderBy("timestamp", "desc"), limit(20))
       );
-      setAuditLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setAuditLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() } as FairnessAuditLog)));
 
       try {
         const company = await companyService.getCompany(user.companyId);
@@ -87,7 +95,13 @@ export default function FairnessDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.companyId]);
+
+  useEffect(() => {
+    if (user?.companyId) {
+      fetchData();
+    }
+  }, [user?.companyId, fetchData]);
 
   const handleGenerateReport = async () => {
     setGenerating(true);
@@ -117,7 +131,7 @@ export default function FairnessDashboard() {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const header = ["Timestamp", "Actor Email", "Actor Role", "Action", "Target Type", "Target ID"];
     const rows = auditLogs.map((log) => [
-      log.timestamp ? new Date(log.timestamp.toMillis ? log.timestamp.toMillis() : log.timestamp).toISOString() : "",
+      log.timestamp !== undefined ? new Date(auditLogMillis(log.timestamp)).toISOString() : "",
       log.actorEmail,
       log.actorRole,
       log.action,
@@ -294,9 +308,7 @@ export default function FairnessDashboard() {
                    <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                    <ReferenceLine y={report.metrics.departmentDisparity.reduce((sum, d) => sum + d.averageIncrement, 0) / (report.metrics.departmentDisparity.length || 1)} stroke="#94a3b8" strokeDasharray="3 3" label="Avg" />
                    <Bar dataKey="averageIncrement" radius={[4, 4, 0, 0]}>
-                      {
-                        // @ts-ignore
-                        report.metrics.departmentDisparity.map((entry, index) => {
+                      {report.metrics.departmentDisparity.map((entry, index) => {
                         const deviation = Math.abs(entry.disparity);
                         let fill = '#10B981';
                         if (deviation > 15) fill = '#EF4444';
@@ -499,7 +511,7 @@ export default function FairnessDashboard() {
                    {auditLogs.map((log) => (
                      <tr key={log.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                         {log.timestamp ? new Date(log.timestamp.toMillis ? log.timestamp.toMillis() : log.timestamp).toLocaleString() : 'N/A'}
+                         {log.timestamp !== undefined ? new Date(auditLogMillis(log.timestamp)).toLocaleString() : 'N/A'}
                        </td>
                        <td className="px-4 py-3">
                          <div className="font-medium text-slate-900">{log.actorEmail}</div>

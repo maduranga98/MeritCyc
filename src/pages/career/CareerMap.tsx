@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -68,7 +68,7 @@ const CareerMapPage: React.FC = () => {
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
   const [activeEvaluation, setActiveEvaluation] = useState<Evaluation | null>(null);
   const [incrementStories, setIncrementStories] = useState<IncrementStory[]>([]);
-  const [recommendations, setRecommendations] = useState<StoryRecommendation[] | null>(null);
+  const [storedRecommendations, setRecommendations] = useState<StoryRecommendation[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [listenerError, setListenerError] = useState<string | null>(null);
   const [selectedMilestone, setSelectedMilestone] = useState<{
@@ -89,11 +89,11 @@ const CareerMapPage: React.FC = () => {
   // Fetch career map
   useEffect(() => {
     if (!user?.uid) return;
-    setListenerError(null);
     const unsub = getEmployeeCareerMap(
       user.uid,
       (map) => {
         setCareerMap(map);
+        setListenerError(null);
         setLoading(false);
       },
       (error) => {
@@ -164,10 +164,8 @@ const CareerMapPage: React.FC = () => {
   }, [user?.uid]);
 
   // Gap calculation: derive recommendations from active evaluation when none are stored
-  useEffect(() => {
-    if (recommendations === null) return; // still loading stored ones
-    if (recommendations.length > 0) return; // already have recommendations
-    if (!activeEvaluation || !activeCycle) return;
+  const gapRecommendations = useMemo(() => {
+    if (!activeEvaluation || !activeCycle) return [];
 
     const computed: StoryRecommendation[] = activeCycle.criteria
       .map((criterion) => {
@@ -198,10 +196,13 @@ const CareerMapPage: React.FC = () => {
       (a, b) => (b.targetScore - b.currentScore) - (a.targetScore - a.currentScore)
     );
 
-    if (computed.length > 0) {
-      setRecommendations(computed);
-    }
-  }, [recommendations, activeEvaluation, activeCycle]);
+    return computed;
+  }, [activeEvaluation, activeCycle]);
+
+  const recommendations = useMemo(() => {
+    if (storedRecommendations === null) return null; // still loading stored ones
+    return storedRecommendations.length > 0 ? storedRecommendations : gapRecommendations;
+  }, [storedRecommendations, gapRecommendations]);
 
   // Animate progress bar on mount
   useEffect(() => {

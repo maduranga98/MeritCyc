@@ -149,23 +149,27 @@ export default function CyclesList() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const companyId = user?.companyId;
   const [cycles, setCycles] = useState<Cycle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!companyId);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CycleStatus | 'all'>('all');
   const [showWizard, setShowWizard] = useState(false);
 
-  useEffect(() => {
-    if (!user?.companyId) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
+  // Reset loading state when the subscribed company changes (render-time
+  // derived state, avoids synchronous setState inside the effect below).
+  const [subscribedCompanyId, setSubscribedCompanyId] = useState(companyId);
+  if (subscribedCompanyId !== companyId) {
+    setSubscribedCompanyId(companyId);
+    setLoading(!!companyId);
     setError(null);
+  }
+
+  useEffect(() => {
+    if (!companyId) return;
 
     const unsub = cycleService.subscribeToCycles(
-      user.companyId,
+      companyId,
       (data) => {
         setCycles(data);
         setError(null);
@@ -183,7 +187,7 @@ export default function CyclesList() {
     );
 
     return () => unsub();
-  }, [user?.companyId]);
+  }, [companyId, t]);
 
   const filtered = activeTab === 'all' ? cycles : cycles.filter((c) => c.status === activeTab);
 

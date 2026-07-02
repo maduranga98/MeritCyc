@@ -83,5 +83,5 @@ export function useIdleTimeout(initialTimeoutMs: number = DEFAULT_TIMEOUT_MS): v
         window.removeEventListener(event, resetTimer)
       );
     };
-  }, [user, resetTimer]);
+  }, [user, resetTimer, timeoutMs]);
 }

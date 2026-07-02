@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { settingsService } from "../../services/settingsService";
 import { type NotificationSettings } from "../../types/settings";
 import { toast } from "sonner";
 import { Loader2, Info } from "lucide-react";
+import { getErrorMessage } from '../../utils/errorUtils';
 
 export default function NotificationSettingsPage() {
   const { t } = useTranslation();
@@ -29,13 +30,8 @@ export default function NotificationSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
-  useEffect(() => {
-    if (user?.companyId) {
-      fetchSettings();
-    }
-  }, [user]);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       if (!user?.companyId) return;
       const data = await settingsService.getNotificationSettings(user.companyId);
@@ -46,7 +42,13 @@ export default function NotificationSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.companyId]);
+
+  useEffect(() => {
+    if (user?.companyId) {
+      fetchSettings();
+    }
+  }, [user?.companyId, fetchSettings]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -54,8 +56,8 @@ export default function NotificationSettingsPage() {
       await settingsService.updateNotificationSettings(settings);
       toast.success("Notification settings saved");
       setIsDirty(false);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save settings");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to save settings"));
     } finally {
       setSaving(false);
     }
@@ -194,7 +196,7 @@ export default function NotificationSettingsPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.notifications.reminderRecipient')}</label>
                 <select
                     value={settings.reminderRecipient || 'manager'}
-                    onChange={e => { setSettings(s => ({...s, reminderRecipient: e.target.value as any})); setIsDirty(true); }}
+                    onChange={e => { setSettings(s => ({...s, reminderRecipient: e.target.value as 'manager' | 'manager_hr' | 'all'})); setIsDirty(true); }}
                     className="w-full md:w-1/2 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                 >
                     <option value="manager">{t('settings.notifications.managerOnly')}</option>
@@ -235,7 +237,7 @@ export default function NotificationSettingsPage() {
                                ...s,
                                emailEventsEnabled: {
                                    ...(s.emailEventsEnabled || {}),
-                                   [event.key]: !(s.emailEventsEnabled as any)?.[event.key]
+                                   [event.key]: !s.emailEventsEnabled?.[event.key]
                                }
                            }));
                            setIsDirty(true);

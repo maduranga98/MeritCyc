@@ -11,6 +11,14 @@ interface RunSimulationModalProps {
   onSuccess: (simulationId: string) => void;
 }
 
+// Estimated tier distribution percentages per distribution type (lowest → highest tier)
+const DIST_PCTS: Record<string, number[]> = {
+  normal:       [0.05, 0.20, 0.50, 0.20, 0.05],
+  uniform:      [0.20, 0.20, 0.20, 0.20, 0.20],
+  top_heavy:    [0.02, 0.10, 0.38, 0.30, 0.20],
+  bottom_heavy: [0.20, 0.30, 0.35, 0.12, 0.03],
+};
+
 export default function RunSimulationModal({ cycle, onClose, onSuccess }: RunSimulationModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -42,14 +50,6 @@ export default function RunSimulationModal({ cycle, onClose, onSuccess }: RunSim
   });
 
   const totalOverrideWeight = Object.values(criteriaWeights).reduce((a, b) => a + b, 0);
-
-  // Estimated tier distribution percentages per distribution type (lowest → highest tier)
-  const DIST_PCTS: Record<string, number[]> = {
-    normal:       [0.05, 0.20, 0.50, 0.20, 0.05],
-    uniform:      [0.20, 0.20, 0.20, 0.20, 0.20],
-    top_heavy:    [0.02, 0.10, 0.38, 0.30, 0.20],
-    bottom_heavy: [0.20, 0.30, 0.35, 0.12, 0.03],
-  };
 
   const liveEstimate = useMemo(() => {
     const numTiers = cycle.tiers.length;

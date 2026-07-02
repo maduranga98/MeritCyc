@@ -1,7 +1,7 @@
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../config/firebase";
-import { type GeneratedReport, type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYTierData, type YoYMetricsPoint } from "../types/analytics";
+import { type GeneratedReport, type CompanyKPIs, type IncrementTrendPoint, type DepartmentPerformance, type YoYTierData, type YoYMetricsPoint, type ReportType } from "../types/analytics";
 import { fairnessService } from "./fairnessService";
 
 // An evaluation only counts toward analytics once it has a finalized outcome.
@@ -314,7 +314,7 @@ export const analyticsService = {
       }));
   },
 
-  generateReport: async (params: any): Promise<{ success: boolean; reportId?: string }> => {
+  generateReport: async (params: { reportType: ReportType; cycleId?: string; format?: string }): Promise<{ success: boolean; reportId?: string }> => {
     if (params.reportType === 'cycle_summary') {
         const fn = httpsCallable(functions, "generateCycleSummaryReport");
         const res = await fn({ cycleId: params.cycleId });

@@ -60,7 +60,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-interface LevelFormData extends CareerLevel {}
+type LevelFormData = CareerLevel;
 
 interface PathFormData {
   name: string;

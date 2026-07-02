@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { settingsService } from "../../services/settingsService";
@@ -6,6 +6,7 @@ import { type SecuritySettings } from "../../types/settings";
 import { toast } from "sonner";
 import { Loader2, ShieldCheck, Download, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getErrorMessage } from '../../utils/errorUtils';
 
 export default function SecuritySettingsPage() {
   const { t } = useTranslation();
@@ -21,13 +22,8 @@ export default function SecuritySettingsPage() {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
-  useEffect(() => {
-    if (user?.companyId) {
-      fetchSettings();
-    }
-  }, [user]);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       if (!user?.companyId) return;
       const data = await settingsService.getSecuritySettings(user.companyId);
@@ -38,7 +34,13 @@ export default function SecuritySettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.companyId]);
+
+  useEffect(() => {
+    if (user?.companyId) {
+      fetchSettings();
+    }
+  }, [user?.companyId, fetchSettings]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -46,8 +48,8 @@ export default function SecuritySettingsPage() {
       await settingsService.updateSecuritySettings(settings);
       toast.success("Security settings saved");
       setIsDirty(false);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save settings");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to save settings"));
     } finally {
       setSaving(false);
     }

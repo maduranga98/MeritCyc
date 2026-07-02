@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { auditService } from './auditService';
+import type { AuditLogEntry } from '../types/audit';
 
 export const dataExportService = {
   /**
@@ -124,10 +125,10 @@ export const dataExportService = {
   /**
    * Convert audit logs to CSV format
    */
-  logsToCSV: (logs: any[]): string => {
+  logsToCSV: (logs: AuditLogEntry[]): string => {
     const headers = ['Timestamp', 'Action', 'Actor Email', 'Actor Role', 'Target Type', 'Target ID', 'Details'];
     const rows = logs.map(log => [
-      log.timestamp ? new Date(log.timestamp.toDate?.() || log.timestamp).toISOString() : '',
+      log.timestamp ? new Date(log.timestamp).toISOString() : '',
       log.action,
       log.actorEmail,
       log.actorRole,

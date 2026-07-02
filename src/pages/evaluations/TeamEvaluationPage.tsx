@@ -59,7 +59,7 @@ export default function TeamEvaluationPage() {
     try {
       await evaluationService.requestEvaluationDeadlineReminder(cycleId);
       toast.success('Reminder sent to team members with pending evaluations');
-    } catch (err) {
+    } catch {
       toast.error('Failed to send reminder');
     } finally {
       setIsSendingReminder(false);

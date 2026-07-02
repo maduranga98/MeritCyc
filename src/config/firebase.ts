@@ -13,6 +13,19 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// Fail fast with an actionable message when the environment is misconfigured,
+// instead of letting the Firebase SDK throw a cryptic runtime error.
+const missingKeys = (Object.entries(firebaseConfig) as [string, string | undefined][])
+  .filter(([, value]) => !value)
+  .map(([key]) => `VITE_FIREBASE_${key.replace(/([A-Z])/g, '_$1').toUpperCase()}`);
+
+if (missingKeys.length > 0) {
+  throw new Error(
+    `Missing Firebase environment variables: ${missingKeys.join(', ')}. ` +
+      'Copy .env.example to .env and fill in the values from the Firebase console.'
+  );
+}
+
 // Initialize Firebase (guard against duplicate init on HMR)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 

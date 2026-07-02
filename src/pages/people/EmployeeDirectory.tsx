@@ -17,7 +17,8 @@ import {
   getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Users, Search, Filter, X, ChevronLeft, ChevronRight, Loader2, UserX, UserCheck, ShieldAlert } from "lucide-react";
+import { Users, Search, Filter, X, ChevronLeft, ChevronRight, Loader2, UserX, UserCheck, ShieldAlert, Download } from "lucide-react";
+import Papa from "papaparse";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -132,6 +133,34 @@ export default function EmployeeDirectory() {
       return acc;
     }, {});
   }, [salaryBands]);
+
+  const handleExportCSV = () => {
+    if (filteredData.length === 0) {
+      toast.info(t("people.export.noData"));
+      return;
+    }
+    const csv = Papa.unparse(
+      filteredData.map((emp) => ({
+        [t("people.table.employee")]: emp.name,
+        Email: emp.email,
+        [t("people.table.role")]: t(`people.roles.${emp.role}`),
+        [t("people.table.department")]: emp.departmentName || "",
+        "Job Title": emp.jobTitle || "",
+        [t("people.table.band")]: (emp.salaryBandId && salaryBandNameById[emp.salaryBandId]) || "",
+        [t("people.table.status")]: emp.status,
+      }))
+    );
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `employees-${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+    toast.success(t("people.export.success", { count: filteredData.length }));
+  };
 
   const columnHelper = createColumnHelper<Employee>();
 
@@ -372,6 +401,15 @@ export default function EmployeeDirectory() {
             <option value="inactive">{t('people.status.inactive')}</option>
             <option value="pending">{t('people.status.pending')}</option>
           </select>
+
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-3 py-2 border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-lg flex-shrink-0 text-sm font-medium"
+            title={t('people.export.button')}
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">{t('people.export.button')}</span>
+          </button>
 
           <button
             onClick={clearFilters}

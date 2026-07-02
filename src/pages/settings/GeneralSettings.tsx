@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { settingsService } from "../../services/settingsService";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Loader2, AlertTriangle, Upload, Building2, Download } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../config/firebase";
+import { getErrorMessage } from '../../utils/errorUtils';
 
 export default function GeneralSettings() {
   const { t } = useTranslation();
@@ -26,21 +27,17 @@ export default function GeneralSettings() {
 
   const [scheduledDeletionDate, setScheduledDeletionDate] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (user?.companyId) {
-      fetchSettings();
-    }
-  }, [user]);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       if (!user?.companyId) return;
       const data = await settingsService.getCompanySettings(user.companyId);
       if (data) {
         setSettings(data);
         // Mock status check since it's on the company object, let's just use mock state
-        if ((data as any).status === 'deletion_scheduled') {
-           setScheduledDeletionDate((data as any).deletionScheduledAt || null);
+        const withDeletion = data as typeof data & { status?: string; deletionScheduledAt?: number };
+        if (withDeletion.status === 'deletion_scheduled') {
+           setScheduledDeletionDate(withDeletion.deletionScheduledAt || null);
         }
       }
     } catch (error) {
@@ -49,7 +46,13 @@ export default function GeneralSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.companyId]);
+
+  useEffect(() => {
+    if (user?.companyId) {
+      fetchSettings();
+    }
+  }, [user?.companyId, fetchSettings]);
 
   const handleSaveGeneral = async () => {
     setSaving(true);
@@ -57,8 +60,8 @@ export default function GeneralSettings() {
       await settingsService.updateCompanySettings(settings);
       toast.success("Settings saved successfully");
       setIsDirty(false);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save settings");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to save settings"));
     } finally {
       setSaving(false);
     }
@@ -113,8 +116,8 @@ export default function GeneralSettings() {
               toast.success("Company scheduled for deletion");
               setScheduledDeletionDate(res.deletionDate || Date.now() + 30*24*60*60*1000);
           }
-      } catch(e: any) {
-          toast.error(e.message || "Failed to schedule deletion");
+      } catch (e) {
+          toast.error(getErrorMessage(e, "Failed to schedule deletion"));
       }
   };
 
@@ -125,8 +128,8 @@ export default function GeneralSettings() {
               toast.success("Deletion cancelled");
               setScheduledDeletionDate(null);
           }
-      } catch(e: any) {
-          toast.error(e.message || "Failed to cancel deletion");
+      } catch (e) {
+          toast.error(getErrorMessage(e, "Failed to cancel deletion"));
       }
   };
 
@@ -141,9 +144,9 @@ export default function GeneralSettings() {
       toast.loading("Preparing your data export...");
       await dataExportService.exportCompanyDataZIP(user.companyId);
       toast.success("Your company data has been downloaded as a ZIP file");
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      toast.error(error.message || "Failed to export data");
+      toast.error(getErrorMessage(error, "Failed to export data"));
     } finally {
       setExporting(false);
     }
@@ -287,7 +290,7 @@ export default function GeneralSettings() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('settings.general.dateFormat')}</label>
                 <select
                     value={settings.dateFormat || "DD/MM/YYYY"}
-                    onChange={e => { setSettings(s => ({...s, dateFormat: e.target.value as any})); setIsDirty(true); }}
+                    onChange={e => { setSettings(s => ({...s, dateFormat: e.target.value as 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'})); setIsDirty(true); }}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                 >
                     <option value="DD/MM/YYYY">DD/MM/YYYY</option>

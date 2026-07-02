@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from 'react-i18next';
 import { useAuth } from "../../context/AuthContext";
 import { analyticsService } from "../../services/analyticsService";
@@ -53,13 +53,8 @@ export default function ExecutiveDashboard() {
   const [employeeGrowth, setEmployeeGrowth] = useState(0);
   const [cycleGrowth, setCycleGrowth] = useState(0);
 
-  useEffect(() => {
-    if (user?.companyId) {
-      fetchData();
-    }
-  }, [user, dateRange]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       if (!user?.companyId) return;
@@ -101,7 +96,13 @@ export default function ExecutiveDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.companyId, dateRange]);
+
+  useEffect(() => {
+    if (user?.companyId) {
+      fetchData();
+    }
+  }, [user?.companyId, fetchData]);
 
   const handleExport = () => {
     if (!kpis) return;

@@ -291,6 +291,11 @@
       "cancel": "Annuler",
       "confirmDeactivate": "Confirmer la désactivation",
       "confirmReactivate": "Confirmer la réactivation"
+    },
+    "export": {
+      "button": "Exporter CSV",
+      "noData": "Aucun employé à exporter",
+      "success": "{{count}} employés exportés"
     }
   },
   "common": {
@@ -815,5 +820,14 @@
         "dedicatedSupport": "Support dédié"
       }
     }
+  },
+  "commandPalette": {
+    "title": "Recherche globale",
+    "searchHint": "Rechercher...",
+    "placeholder": "Rechercher des pages...",
+    "placeholderAdmin": "Rechercher des pages, des employés...",
+    "noResults": "Aucun résultat trouvé",
+    "hintNavigate": "↑↓ pour naviguer",
+    "hintSelect": "↵ pour sélectionner"
   }
 }

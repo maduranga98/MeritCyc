@@ -1,5 +1,6 @@
 import { db } from '../config/firebase';
 import { collection, query, where, orderBy, limit, startAfter, getDocs, Timestamp, QueryConstraint } from 'firebase/firestore';
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import type { AuditLogEntry, AuditAction } from '../types/audit';
 
 const BATCH_SIZE = 50;
@@ -19,8 +20,8 @@ export const auditService = {
   async fetchAuditLogs(
     companyId: string,
     filters: AuditFilters = {},
-    pageParam?: any
-  ): Promise<{ logs: AuditLogEntry[]; nextPage?: any }> {
+    pageParam?: QueryDocumentSnapshot<DocumentData>
+  ): Promise<{ logs: AuditLogEntry[]; nextPage?: QueryDocumentSnapshot<DocumentData> }> {
     const constraints: QueryConstraint[] = [
       where('companyId', '==', companyId),
       orderBy('timestamp', 'desc'),

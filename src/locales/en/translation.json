@@ -291,6 +291,11 @@
       "cancel": "Cancel",
       "confirmDeactivate": "Confirm deactivate",
       "confirmReactivate": "Confirm reactivate"
+    },
+    "export": {
+      "button": "Export CSV",
+      "noData": "No employees to export",
+      "success": "Exported {{count}} employees"
     }
   },
   "common": {
@@ -815,5 +820,14 @@
         "dedicatedSupport": "Dedicated Support"
       }
     }
+  },
+  "commandPalette": {
+    "title": "Global search",
+    "searchHint": "Search...",
+    "placeholder": "Search pages...",
+    "placeholderAdmin": "Search pages, employees...",
+    "noResults": "No results found",
+    "hintNavigate": "↑↓ to navigate",
+    "hintSelect": "↵ to select"
   }
 }

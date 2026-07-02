@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { analyticsService } from "../../services/analyticsService";
 import { pdfGenerationService } from "../../services/pdfGenerationService";
 import { companyService } from "../../services/companyService";
 import { type GeneratedReport, type ReportType } from "../../types/analytics";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { departmentService } from "../../services/departmentService";
 import { type Cycle } from "../../types/cycle";
@@ -66,13 +66,8 @@ export default function ReportsGenerator() {
   const [format, setFormat] = useState<"pdf" | "csv">("pdf");
   const [generatedPreview, setGeneratedPreview] = useState<GeneratedReport | null>(null);
 
-  useEffect(() => {
-    if (user?.companyId) {
-      fetchData();
-    }
-  }, [user]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       if (!user?.companyId) return;
       const reports = await analyticsService.getGeneratedReports(user.companyId);
@@ -82,13 +77,19 @@ export default function ReportsGenerator() {
       const cyclesData = cyclesSnap.docs
         .map(d => ({ id: d.id, name: d.data().name }));
       setCycles(cyclesData);
-      if (cyclesData.length > 0 && !selectedCycle) {
-          setSelectedCycle(cyclesData[0].id);
+      if (cyclesData.length > 0) {
+          setSelectedCycle(prev => prev || cyclesData[0].id);
       }
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [user?.companyId]);
+
+  useEffect(() => {
+    if (user?.companyId) {
+      fetchData();
+    }
+  }, [user?.companyId, fetchData]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -201,7 +202,7 @@ export default function ReportsGenerator() {
           reportType: selectedType,
           parameters: { cycleId: selectedCycle },
           format: 'pdf',
-          generatedAt: { toMillis: () => Date.now() } as any,
+          generatedAt: Timestamp.now(),
           generatedBy: user?.uid || "",
         };
         // PDF is generated client-side and saved on generation.
@@ -229,7 +230,7 @@ export default function ReportsGenerator() {
               reportType: selectedType,
               parameters: { cycleId: selectedCycle },
               format,
-              generatedAt: { toMillis: () => Date.now() } as any,
+              generatedAt: Timestamp.now(),
               generatedBy: user?.uid || "",
           });
       }

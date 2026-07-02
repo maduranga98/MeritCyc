@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import QRCodeManager from "../../components/shared/QRCodeManager";
 import { Link } from "react-router-dom";
@@ -17,13 +17,8 @@ export default function RegistrationSettings() {
   const [loading, setLoading] = useState(true);
   const [qrEnabled, setQrEnabled] = useState(true); // Mocking initial state
 
-  useEffect(() => {
-    if (user?.companyId) {
-      fetchData();
-    }
-  }, [user]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       if (!user?.companyId) return;
       const q = query(
@@ -43,7 +38,13 @@ export default function RegistrationSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.companyId]);
+
+  useEffect(() => {
+    if (user?.companyId) {
+      fetchData();
+    }
+  }, [user?.companyId, fetchData]);
 
   const handleToggleQR = async () => {
       const newState = !qrEnabled;
@@ -52,7 +53,7 @@ export default function RegistrationSettings() {
           const fn = httpsCallable(functions, "toggleQRRegistration");
           await fn({ enabled: newState });
           toast.success(`Self-registration ${newState ? 'enabled' : 'disabled'}`);
-      } catch (e: any) {
+      } catch {
           setQrEnabled(!newState); // revert
           toast.error("Failed to update registration settings");
       }

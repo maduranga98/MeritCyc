@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { employeeService } from "../../services/employeeService";
@@ -26,16 +26,13 @@ export default function DepartmentAnalyticsDetail() {
   );
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user?.companyId && deptId) {
-      fetchData();
-    }
-  }, [user, deptId]);
 
-  const fetchData = async () => {
+  const companyId = user?.companyId;
+  const fetchData = useCallback(async () => {
+    if (!companyId) return;
     setLoading(true);
     try {
-      const allEmployees = await employeeService.getEmployees(user!.companyId);
+      const allEmployees = await employeeService.getEmployees(companyId);
       const deptEmployees = allEmployees.filter(
         (e) => e.departmentId === deptId
       );
@@ -45,7 +42,13 @@ export default function DepartmentAnalyticsDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, deptId]);
+
+  useEffect(() => {
+    if (user?.companyId) {
+      fetchData();
+    }
+  }, [user?.companyId, fetchData]);
 
   if (loading) {
     return (

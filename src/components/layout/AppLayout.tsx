@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { TopNav } from "./TopNav";
 import TrialBanner from "../billing/TrialBanner";
+import CommandPalette from "../shared/CommandPalette";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -12,6 +13,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-slate-50 font-brand overflow-hidden">
+      <CommandPalette />
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col md:pl-64 transition-all duration-300 min-w-0">

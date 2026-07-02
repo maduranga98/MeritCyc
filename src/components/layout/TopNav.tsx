@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Menu, Bell, UserCheck, AlertCircle, Clock, Lock, ClipboardList, CheckCircle2, Star, Globe } from "lucide-react";
+import { Menu, Bell, UserCheck, AlertCircle, Clock, Lock, ClipboardList, CheckCircle2, Star, Globe, Search as SearchIcon } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNotificationStore } from "../../stores/notificationStore";
 import { markNotificationRead, markAllNotificationsRead } from "../../services/notificationService";
@@ -118,6 +118,19 @@ export const TopNav: React.FC<TopNavProps> = ({ setSidebarOpen }) => {
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Global search (command palette) */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+          className="flex items-center gap-2 px-2.5 py-1.5 text-sm text-slate-500 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
+          aria-label={t("commandPalette.title")}
+        >
+          <SearchIcon className="w-4 h-4" />
+          <span className="hidden lg:inline text-slate-400">{t("commandPalette.searchHint")}</span>
+          <kbd className="hidden lg:inline text-[10px] font-semibold text-slate-400 border border-slate-200 rounded px-1.5 py-0.5">
+            Ctrl K
+          </kbd>
+        </button>
+
         {/* Language Switcher */}
         <div className="relative" ref={langMenuRef}>
           <button

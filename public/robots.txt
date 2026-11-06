@@ -1,11 +1,16 @@
 User-agent: *
-# MeritCyc is an authenticated application; only the public landing/join
+# MeritCyc is an authenticated application; only the public login/signup/join
 # pages are useful to crawlers.
 Disallow: /dashboard
+Disallow: /platform
 Disallow: /people
+Disallow: /invites
 Disallow: /cycles
 Disallow: /evaluations
 Disallow: /analytics
+Disallow: /fairness
+Disallow: /audit-trail
 Disallow: /settings
 Disallow: /billing
+Disallow: /onboarding
 Allow: /

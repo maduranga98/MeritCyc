@@ -240,7 +240,7 @@ exports.toggleCompanyStatus = onCall(async (request) => {
 // =============================================================================
 // completeOnboarding — PUBLIC but requires authenticated user
 // Creates company, user document, and generates QR code for new company signup
-// Input: { company: {name, industry, size, country, currency, logoUrl?}, departments[], salaryBands[] }
+// Input: { company: {name, industry, size, country, currency, logoUrl?}, departments[]?, salaryBands[]? }
 // =============================================================================
 
 exports.completeOnboarding = onCall(async (request) => {
@@ -252,20 +252,17 @@ exports.completeOnboarding = onCall(async (request) => {
   const email = request.auth.token.email || "";
   const displayName = request.auth.token.name || email.split("@")[0];
 
-  const { company, departments, salaryBands } = request.data;
+  const { company, departments: rawDepartments, salaryBands: rawSalaryBands } = request.data;
 
   // Validate inputs
   if (!company || !company.companyName) {
     throw new HttpsError("invalid-argument", "Company name is required.");
   }
 
-  if (!Array.isArray(departments) || departments.length === 0) {
-    throw new HttpsError("invalid-argument", "At least one department is required.");
-  }
-
-  if (!Array.isArray(salaryBands) || salaryBands.length === 0) {
-    throw new HttpsError("invalid-argument", "At least one salary band is required.");
-  }
+  // Departments and salary bands are optional at signup — admins can add them
+  // later from People settings (the registering member may not be in finance/HR).
+  const departments = Array.isArray(rawDepartments) ? rawDepartments : [];
+  const salaryBands = Array.isArray(rawSalaryBands) ? rawSalaryBands : [];
 
   try {
     // Create company document
@@ -316,7 +313,7 @@ exports.completeOnboarding = onCall(async (request) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
-    await deptBatch.commit();
+    if (departments.length > 0) await deptBatch.commit();
 
     // Create salary bands
     const bandBatch = firestore.batch();
@@ -332,7 +329,7 @@ exports.completeOnboarding = onCall(async (request) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
-    await bandBatch.commit();
+    if (salaryBands.length > 0) await bandBatch.commit();
 
     // Generate QR code for the company
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars

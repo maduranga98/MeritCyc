@@ -7,9 +7,11 @@ export type DeadlineUrgency = 'overdue' | '1d' | '3d' | '7d' | 'normal';
  */
 export function getDeadlineUrgency(deadlineDate: Date): DeadlineUrgency {
   const now = new Date();
+  // differenceInDays truncates toward zero, so a deadline that passed a few
+  // hours ago would read as "0 days" — compare timestamps for overdue instead.
+  if (deadlineDate.getTime() < now.getTime()) return 'overdue';
   const daysRemaining = differenceInDays(deadlineDate, now);
 
-  if (daysRemaining < 0) return 'overdue';
   if (daysRemaining === 0) return '1d';
   if (daysRemaining <= 3) return '3d';
   if (daysRemaining <= 7) return '7d';
@@ -106,5 +108,5 @@ export function isDeadlineCritical(deadlineDate: Date): boolean {
  * Check if evaluation is overdue
  */
 export function isOverdue(deadlineDate: Date): boolean {
-  return getDaysRemaining(deadlineDate) < 0;
+  return deadlineDate.getTime() < Date.now();
 }
